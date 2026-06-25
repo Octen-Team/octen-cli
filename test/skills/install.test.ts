@@ -9,7 +9,7 @@ import {
 } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { installSkills, skillStatus } from "../../src/skills/install.js";
+import { installSkills, skillStatus, removeSkills } from "../../src/skills/install.js";
 
 let tmpDirs: string[] = [];
 
@@ -156,5 +156,57 @@ describe("skillStatus", () => {
 
     const status = skillStatus(target);
     expect(Object.keys(status)).toEqual(["octen-search"]);
+  });
+});
+
+describe("removeSkills", () => {
+  it("removes all octen-* dirs and returns their names", () => {
+    const target = makeTmp();
+    // Pre-seed with octen skills and a non-octen skill
+    mkdirSync(join(target, "octen-search"), { recursive: true });
+    writeFileSync(join(target, "octen-search", "SKILL.md"), "# octen-search\n", "utf8");
+    mkdirSync(join(target, "octen-web-search"), { recursive: true });
+    writeFileSync(join(target, "octen-web-search", "SKILL.md"), "# octen-web-search\n", "utf8");
+    mkdirSync(join(target, "other-skill"), { recursive: true });
+    writeFileSync(join(target, "other-skill", "SKILL.md"), "# other\n", "utf8");
+
+    const removed = removeSkills(target);
+
+    // Order-insensitive check
+    expect(removed.sort()).toEqual(["octen-search", "octen-web-search"]);
+    // octen dirs are gone
+    expect(existsSync(join(target, "octen-search"))).toBe(false);
+    expect(existsSync(join(target, "octen-web-search"))).toBe(false);
+    // non-octen dir SURVIVES
+    expect(existsSync(join(target, "other-skill"))).toBe(true);
+    expect(existsSync(join(target, "other-skill", "SKILL.md"))).toBe(true);
+  });
+
+  it("calling again on already-empty dir returns []", () => {
+    const target = makeTmp();
+    mkdirSync(join(target, "octen-search"), { recursive: true });
+
+    removeSkills(target); // first call removes it
+    const second = removeSkills(target); // second call — nothing left
+
+    expect(second).toEqual([]);
+  });
+
+  it("returns [] when targetSkillsDir does not exist (no throw)", () => {
+    const base = makeTmp();
+    const missing = join(base, "nonexistent-skills");
+
+    const result = removeSkills(missing);
+    expect(result).toEqual([]);
+  });
+
+  it("never removes the parent dir itself", () => {
+    const target = makeTmp();
+    mkdirSync(join(target, "octen-search"), { recursive: true });
+
+    removeSkills(target);
+
+    // Parent dir must still exist
+    expect(existsSync(target)).toBe(true);
   });
 });

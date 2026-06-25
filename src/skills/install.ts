@@ -10,6 +10,30 @@ import {
 import { join } from "node:path";
 
 /**
+ * Remove every octen-* subdirectory from targetSkillsDir.
+ * Returns the list of removed skill names.
+ * Non-octen-* entries and the parent dir itself are never touched.
+ * If targetSkillsDir does not exist, returns [] without throwing.
+ */
+export function removeSkills(targetSkillsDir: string): string[] {
+  if (!existsSync(targetSkillsDir)) return [];
+
+  const entries = readdirSync(targetSkillsDir, { withFileTypes: true });
+  const removed: string[] = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) continue;
+    const name = entry.name;
+    if (!name.startsWith("octen-")) continue;
+
+    rmSync(join(targetSkillsDir, name), { recursive: true, force: true });
+    removed.push(name);
+  }
+
+  return removed;
+}
+
+/**
  * Install octen-* skills from srcDir into targetSkillsDir.
  * If `only` is given, only those skill names are installed.
  * Returns the list of installed skill names.
