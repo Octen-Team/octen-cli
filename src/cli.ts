@@ -11,6 +11,7 @@ import { registerEmbed } from "./commands/embed.js";
 import { registerVlEmbed } from "./commands/vlEmbed.js";
 import { registerConfigureMcp } from "./commands/configureMcp.js";
 import { registerConfigureSkills } from "./commands/configureSkills.js";
+import { registerReset } from "./commands/reset.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -25,15 +26,7 @@ program
   .option("--pretty", "human-readable output")
   .option("--no-color", "disable color");
 
-for (const [name, desc] of [
-  ["reset", "Remove Octen MCP/skills from AI clients"],
-] as const) {
-  program.command(name).description(desc).action(() => {
-    console.error(`'${name}' not yet implemented`);
-    process.exit(1);
-  });
-}
-
+registerReset(program);
 registerConfigureMcp(program);
 registerConfigureSkills(program);
 
