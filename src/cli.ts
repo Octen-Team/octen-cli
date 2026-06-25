@@ -10,6 +10,7 @@ import { registerChat } from "./commands/chat.js";
 import { registerEmbed } from "./commands/embed.js";
 import { registerVlEmbed } from "./commands/vlEmbed.js";
 import { registerConfigureMcp } from "./commands/configureMcp.js";
+import { registerConfigureSkills } from "./commands/configureSkills.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -25,7 +26,6 @@ program
   .option("--no-color", "disable color");
 
 for (const [name, desc] of [
-  ["configure-skills", "Install Octen Agent Skills into AI clients"],
   ["reset", "Remove Octen MCP/skills from AI clients"],
 ] as const) {
   program.command(name).description(desc).action(() => {
@@ -35,6 +35,7 @@ for (const [name, desc] of [
 }
 
 registerConfigureMcp(program);
+registerConfigureSkills(program);
 
 registerSearch(program);
 registerSearch(program, "news");

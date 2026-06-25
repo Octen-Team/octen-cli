@@ -28,10 +28,12 @@
   "dependencies": {
     "commander": "^12.1.0",
     "picocolors": "^1.0.1",
-    "smol-toml": "^1.7.0"
+    "smol-toml": "^1.7.0",
+    "tar": "^7.5.16"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "@types/tar": "^6.1.13",
     "tsx": "^4.0.0",
     "typescript": "^5.5.0",
     "vitest": "^2.0.0"
