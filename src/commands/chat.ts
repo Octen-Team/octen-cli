@@ -18,6 +18,8 @@ export function registerChat(program: Command) {
     .option("--web-search <onoff>", "on|off")
     .option("--temperature <n>", "sampling temperature", parseFloatOpt("--temperature"))
     .option("--top-p <n>", "nucleus sampling top-p", parseFloatOpt("--top-p"))
+    .option("--frequency-penalty <n>", "frequency penalty", parseFloatOpt("--frequency-penalty"))
+    .option("--presence-penalty <n>", "presence penalty", parseFloatOpt("--presence-penalty"))
     .option("--max-tokens <n>", "max output tokens", parseIntOpt("--max-tokens"))
     .option("--reasoning-effort <e>", "low|medium|high")
     .option("--stop <list>", "comma-separated stop sequences", (v) => v.split(","))
@@ -108,7 +110,7 @@ export function registerChat(program: Command) {
 
       const req = buildChatRequest(messages, model, chatOpts);
 
-      // JSON mode or --no-stream: use request/response
+      // --json forces the non-stream path: we emit one JSON object, not a token stream.
       if (mode === "json" || opts.stream === false) {
         const res = await client.request<any>(ENDPOINTS.chat, req);
         emit(res, mode, renderChat);

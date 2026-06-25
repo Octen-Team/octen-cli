@@ -70,4 +70,15 @@ describe("parseSSE", () => {
     }
     expect(collected).toHaveLength(0);
   });
+
+  it("handles an event split mid-JSON across two chunks", async () => {
+    const res = makeSSEResponse([
+      'data: {"choices":[{"delta":{"cont',
+      'ent":"X"}}]}\n\ndata: [DONE]\n\n',
+    ]);
+    const collected: any[] = [];
+    for await (const ev of parseSSE(res)) collected.push(ev);
+    expect(collected).toHaveLength(1);
+    expect(collected[0].choices[0].delta.content).toBe("X");
+  });
 });
