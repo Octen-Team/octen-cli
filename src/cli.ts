@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { exitCodeFor } from "./api/errors.js";
 import { registerSearch } from "./commands/search.js";
+import { registerFetch } from "./commands/fetch.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -20,7 +21,6 @@ program
   .option("--no-color", "disable color");
 
 for (const [name, desc] of [
-  ["fetch", "Extract content from URLs"],
   ["chat", "Chat completion"],
   ["embed", "Create text embeddings"],
   ["vl-embed", "Create multimodal embeddings"],
@@ -36,6 +36,7 @@ for (const [name, desc] of [
 
 registerSearch(program);
 registerSearch(program, "news");
+registerFetch(program);
 
 program.parseAsync().catch((err) => {
   process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
