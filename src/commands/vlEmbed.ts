@@ -32,7 +32,7 @@ function mimeForExtension(ext: string): string {
  * base64 data URIs or only HTTPS URLs. The local-file path is implemented here
  * for ergonomics but should be validated against the API once confirmed.
  */
-function resolveContentValue(type: "image" | "video", value: string): string {
+function resolveContentValue(value: string): string {
   if (
     value.startsWith("http://") ||
     value.startsWith("https://") ||
@@ -52,13 +52,13 @@ function resolveContentValue(type: "image" | "video", value: string): string {
 }
 
 /** Resolve local file paths for image and video contents. */
-async function resolveLocalFiles(contents: VLContent[]): Promise<VLContent[]> {
+function resolveLocalFiles(contents: VLContent[]): VLContent[] {
   return contents.map((c) => {
     if ("image" in c) {
-      return { image: resolveContentValue("image", c.image) };
+      return { image: resolveContentValue(c.image) };
     }
     if ("video" in c) {
-      return { video: resolveContentValue("video", c.video) };
+      return { video: resolveContentValue(c.video) };
     }
     return c; // text items pass through
   });
@@ -86,7 +86,7 @@ export function registerVlEmbed(program: Command) {
       const rawContents = parseContentTokens(contentArgs);
 
       // Resolve local files to base64 data URIs
-      const contents = await resolveLocalFiles(rawContents);
+      const contents = resolveLocalFiles(rawContents);
 
       // Fusion tri-state: only forward if explicitly set via CLI
       const fusionSource = command.getOptionValueSource("fusion");

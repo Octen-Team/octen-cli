@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Command } from "commander";
 import { registerVlEmbed } from "../../src/commands/vlEmbed.js";
 
@@ -242,5 +245,46 @@ describe("vl-embed command", () => {
       { image: "https://a.com/1.png" },
       { text: "last" },
     ]);
+  });
+
+  it("encodes a local image file as a base64 data URI", async () => {
+    const bytes = Buffer.from([0x89, 0x50, 0x4e, 0x47]); // PNG magic bytes
+    const file = join(tmpdir(), `octen-vl-test-${Date.now()}.png`);
+    writeFileSync(file, bytes);
+    try {
+      const prog = makeProgram();
+      await prog.parseAsync([
+        "node", "octen", "vl-embed",
+        `image:${file}`,
+        "-m", "base",
+        "--json",
+        "--api-key", "k",
+      ]);
+
+      expect(fetchSpy).toHaveBeenCalledOnce();
+      const [, init] = fetchSpy.mock.calls[0];
+      const body = JSON.parse((init as RequestInit).body as string);
+      const imageContent = body.input.contents[0];
+      const expectedDataUri = `data:image/png;base64,${bytes.toString("base64")}`;
+      expect(imageContent.image).toBe(expectedDataUri);
+      // Also verify the decoded bytes match the original
+      const encoded = imageContent.image.split(",")[1];
+      expect(Buffer.from(encoded, "base64")).toEqual(bytes);
+    } finally {
+      rmSync(file, { force: true });
+    }
+  });
+
+  it("rejects a missing local file with an error mentioning the file / 'not found'", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "vl-embed",
+        "image:/no/such/file.png",
+        "-m", "base",
+        "--api-key", "k",
+      ]),
+    ).rejects.toThrow(/not found/);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
