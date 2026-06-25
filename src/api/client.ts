@@ -1,5 +1,5 @@
 import { DEFAULT_BASE_URL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, ENDPOINTS } from "./constants.js";
-import { OctenAPIError, OctenTimeoutError } from "./errors.js";
+import { OctenAPIError, OctenAuthError, OctenTimeoutError } from "./errors.js";
 
 export interface OctenClientOptions {
   apiKey: string;
@@ -53,11 +53,12 @@ export class OctenClient {
           continue;
         }
         const msg = (errBody as any)?.msg ?? (errBody as any)?.error ?? `HTTP ${res.status}`;
+        if (res.status === 401) throw new OctenAuthError(msg);
         throw new OctenAPIError(msg, res.status, errBody);
       } catch (e) {
-        if (e instanceof OctenAPIError) throw e;
-        if ((e as Error).name === "AbortError") { lastErr = new OctenTimeoutError("request timed out"); }
-        else lastErr = e;
+        if (e instanceof OctenAPIError || e instanceof OctenAuthError) throw e;
+        if ((e as Error).name === "AbortError") throw new OctenTimeoutError("request timed out");
+        lastErr = e;
         if (attempt < this.maxRetries) { await sleep(this.retryBaseMs * 2 ** attempt); continue; }
         throw lastErr;
       } finally {
@@ -68,19 +69,24 @@ export class OctenClient {
   }
 
   /** Returns the raw Response for SSE streaming (chat). */
-  async stream(endpoint: string, body: unknown, timeoutMs?: number): Promise<Response> {
+  async stream(endpoint: string, body: Record<string, unknown>, timeoutMs?: number): Promise<Response> {
     const ac = new AbortController();
-    if (timeoutMs ?? this.timeoutMs) setTimeout(() => ac.abort(), timeoutMs ?? this.timeoutMs);
-    const res = await fetch(`${this.baseUrl}${endpoint}`, {
-      method: "POST",
-      headers: this.headers(endpoint),
-      body: JSON.stringify({ ...(body as object), stream: true }),
-      signal: ac.signal,
-    });
-    if (!res.ok) {
-      const errBody = await res.json().catch(() => ({}));
-      throw new OctenAPIError((errBody as any)?.msg ?? `HTTP ${res.status}`, res.status, errBody);
+    const ms = timeoutMs ?? this.timeoutMs;
+    const t = ms ? setTimeout(() => ac.abort(), ms) : undefined;
+    try {
+      const res = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: "POST",
+        headers: this.headers(endpoint),
+        body: JSON.stringify({ ...body, stream: true }),
+        signal: ac.signal,
+      });
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new OctenAPIError((errBody as any)?.msg ?? `HTTP ${res.status}`, res.status, errBody);
+      }
+      return res;
+    } finally {
+      clearTimeout(t);
     }
-    return res;
   }
 }

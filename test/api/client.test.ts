@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OctenClient } from "../../src/api/client.js";
-import { OctenAPIError } from "../../src/api/errors.js";
+import { OctenAPIError, OctenAuthError, OctenTimeoutError } from "../../src/api/errors.js";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -18,6 +18,7 @@ describe("OctenClient.request", () => {
     expect(url).toBe("https://api.octen.ai/search");
     expect((init as RequestInit).method).toBe("POST");
     expect((init as any).headers["x-api-key"]).toBe("k");
+    expect((init as any).headers["Authorization"]).toBeUndefined();
     expect(JSON.parse((init as any).body)).toEqual({ query: "x" });
   });
 
@@ -41,5 +42,21 @@ describe("OctenClient.request", () => {
     const c = new OctenClient({ apiKey: "k" });
     await c.request("/v1/chat/completions", { model: "m", messages: [] });
     expect((spy.mock.calls[0][1] as any).headers["Authorization"]).toBe("Bearer k");
+    expect((spy.mock.calls[0][1] as any).headers["x-api-key"]).toBeUndefined();
+  });
+
+  it("throws OctenTimeoutError on abort and does not retry", async () => {
+    const spy = vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      Object.assign(new Error("aborted"), { name: "AbortError" }),
+    );
+    const c = new OctenClient({ apiKey: "k", maxRetries: 3, retryBaseMs: 0 });
+    await expect(c.request("/search", {})).rejects.toBeInstanceOf(OctenTimeoutError);
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("throws OctenAuthError on 401", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ msg: "bad key" }, 401));
+    const c = new OctenClient({ apiKey: "k" });
+    await expect(c.request("/search", {})).rejects.toBeInstanceOf(OctenAuthError);
   });
 });
