@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { exitCodeFor } from "./api/errors.js";
+import { registerSearch } from "./commands/search.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -11,11 +12,14 @@ const program = new Command();
 program
   .name("octen")
   .description("Octen CLI — search, extract, chat, embeddings, and MCP/Skills setup")
-  .version(pkg.version);
+  .version(pkg.version)
+  .option("--api-key <key>", "Octen API key")
+  .option("--base-url <url>", "API base URL")
+  .option("--json", "raw JSON output")
+  .option("--pretty", "human-readable output")
+  .option("--no-color", "disable color");
 
 for (const [name, desc] of [
-  ["search", "Search the live web"],
-  ["news", "News-focused web search"],
   ["fetch", "Extract content from URLs"],
   ["chat", "Chat completion"],
   ["embed", "Create text embeddings"],
@@ -29,6 +33,9 @@ for (const [name, desc] of [
     process.exit(1);
   });
 }
+
+registerSearch(program);
+registerSearch(program, "news");
 
 program.parseAsync().catch((err) => {
   process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
