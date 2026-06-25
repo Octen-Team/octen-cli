@@ -7,6 +7,7 @@ import { exitCodeFor } from "./api/errors.js";
 import { registerSearch } from "./commands/search.js";
 import { registerFetch } from "./commands/fetch.js";
 import { registerChat } from "./commands/chat.js";
+import { registerEmbed } from "./commands/embed.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -22,7 +23,6 @@ program
   .option("--no-color", "disable color");
 
 for (const [name, desc] of [
-  ["embed", "Create text embeddings"],
   ["vl-embed", "Create multimodal embeddings"],
   ["configure-mcp", "Configure the Octen MCP server in AI clients"],
   ["configure-skills", "Install Octen Agent Skills into AI clients"],
@@ -38,6 +38,7 @@ registerSearch(program);
 registerSearch(program, "news");
 registerFetch(program);
 registerChat(program);
+registerEmbed(program);
 
 program.parseAsync().catch((err) => {
   process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
