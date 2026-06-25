@@ -5,9 +5,18 @@
   "type": "module",
   "license": "MIT",
   "author": "Octen <hello@octen.ai>",
-  "bin": { "octen": "dist/cli.js" },
-  "files": ["dist", "skills", "README.md", "LICENSE"],
-  "engines": { "node": ">=18" },
+  "bin": {
+    "octen": "dist/cli.js"
+  },
+  "files": [
+    "dist",
+    "skills",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
   "scripts": {
     "build": "tsc && chmod +x dist/cli.js",
     "dev": "tsc --watch",
@@ -18,7 +27,8 @@
   },
   "dependencies": {
     "commander": "^12.1.0",
-    "picocolors": "^1.0.1"
+    "picocolors": "^1.0.1",
+    "smol-toml": "^1.7.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
