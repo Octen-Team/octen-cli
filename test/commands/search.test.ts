@@ -76,4 +76,13 @@ describe("search command", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body).toMatchObject({ query: "hi", count: 10 });
   });
+
+  it("rejects non-integer --count", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync(["node", "octen", "search", "hi", "--count", "abc", "--api-key", "k"]),
+    ).rejects.toThrow(/integer/);
+    // The error is thrown during option parsing — fetch must NOT have been called
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
 });

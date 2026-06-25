@@ -30,6 +30,9 @@ export function renderSearch(data: any): string {
       // Dim URL
       if (r.url) lines.push(`   ${pc.dim(r.url)}`);
 
+      // Dim publication time
+      if (r.time_published) lines.push(`   ${pc.dim(r.time_published)}`);
+
       // Snippet from highlight or full_content (truncated)
       const raw = r.highlight ?? r.full_content ?? "";
       if (raw) {
