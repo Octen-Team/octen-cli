@@ -130,6 +130,7 @@ describe("installMcp – claude-code (claude-cli path)", () => {
       "-e",
       "OCTEN_API_KEY=k",
       "--",
+      "npx",
       "-y",
       "octen-mcp",
     ]);

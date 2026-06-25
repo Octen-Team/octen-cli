@@ -45,6 +45,7 @@ export function installMcp(
           "-e",
           `OCTEN_API_KEY=${apiKey}`,
           "--",
+          entry.command,
           ...entry.args,
         ],
         { stdio: "inherit" },
