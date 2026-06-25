@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parse as tomlParse } from "smol-toml";
 import { MCP_CLIENTS } from "../../src/mcp/clients.js";
-import { installMcp } from "../../src/mcp/install.js";
+import { installMcp, removeMcp } from "../../src/mcp/install.js";
 import { mcpStatus } from "../../src/mcp/detect.js";
 
 // Mock node:child_process so we can spy on execFileSync without touching the real CLI
@@ -154,6 +154,83 @@ describe("installMcp – claude-code (claude-cli path)", () => {
     // Confirm it's one element at a specific index, not fragmented
     const envIdx = (args as string[]).indexOf("OCTEN_API_KEY=a b;c");
     expect(envIdx).toBeGreaterThanOrEqual(0);
+  });
+});
+
+describe("removeMcp – cursor (file path)", () => {
+  it("removes octen from cursor mcp.json while leaving other entries", () => {
+    const home = makeTmp();
+    const client = MCP_CLIENTS.find((c) => c.id === "cursor")!;
+    const configPath = join(home, ".cursor/mcp.json");
+
+    // Pre-seed cursor config with octen + another server
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    writeFileSync(
+      configPath,
+      JSON.stringify({ mcpServers: { octen: { command: "npx" }, other: { command: "other" } } }),
+      "utf8",
+    );
+
+    const result = removeMcp(client, "user", home, home, { hasClaudeCli: false });
+
+    expect(result.method).toBe("file");
+    expect(result.removed).toBe(true);
+    expect(result.path).toBe(configPath);
+
+    const obj = JSON.parse(readFileSync(configPath, "utf8"));
+    // octen is gone
+    expect(obj.mcpServers.octen).toBeUndefined();
+    // other server survives
+    expect(obj.mcpServers.other).toBeDefined();
+  });
+
+  it("returns removed=false when config file does not exist", () => {
+    const home = makeTmp();
+    const client = MCP_CLIENTS.find((c) => c.id === "cursor")!;
+
+    const result = removeMcp(client, "user", home, home, { hasClaudeCli: false });
+
+    expect(result.method).toBe("file");
+    expect(result.removed).toBe(false);
+  });
+
+  it("returns removed=false when octen is not present in existing config", () => {
+    const home = makeTmp();
+    const client = MCP_CLIENTS.find((c) => c.id === "cursor")!;
+
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    writeFileSync(
+      join(home, ".cursor/mcp.json"),
+      JSON.stringify({ mcpServers: { other: { command: "other" } } }),
+      "utf8",
+    );
+
+    const result = removeMcp(client, "user", home, home, { hasClaudeCli: false });
+
+    expect(result.removed).toBe(false);
+  });
+});
+
+describe("removeMcp – claude-code (claude-cli path)", () => {
+  beforeEach(() => {
+    execFileSyncMock.mockReturnValue(undefined as any);
+  });
+
+  it("calls execFileSync with claude + ['mcp','remove','octen'] when hasClaudeCli=true", () => {
+    const home = makeTmp();
+    const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
+
+    const result = removeMcp(client, "user", home, home, { hasClaudeCli: true });
+
+    expect(result.method).toBe("claude-cli");
+    expect(result.removed).toBe(true);
+
+    const claudeCall = execFileSyncMock.mock.calls.find((call) => call[0] === "claude");
+    expect(claudeCall).toBeDefined();
+
+    const [cmd, args] = claudeCall!;
+    expect(cmd).toBe("claude");
+    expect(args).toEqual(["mcp", "remove", "octen"]);
   });
 });
 

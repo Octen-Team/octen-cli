@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { upsertMcpServer } from "./write.js";
+import { upsertMcpServer, removeMcpServer } from "./write.js";
 import type { McpClient } from "./clients.js";
 
 export interface InstallOpts {
@@ -9,6 +9,12 @@ export interface InstallOpts {
 
 export interface InstallResult {
   path: string;
+  method: "claude-cli" | "file";
+}
+
+export interface RemoveResult {
+  path: string;
+  removed: boolean;
   method: "claude-cli" | "file";
 }
 
@@ -63,4 +69,24 @@ export function installMcp(
   const filePath = client.pathFor(scope, home, cwd);
   upsertMcpServer(filePath, client.format, entry);
   return { path: filePath, method: "file" };
+}
+
+export function removeMcp(
+  client: McpClient,
+  scope: "user" | "project",
+  home: string,
+  cwd: string,
+  opts: InstallOpts = {},
+): RemoveResult {
+  if (client.id === "claude-code") {
+    if (claudeAvailable(opts.hasClaudeCli)) {
+      execFileSync("claude", ["mcp", "remove", "octen"], { stdio: "inherit" });
+      return { path: client.pathFor(scope, home, cwd), removed: true, method: "claude-cli" };
+    }
+  }
+
+  // All other clients (and claude-code without CLI): write via file
+  const filePath = client.pathFor(scope, home, cwd);
+  const removed = removeMcpServer(filePath, client.format);
+  return { path: filePath, removed, method: "file" };
 }
