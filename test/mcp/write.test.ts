@@ -90,6 +90,18 @@ describe("upsertMcpServer – json-servers (vscode)", () => {
     expect(obj.servers.other.command).toBe("other");
     expect(obj.servers.octen.command).toBe("npx");
   });
+
+  it("is idempotent: upserting twice results in one octen entry", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+
+    upsertMcpServer(filePath, "json-servers", ENTRY);
+    upsertMcpServer(filePath, "json-servers", ENTRY);
+
+    const obj = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(Object.keys(obj.servers)).toHaveLength(1);
+    expect(obj.servers.octen).toBeDefined();
+  });
 });
 
 describe("upsertMcpServer – toml (codex)", () => {
@@ -176,5 +188,98 @@ describe("removeMcpServer", () => {
     const after = tomlParse(readFileSync(filePath, "utf8")) as Record<string, any>;
     expect(after.mcp_servers.octen).toBeUndefined();
     expect(after.mcp_servers.other).toBeDefined();
+  });
+
+  it("removes octen and returns true, leaves other servers intact (json-servers)", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+    writeFileSync(
+      filePath,
+      JSON.stringify({ servers: { octen: ENTRY, other: {} } }),
+      "utf8",
+    );
+
+    const result = removeMcpServer(filePath, "json-servers");
+
+    expect(result).toBe(true);
+    const obj = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(obj.servers.octen).toBeUndefined();
+    expect(obj.servers.other).toBeDefined();
+  });
+
+  it("returns false when removing octen again from json-servers (idempotent remove)", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+    writeFileSync(
+      filePath,
+      JSON.stringify({ servers: { octen: ENTRY, other: {} } }),
+      "utf8",
+    );
+
+    removeMcpServer(filePath, "json-servers");
+    const result = removeMcpServer(filePath, "json-servers");
+
+    expect(result).toBe(false);
+  });
+});
+
+describe("top-level key preservation", () => {
+  it("json-mcpServers: sibling keys survive upsert", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+    writeFileSync(
+      filePath,
+      JSON.stringify({
+        mcpServers: { other: { command: "x" } },
+        version: "1.0",
+        theme: "dark",
+      }),
+      "utf8",
+    );
+
+    upsertMcpServer(filePath, "json-mcpServers", ENTRY);
+
+    const obj = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(obj.version).toBe("1.0");
+    expect(obj.theme).toBe("dark");
+    expect(obj.mcpServers.other).toBeDefined();
+    expect(obj.mcpServers.octen).toBeDefined();
+    expect(obj.mcpServers.octen.command).toBe("npx");
+  });
+
+  it("json-servers: sibling keys survive upsert", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+    writeFileSync(
+      filePath,
+      JSON.stringify({ servers: { other: {} }, foo: 42 }),
+      "utf8",
+    );
+
+    upsertMcpServer(filePath, "json-servers", ENTRY);
+
+    const obj = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(obj.foo).toBe(42);
+    expect(obj.servers.other).toBeDefined();
+    expect(obj.servers.octen).toBeDefined();
+  });
+
+  it("toml: non-mcp sections survive upsert", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "config.toml");
+    writeFileSync(
+      filePath,
+      '[model]\nname = "gpt"\n\n[mcp_servers.other]\ncommand = "x"\n',
+      "utf8",
+    );
+
+    upsertMcpServer(filePath, "toml", ENTRY);
+
+    const parsed = tomlParse(readFileSync(filePath, "utf8")) as Record<string, any>;
+    expect(parsed.model.name).toBe("gpt");
+    expect(parsed.mcp_servers.other).toBeDefined();
+    expect(parsed.mcp_servers.other.command).toBe("x");
+    expect(parsed.mcp_servers.octen).toBeDefined();
+    expect(parsed.mcp_servers.octen.command).toBe("npx");
   });
 });

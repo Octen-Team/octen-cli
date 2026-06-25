@@ -1,4 +1,4 @@
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -6,6 +6,16 @@ import { parse as tomlParse } from "smol-toml";
 import { MCP_CLIENTS } from "../../src/mcp/clients.js";
 import { installMcp } from "../../src/mcp/install.js";
 import { mcpStatus } from "../../src/mcp/detect.js";
+
+// Mock node:child_process so we can spy on execFileSync without touching the real CLI
+vi.mock("node:child_process", async (importOriginal) => {
+  const original = await importOriginal<typeof import("node:child_process")>();
+  return { ...original, execFileSync: vi.fn(original.execFileSync) };
+});
+
+// Import the mocked module so tests can inspect calls
+import { execFileSync as mockExecFileSync } from "node:child_process";
+const execFileSyncMock = mockExecFileSync as ReturnType<typeof vi.fn>;
 
 const ENTRY = { command: "npx", args: ["-y", "octen-mcp"], env: { OCTEN_API_KEY: "testkey" } };
 
@@ -21,6 +31,7 @@ afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = "";
   }
+  vi.clearAllMocks();
 });
 
 describe("installMcp – cursor (json-mcpServers)", () => {
@@ -83,6 +94,65 @@ describe("installMcp – claude-code (file fallback)", () => {
 
     const obj = JSON.parse(readFileSync(result.path, "utf8"));
     expect(obj.mcpServers.octen.command).toBe("npx");
+  });
+});
+
+describe("installMcp – claude-code (claude-cli path)", () => {
+  beforeEach(() => {
+    // Prevent real execFileSync from running — return void (success)
+    execFileSyncMock.mockReturnValue(undefined as any);
+  });
+
+  it("invokes execFileSync with exact args array (injection-safe) when hasClaudeCli=true", () => {
+    const home = makeTmp();
+    const cwd = home;
+    const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
+    const entry = { command: "npx", args: ["-y", "octen-mcp"], env: { OCTEN_API_KEY: "k" } };
+
+    const result = installMcp(client, "user", entry, home, cwd, { hasClaudeCli: true });
+
+    expect(result.method).toBe("claude-cli");
+
+    // Find the call to `claude` (not `which`)
+    const claudeCall = execFileSyncMock.mock.calls.find((call) => call[0] === "claude");
+    expect(claudeCall).toBeDefined();
+
+    const [cmd, args] = claudeCall!;
+    expect(cmd).toBe("claude");
+    // Assert the full args array – this documents injection-safety:
+    // the key value is a single array element, not shell-interpolated
+    expect(args).toEqual([
+      "mcp",
+      "add",
+      "--scope",
+      "user",
+      "octen",
+      "-e",
+      "OCTEN_API_KEY=k",
+      "--",
+      "-y",
+      "octen-mcp",
+    ]);
+  });
+
+  it("key with special chars (spaces, semicolons) stays as one array element (no injection)", () => {
+    const home = makeTmp();
+    const cwd = home;
+    const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
+    const specialKey = "a b;c";
+    const entry = { command: "npx", args: ["-y", "octen-mcp"], env: { OCTEN_API_KEY: specialKey } };
+
+    installMcp(client, "user", entry, home, cwd, { hasClaudeCli: true });
+
+    const claudeCall = execFileSyncMock.mock.calls.find((call) => call[0] === "claude");
+    expect(claudeCall).toBeDefined();
+
+    const [, args] = claudeCall!;
+    // The entire "OCTEN_API_KEY=a b;c" must be a single element — no shell splitting
+    expect(args).toContain("OCTEN_API_KEY=a b;c");
+    // Confirm it's one element at a specific index, not fragmented
+    const envIdx = (args as string[]).indexOf("OCTEN_API_KEY=a b;c");
+    expect(envIdx).toBeGreaterThanOrEqual(0);
   });
 });
 

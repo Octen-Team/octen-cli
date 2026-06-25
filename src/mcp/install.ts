@@ -53,7 +53,7 @@ export function installMcp(
     } else {
       // Fall back to writing ~/.claude.json mcpServers directly
       const filePath = client.pathFor(scope, home, cwd);
-      upsertMcpServer(filePath, "json-mcpServers", entry);
+      upsertMcpServer(filePath, client.format, entry);
       return { path: filePath, method: "file" };
     }
   }

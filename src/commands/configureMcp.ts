@@ -1,4 +1,5 @@
 import os from "node:os";
+import pc from "picocolors";
 import type { Command } from "commander";
 import { MCP_CLIENTS } from "../mcp/clients.js";
 import { installMcp, type InstallOpts } from "../mcp/install.js";
@@ -113,6 +114,7 @@ export function registerConfigureMcp(
             return flagName ? Boolean((opts as Record<string, unknown>)[flagName]) : false;
           });
 
+      let anyFailed = false;
       for (const client of selected) {
         try {
           const result = installMcp(client, scope, entry, home, cwd, installOpts);
@@ -122,8 +124,14 @@ export function registerConfigureMcp(
             process.stdout.write(`${client.label}: configured → ${result.path}\n`);
           }
         } catch (err) {
-          throw err;
+          const msg = err instanceof Error ? err.message : String(err);
+          process.stderr.write(pc.red(`error configuring ${client.label}: ${msg}`) + "\n");
+          anyFailed = true;
         }
+      }
+
+      if (anyFailed) {
+        process.exitCode = 1;
       }
 
       if (keyMissing) {
