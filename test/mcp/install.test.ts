@@ -230,7 +230,7 @@ describe("removeMcp – claude-code (claude-cli path)", () => {
 
     const [cmd, args] = claudeCall!;
     expect(cmd).toBe("claude");
-    expect(args).toEqual(["mcp", "remove", "octen"]);
+    expect(args).toEqual(["mcp", "remove", "--scope", "user", "octen"]);
   });
 });
 

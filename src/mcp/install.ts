@@ -80,7 +80,7 @@ export function removeMcp(
 ): RemoveResult {
   if (client.id === "claude-code") {
     if (claudeAvailable(opts.hasClaudeCli)) {
-      execFileSync("claude", ["mcp", "remove", "octen"], { stdio: "inherit" });
+      execFileSync("claude", ["mcp", "remove", "--scope", scope, "octen"], { stdio: "inherit" });
       return { path: client.pathFor(scope, home, cwd), removed: true, method: "claude-cli" };
     }
   }
