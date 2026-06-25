@@ -2,6 +2,8 @@
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import pc from "picocolors";
+import { exitCodeFor } from "./api/errors.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -28,4 +30,7 @@ for (const [name, desc] of [
   });
 }
 
-program.parseAsync();
+program.parseAsync().catch((err) => {
+  process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
+  process.exit(exitCodeFor(err));
+});
