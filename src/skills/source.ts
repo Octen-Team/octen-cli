@@ -1,8 +1,10 @@
-import { mkdirSync, readdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
 import * as tar from "tar";
 import { SKILLS_REPO_TARBALL } from "../api/constants.js";
+import { OctenValidationError } from "../api/errors.js";
 
 export interface ResolveOpts {
   ref: string;
@@ -22,6 +24,12 @@ export async function resolveSkillsDir(o: ResolveOpts): Promise<ResolveResult> {
     return { dir: o.bundledDir, source: "bundled" };
   }
 
+  // Validate ref before use in paths/URLs to prevent traversal or malformed URLs.
+  // Must match /^[\w.\/-]+$/ AND must not contain the ".." sequence.
+  if (!/^[\w.\/-]+$/.test(o.ref) || o.ref.includes("..")) {
+    throw new OctenValidationError(`invalid ref: ${o.ref}`);
+  }
+
   try {
     const fetcher = o.fetchImpl ?? fetch;
     const url = SKILLS_REPO_TARBALL(o.ref);
@@ -32,15 +40,19 @@ export async function resolveSkillsDir(o: ResolveOpts): Promise<ResolveResult> {
 
     const buffer = Buffer.from(await response.arrayBuffer());
 
-    // Write tarball to a temp file for tar.extract (which needs a file path)
-    const tmpTar = join(tmpdir(), `octen-skills-${o.ref}-${Date.now()}.tar.gz`);
+    // Write tarball to a collision-resistant temp file for tar.extract (which needs a file path)
+    const tmpTar = join(tmpdir(), `octen-skills-${randomUUID()}.tar.gz`);
     writeFileSync(tmpTar, buffer);
 
     // Extract into cacheDir/<ref>/
     const extractDir = join(o.cacheDir, o.ref);
     mkdirSync(extractDir, { recursive: true });
 
-    await tar.extract({ file: tmpTar, cwd: extractDir });
+    try {
+      await tar.extract({ file: tmpTar, cwd: extractDir });
+    } finally {
+      rmSync(tmpTar, { force: true });
+    }
 
     // The tarball root is web-search-skills-<ref>/skills/
     // Locate the skills/ subdir

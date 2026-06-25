@@ -1,7 +1,8 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, existsSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync, existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import * as tar from "tar";
 import { Command } from "commander";
 import { registerConfigureSkills } from "../../src/commands/configureSkills.js";
 
@@ -21,7 +22,7 @@ afterEach(() => {
   tmpDirs = [];
 });
 
-function makeProgram(home: string, cwd: string) {
+function makeProgram(home: string, cwd: string, fetchImpl?: typeof fetch) {
   const prog = new Command();
   prog
     .name("octen")
@@ -30,8 +31,33 @@ function makeProgram(home: string, cwd: string) {
     .option("--json", "raw JSON output")
     .option("--pretty", "human-readable output")
     .exitOverride();
-  registerConfigureSkills(prog, { home, cwd });
+  registerConfigureSkills(prog, { home, cwd, fetchImpl });
   return prog;
+}
+
+/** Build a real .tar.gz Buffer laid out as web-search-skills-<ref>/skills/<name>/SKILL.md */
+async function buildTarball(ref: string, skills: string[]): Promise<Buffer> {
+  const srcDir = mkdtempSync(join(tmpdir(), "octen-skill-cmd-tarball-"));
+  tmpDirs.push(srcDir);
+  for (const name of skills) {
+    mkdirSync(join(srcDir, `web-search-skills-${ref}`, "skills", name), {
+      recursive: true,
+    });
+    writeFileSync(
+      join(srcDir, `web-search-skills-${ref}`, "skills", name, "SKILL.md"),
+      `# ${name}\n`,
+    );
+  }
+
+  const tarDir = mkdtempSync(join(tmpdir(), "octen-skill-cmd-tar-"));
+  tmpDirs.push(tarDir);
+  const tarPath = join(tarDir, `${ref}.tar.gz`);
+  await tar.create(
+    { gzip: true, file: tarPath, cwd: srcDir },
+    [`web-search-skills-${ref}`],
+  );
+
+  return readFileSync(tarPath);
 }
 
 describe("configure-skills --cursor --offline", () => {
@@ -202,5 +228,39 @@ describe("configure-skills output messages", () => {
     const output = stdoutLines.join("");
     expect(output).toMatch(/OCTEN_API_KEY/);
     expect(output).toMatch(/octen\.ai/);
+  });
+});
+
+describe("configure-skills default remote path", () => {
+  it("installs skills from remote tarball when no --offline flag is given", async () => {
+    const home = makeTmp();
+    const cwd = home;
+
+    const ref = "main";
+    const buffer = await buildTarball(ref, ["octen-search"]);
+
+    const fetchImpl = async (_url: string): Promise<Response> => {
+      return new Response(buffer);
+    };
+
+    const prog = makeProgram(home, cwd, fetchImpl as typeof fetch);
+
+    const stdoutLines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdoutLines.push(String(chunk));
+      return true;
+    });
+
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--cursor", "--api-key", "k",
+    ]);
+
+    // Skill should be installed into temp ~/.cursor/skills/octen-search/
+    const skillsDir = join(home, ".cursor/skills");
+    expect(existsSync(join(skillsDir, "octen-search", "SKILL.md"))).toBe(true);
+
+    // Output must mention remote source
+    const output = stdoutLines.join("");
+    expect(output).toMatch(/source: remote/);
   });
 });

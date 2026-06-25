@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import * as tar from "tar";
 import { resolveSkillsDir } from "../../src/skills/source.js";
+import { OctenValidationError } from "../../src/api/errors.js";
 
 let tmpDirs: string[] = [];
 
@@ -129,23 +130,69 @@ describe("resolveSkillsDir – happy path (real tarball)", () => {
     expect(existsSync(join(result.dir, "octen-web-search", "SKILL.md"))).toBe(true);
   });
 
-  it("falls back to bundled if tarball response is not ok", async () => {
+  it("falls back to bundled if tarball response is not ok and prints a warning", async () => {
+    const bundledDir = makeTmp();
+    const cacheDir = makeTmp();
+
+    const stderrLines: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr as any).write = (chunk: unknown) => {
+      stderrLines.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const fetchImpl = async (): Promise<Response> => {
+        return new Response("not found", { status: 404 });
+      };
+
+      const result = await resolveSkillsDir({
+        ref: "main",
+        offline: false,
+        cacheDir,
+        bundledDir,
+        fetchImpl: fetchImpl as typeof fetch,
+      });
+
+      expect(result.source).toBe("bundled");
+      expect(result.dir).toBe(bundledDir);
+
+      const combined = stderrLines.join("");
+      expect(combined).toMatch(/warning/);
+      expect(combined).toMatch(/bundled/);
+    } finally {
+      (process.stderr as any).write = origWrite;
+    }
+  });
+});
+
+describe("resolveSkillsDir – ref validation", () => {
+  it("throws OctenValidationError for a malicious ref before any fetch", async () => {
     const bundledDir = makeTmp();
     const cacheDir = makeTmp();
 
     const fetchImpl = async (): Promise<Response> => {
-      return new Response("not found", { status: 404 });
+      throw new Error("should not be called");
     };
 
-    const result = await resolveSkillsDir({
-      ref: "main",
-      offline: false,
-      cacheDir,
-      bundledDir,
-      fetchImpl: fetchImpl as typeof fetch,
-    });
+    await expect(
+      resolveSkillsDir({
+        ref: "../evil",
+        offline: false,
+        cacheDir,
+        bundledDir,
+        fetchImpl: fetchImpl as typeof fetch,
+      }),
+    ).rejects.toThrow(OctenValidationError);
 
-    expect(result.source).toBe("bundled");
-    expect(result.dir).toBe(bundledDir);
+    await expect(
+      resolveSkillsDir({
+        ref: "../evil",
+        offline: false,
+        cacheDir,
+        bundledDir,
+        fetchImpl: fetchImpl as typeof fetch,
+      }),
+    ).rejects.toThrow(/invalid ref/);
   });
 });

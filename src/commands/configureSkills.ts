@@ -12,6 +12,8 @@ interface ConfigureSkillsInternalOpts {
   home?: string;
   /** Injected cwd (for testing); defaults to process.cwd() */
   cwd?: string;
+  /** Injected fetch implementation (for testing); defaults to global fetch */
+  fetchImpl?: typeof fetch;
 }
 
 // Exported so tests can call with injected dirs
@@ -41,7 +43,6 @@ export function registerConfigureSkills(
     .option("--ref <ref>", "upstream git ref to fetch skills from", "main")
     .option("--bundled", "force use of bundled (vendored) skills — no network")
     .option("--offline", "alias for --bundled")
-    .option("--force", "overwrite existing skills without prompting")
     .action(async (_opts: Record<string, any>, command: Command) => {
       const opts = command.opts() as {
         all?: boolean;
@@ -56,7 +57,6 @@ export function registerConfigureSkills(
         ref: string;
         bundled?: boolean;
         offline?: boolean;
-        force?: boolean;
       };
 
       const scope = (opts.scope === "project" ? "project" : "user") as
@@ -137,6 +137,7 @@ export function registerConfigureSkills(
           offline,
           cacheDir,
           bundledDir,
+          fetchImpl: internal.fetchImpl,
         });
         srcDir = resolved.dir;
         source = resolved.source;

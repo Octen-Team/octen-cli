@@ -4,6 +4,7 @@ import {
   mkdirSync,
   readdirSync,
   readFileSync,
+  rmSync,
   writeFileSync,
 } from "node:fs";
 import { join } from "node:path";
@@ -33,6 +34,8 @@ export function installSkills(
     const src = join(srcDir, name);
     const dest = join(targetSkillsDir, name);
 
+    // Remove existing skill dir so the install is clean (no stale files linger)
+    rmSync(dest, { recursive: true, force: true });
     cpSync(src, dest, { recursive: true });
 
     // Write version marker

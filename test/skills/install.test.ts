@@ -88,6 +88,23 @@ describe("installSkills", () => {
     expect(readFileSync(join(target, "octen-search", ".octen-version"), "utf8")).toBe("v1.2.3");
   });
 
+  it("clean update: removes stale files from existing octen-* skill dir", () => {
+    const src = makeTmp();
+    const target = makeTmp();
+    // Pre-create an existing octen-search dir in target with a stale file
+    mkdirSync(join(target, "octen-search"), { recursive: true });
+    writeFileSync(join(target, "octen-search", "STALE.md"), "stale content\n", "utf8");
+    // Src has octen-search/SKILL.md but no STALE.md
+    seedSrcDir(src, ["octen-search"]);
+
+    installSkills(src, target, "main");
+
+    // STALE.md must be gone — clean update removes the old dir first
+    expect(existsSync(join(target, "octen-search", "STALE.md"))).toBe(false);
+    // SKILL.md from src must be present
+    expect(existsSync(join(target, "octen-search", "SKILL.md"))).toBe(true);
+  });
+
   it("does not copy non-octen dirs from src", () => {
     const src = makeTmp();
     const target = join(makeTmp(), "skills");
