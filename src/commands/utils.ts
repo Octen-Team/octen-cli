@@ -16,3 +16,10 @@ export const parseIntOpt = (name: string) => (v: string): number => {
   if (Number.isNaN(n)) throw new OctenValidationError(`${name} must be an integer`);
   return n;
 };
+
+/** Commander option parser for float flags that errors clearly on non-numbers. */
+export const parseFloatOpt = (name: string) => (v: string): number => {
+  const n = parseFloat(v);
+  if (Number.isNaN(n)) throw new OctenValidationError(`${name} must be a number`);
+  return n;
+};
