@@ -58,18 +58,34 @@ jobs:
           cd dist-bin
           shasum -a 256 octen-* > "SHA256SUMS-$OSNAME.txt"
           cat "SHA256SUMS-$OSNAME.txt"
-      - name: Upload build artifacts (for workflow_dispatch / debugging)
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: binaries-${{ matrix.os }}
           path: dist-bin/*
-      - name: Attach binaries to the GitHub Release (tag pushes only)
-        if: startsWith(github.ref, 'refs/tags/')
+
+  release-upload:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Collect binaries and checksums
+        run: |
+          mkdir -p dist-bin
+          find artifacts -type f -name 'octen-*' -exec cp {} dist-bin/ \;
+          cat artifacts/*/SHA256SUMS-*.txt > dist-bin/SHA256SUMS.txt
+          echo "=== combined checksums ===" && cat dist-bin/SHA256SUMS.txt
+          ls -la dist-bin
+      - name: Create / update the GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create "$GITHUB_REF_NAME" \
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             --title "$GITHUB_REF_NAME" \
             --notes "Standalone binaries (no Node.js required). Also on npm: \`npm i -g @octen.ai/cli\`." \
             2>/dev/null || true
-          gh release upload "$GITHUB_REF_NAME" dist-bin/octen-* dist-bin/SHA256SUMS-*.txt --clobber
+          gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
+            dist-bin/octen-* dist-bin/SHA256SUMS.txt --clobber

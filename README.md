@@ -4,8 +4,21 @@ Command-line tool for Octen — web search, extract, chat, embeddings, and one-c
 
 ## Install
 
+**With Node.js (npm):**
+
 ```sh
 npm i -g @octen.ai/cli
+```
+
+Or run without installing: `npx @octen.ai/cli <command>`. Requires Node.js 18+.
+
+**Without Node.js (standalone binary):** download the binary for your platform
+from the [latest release](https://github.com/Octen-Team/octen-cli/releases/latest)
+(`octen-darwin-arm64`, `octen-darwin-x64`, `octen-linux-x64`, `octen-linux-arm64`),
+`chmod +x` it, and put it on your `PATH`. On macOS/Linux you can also use Homebrew:
+
+```sh
+brew install Octen-Team/tap/octen
 ```
 
 Then enable tab-completion (one-time; `bash` / `zsh` / `fish`):
@@ -13,14 +26,6 @@ Then enable tab-completion (one-time; `bash` / `zsh` / `fish`):
 ```sh
 octen completion zsh --install     # writes to ~/.zshrc — then: source ~/.zshrc
 ```
-
-Or run without installing:
-
-```sh
-npx @octen.ai/cli <command>
-```
-
-Requires Node.js 18+.
 
 ## Auth
 
