@@ -11,10 +11,8 @@ jobs:
       # Skip the interactive third-party-tap trust prompt (Homebrew 6+).
       HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
     steps:
-      - name: Tap + install via short name
-        run: |
-          brew tap Octen-Team/tap
-          brew install octen
+      - name: Install via the single fully-qualified command (auto-taps; no separate brew tap)
+        run: brew install Octen-Team/tap/octen
       - name: Verify the installed binary
         run: |
           which octen

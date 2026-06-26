@@ -15,13 +15,15 @@ Or run without installing: `npx @octen.ai/cli <command>`. Requires Node.js 18+.
 **Without Node.js (standalone binary):** download the binary for your platform
 from the [latest release](https://github.com/Octen-Team/octen-cli/releases/latest)
 (`octen-darwin-arm64`, `octen-darwin-x64`, `octen-linux-x64`, `octen-linux-arm64`),
-`chmod +x` it, and put it on your `PATH`. On macOS/Linux you can also use Homebrew:
+`chmod +x` it, and put it on your `PATH`. On macOS/Linux you can also use Homebrew
+(one command — it taps automatically):
 
 ```sh
-brew tap Octen-Team/tap
-brew install octen
-# Homebrew 6+ may ask you to trust the tap first: brew trust octen-team/tap
+brew install Octen-Team/tap/octen
 ```
+
+Prefer the short `brew install octen`? Tap once first: `brew tap Octen-Team/tap`.
+(On Homebrew 6+ you may be asked to trust the tap the first time: `brew trust octen-team/tap`.)
 
 Then enable tab-completion (one-time; `bash` / `zsh` / `fish`):
 
