@@ -5,6 +5,7 @@ import { MCP_CLIENTS } from "../mcp/clients.js";
 import { SKILL_CLIENTS } from "../skills/clients.js";
 import { removeMcp, type InstallOpts } from "../mcp/install.js";
 import { removeSkills } from "../skills/install.js";
+import { quotePath } from "../util/quotePath.js";
 
 interface ResetInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -112,7 +113,7 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
           try {
             const result = removeMcp(client, scope, home, cwd, installOpts);
             if (result.removed) {
-              process.stdout.write(`removed octen from ${client.label} (${result.path})\n`);
+              process.stdout.write(`removed octen from ${client.label} (${quotePath(result.path)})\n`);
             } else {
               process.stdout.write(`octen not present in ${client.label}\n`);
             }
@@ -128,14 +129,21 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
 
       // --- Skills surface ---
       if (doSkills) {
-        const selectedSkillClients = selectClients(SKILL_CLIENTS);
+        // Claude Desktop shares Claude Code's ~/.claude/skills, so for the skills
+        // surface treat --claude-desktop as --claude-code (consistent with configure-skills).
+        const skillRequestedIds = new Set(requestedIds);
+        if (skillRequestedIds.has("claude-desktop")) skillRequestedIds.add("claude-code");
+        const selectedSkillClients =
+          opts.all || !anyPerClientFlag
+            ? SKILL_CLIENTS
+            : SKILL_CLIENTS.filter((c) => skillRequestedIds.has(c.id));
         for (const client of selectedSkillClients) {
           try {
             const skillsDir = client.dirFor(scope, home, cwd);
             const removed = removeSkills(skillsDir);
             if (removed.length > 0) {
               process.stdout.write(
-                `removed [${removed.join(", ")}] from ${client.label} (${skillsDir})\n`,
+                `removed [${removed.join(", ")}] from ${client.label} (${quotePath(skillsDir)})\n`,
               );
             } else {
               process.stdout.write(`no octen skills in ${client.label}\n`);

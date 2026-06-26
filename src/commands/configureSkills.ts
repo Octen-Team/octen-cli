@@ -9,6 +9,7 @@ import { installSkills, skillStatus } from "../skills/install.js";
 import { setClientEnvKey } from "../skills/setkey.js";
 import { OctenValidationError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
+import { quotePath } from "../util/quotePath.js";
 
 interface ConfigureSkillsInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -191,7 +192,7 @@ export function registerConfigureSkills(
           const installed = installSkills(srcDir, targetDir, ref, only);
           const skillList = installed.length > 0 ? installed.join(", ") : "(none)";
           process.stdout.write(
-            `${client.label}: installed [${skillList}] → ${targetDir} (source: ${source})\n`,
+            `${client.label}: installed [${skillList}] → ${quotePath(targetDir)} (source: ${source})\n`,
           );
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
@@ -224,7 +225,7 @@ export function registerConfigureSkills(
           const result = setClientEnvKey(client.id, key, scope, home, cwd);
           if (result.written) {
             process.stdout.write(
-              `set OCTEN_API_KEY in ${client.label} (${result.path})\n`,
+              `set OCTEN_API_KEY in ${client.label} (${quotePath(result.path!)})\n`,
             );
           } else {
             process.stdout.write(`${client.label}: ${result.hint}\n`);

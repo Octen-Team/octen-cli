@@ -6,6 +6,7 @@ import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
 import { isClientInstalled } from "../util/detectClient.js";
+import { quotePath } from "../util/quotePath.js";
 
 interface ConfigureMcpInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -155,7 +156,7 @@ export function registerConfigureMcp(
           if (result.method === "claude-cli") {
             process.stdout.write(`${client.label}: configured via claude CLI\n`);
           } else {
-            process.stdout.write(`${client.label}: configured → ${result.path}\n`);
+            process.stdout.write(`${client.label}: configured → ${quotePath(result.path)}\n`);
           }
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
