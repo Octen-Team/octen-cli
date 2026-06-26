@@ -1,0 +1,71 @@
+name: Binaries
+
+on:
+  workflow_dispatch: {}
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-14
+            targets: "bun-darwin-arm64 bun-darwin-x64"
+            smoke: octen-darwin-arm64
+          - os: ubuntu-latest
+            targets: "bun-linux-x64 bun-linux-arm64"
+            smoke: octen-linux-x64
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - run: npm ci
+      - name: Build standalone binaries
+        env:
+          TARGETS: ${{ matrix.targets }}
+        run: |
+          mkdir -p dist-bin
+          for t in $TARGETS; do
+            name="octen-${t#bun-}"
+            echo "building $name ($t)"
+            bun build ./src/cli.ts --compile --target="$t" --outfile "dist-bin/$name"
+          done
+          ls -la dist-bin
+      - name: Smoke test the native binary
+        env:
+          SMOKE: ${{ matrix.smoke }}
+        run: |
+          chmod +x "dist-bin/$SMOKE"
+          "./dist-bin/$SMOKE" --version
+          "./dist-bin/$SMOKE" completion bash | head -1
+      - name: Checksums
+        env:
+          OSNAME: ${{ matrix.os }}
+        run: |
+          cd dist-bin
+          shasum -a 256 octen-* > "SHA256SUMS-$OSNAME.txt"
+          cat "SHA256SUMS-$OSNAME.txt"
+      - name: Upload build artifacts (for workflow_dispatch / debugging)
+        uses: actions/upload-artifact@v4
+        with:
+          name: binaries-${{ matrix.os }}
+          path: dist-bin/*
+      - name: Attach binaries to the GitHub Release (tag pushes only)
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "Standalone binaries (no Node.js required). Also on npm: \`npm i -g @octen.ai/cli\`." \
+            2>/dev/null || true
+          gh release upload "$GITHUB_REF_NAME" dist-bin/octen-* dist-bin/SHA256SUMS-*.txt --clobber
