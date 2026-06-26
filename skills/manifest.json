@@ -1,5 +1,8 @@
 {
-  "source": "Octen-Team/web-search-skills",
+  "source": "Octen-Team/octen-skills",
   "ref": "main",
-  "skills": ["octen-web-search", "octen-search"]
+  "skills": [
+    "octen-design",
+    "octen-search"
+  ]
 }

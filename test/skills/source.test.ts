@@ -103,14 +103,14 @@ describe("resolveSkillsDir – fetchImpl throws", () => {
 });
 
 /**
- * Build a real .tar.gz Buffer whose root is NOT `web-search-skills-<ref>/skills/...`.
- * The extracted layout therefore lacks the expected skills/ dir, so the
- * readdirSync(skillsDir) locate step throws and resolveSkillsDir falls back.
+ * Build a real .tar.gz Buffer whose single root dir has NO `skills/` subdir.
+ * Root-dir discovery succeeds (one top-level dir) but the `<root>/skills` locate
+ * step throws (ENOENT), so resolveSkillsDir falls back to bundled.
  */
 async function buildWrongLayoutTarball(rootName: string): Promise<Buffer> {
   const srcDir = makeTmp();
-  mkdirSync(join(srcDir, rootName, "skills", "octen-search"), { recursive: true });
-  writeFileSync(join(srcDir, rootName, "skills", "octen-search", "SKILL.md"), "# octen-search\n");
+  mkdirSync(join(srcDir, rootName, "notskills", "octen-search"), { recursive: true });
+  writeFileSync(join(srcDir, rootName, "notskills", "octen-search", "SKILL.md"), "# octen-search\n");
 
   const tarPath = join(makeTmp(), "wrong.tar.gz");
   await tar.create({ gzip: true, file: tarPath, cwd: srcDir }, [rootName]);
@@ -124,7 +124,7 @@ describe("resolveSkillsDir – valid tarball, unexpected internal layout", () =>
     const bundledDir = makeTmp();
     const cacheDir = makeTmp();
 
-    // Root is "wrong-root/skills/..." instead of "web-search-skills-main/skills/...".
+    // Single root dir "wrong-root" exists but has no skills/ subdir.
     const buffer = await buildWrongLayoutTarball("wrong-root");
 
     const stderrLines: string[] = [];

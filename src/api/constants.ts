@@ -32,6 +32,6 @@ export const LIMITS = {
   vlVideos: 1,
 } as const;
 
-export const SKILLS_REPO = "Octen-Team/web-search-skills";
+export const SKILLS_REPO = "Octen-Team/octen-skills";
 export const SKILLS_REPO_TARBALL = (ref: string) =>
   `https://github.com/${SKILLS_REPO}/archive/${ref}.tar.gz`;

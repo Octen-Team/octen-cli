@@ -44,8 +44,10 @@ export async function resolveSkillsDir(o: ResolveOpts): Promise<ResolveResult> {
     const tmpTar = join(tmpdir(), `octen-skills-${randomUUID()}.tar.gz`);
     writeFileSync(tmpTar, buffer);
 
-    // Extract into cacheDir/<ref>/
+    // Extract into a clean cacheDir/<ref>/ (clean so a prior run, possibly from a
+    // differently-named archive root, can't leave a stale dir behind).
     const extractDir = join(o.cacheDir, o.ref);
+    rmSync(extractDir, { recursive: true, force: true });
     mkdirSync(extractDir, { recursive: true });
 
     try {
@@ -54,11 +56,16 @@ export async function resolveSkillsDir(o: ResolveOpts): Promise<ResolveResult> {
       rmSync(tmpTar, { force: true });
     }
 
-    // The tarball root is web-search-skills-<ref>/skills/
-    // Locate the skills/ subdir
-    const skillsDir = join(extractDir, `web-search-skills-${o.ref}`, "skills");
+    // GitHub archive tarballs nest everything under a single top-level dir named
+    // <repo>-<ref>. The repo can be renamed (the download follows GitHub's
+    // redirect), so DISCOVER that root dir rather than hardcoding the repo name.
+    const roots = readdirSync(extractDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+    if (roots.length !== 1) {
+      throw new Error(`unexpected archive layout: ${roots.length} top-level dirs`);
+    }
+    const skillsDir = join(extractDir, roots[0].name, "skills");
 
-    // Verify it exists
+    // Verify the skills/ subdir exists
     readdirSync(skillsDir);
 
     return { dir: skillsDir, source: "remote" };

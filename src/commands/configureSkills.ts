@@ -38,7 +38,7 @@ export function registerConfigureSkills(
     )
     .option(
       "--only <names>",
-      "comma-separated list of skill names to install (e.g. octen-search,octen-web-search)",
+      "comma-separated list of skill names to install (e.g. octen-search,octen-design)",
     )
     .option("--ref <ref>", "upstream git ref to fetch skills from", "main")
     .option("--bundled", "force use of bundled (vendored) skills — no network")

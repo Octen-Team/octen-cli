@@ -23,7 +23,7 @@ const require = createRequire(import.meta.url);
 
 // Inline SKILLS_REPO and SKILLS_REPO_TARBALL to avoid src/ imports that
 // would require tsconfig include paths — scripts/ is excluded from tsconfig.
-const SKILLS_REPO = "Octen-Team/web-search-skills";
+const SKILLS_REPO = "Octen-Team/octen-skills";
 const SKILLS_REPO_TARBALL = (ref: string) =>
   `https://github.com/${SKILLS_REPO}/archive/${ref}.tar.gz`;
 
@@ -62,8 +62,14 @@ async function main(): Promise<void> {
   // Extract
   await tar.extract({ file: tmpTar, cwd: tmpDir });
 
-  // Locate skills/ inside tarball
-  const srcSkillsDir = join(tmpDir, `web-search-skills-${ref}`, "skills");
+  // Locate skills/ inside the tarball. GitHub archives nest under a single
+  // <repo>-<ref> dir; the repo can be renamed, so discover that root dir.
+  const roots = readdirSync(tmpDir, { withFileTypes: true }).filter((e) => e.isDirectory());
+  if (roots.length !== 1) {
+    process.stderr.write(`error: unexpected archive layout (${roots.length} top-level dirs)\n`);
+    process.exit(1);
+  }
+  const srcSkillsDir = join(tmpDir, roots[0].name, "skills");
 
   const entries = readdirSync(srcSkillsDir, { withFileTypes: true });
   const octenSkills = entries
@@ -72,6 +78,14 @@ async function main(): Promise<void> {
 
   if (octenSkills.length === 0) {
     process.stderr.write(`warning: no octen-* skills found in tarball at ref "${ref}"\n`);
+  }
+
+  // Prune bundled octen-* skills no longer present upstream.
+  for (const e of readdirSync(skillsDir, { withFileTypes: true })) {
+    if (e.isDirectory() && e.name.startsWith("octen-") && !octenSkills.includes(e.name)) {
+      rmSync(join(skillsDir, e.name), { recursive: true, force: true });
+      process.stdout.write(`  pruned: ${e.name}\n`);
+    }
   }
 
   // Copy each octen-* skill into the package skills/ dir (overwrite)
