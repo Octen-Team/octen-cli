@@ -47,7 +47,7 @@ Search the live web.
 octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight`, `--time-range` (day|week|month|year or d|w|m|y), `--start-time`, `--end-time`, `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
+Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, min 100), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
 
 ---
 
@@ -69,7 +69,7 @@ Extract content from one or more URLs (1–20).
 octen fetch https://example.com --query "pricing" --max-age 3600 --images
 ```
 
-Options: `--query` (relevance hint), `--max-age <sec>` (cache age), `--images`, `--videos`, `--audio`, `--favicon`, `--format` (markdown|text), `--fetch-timeout <sec>`, `--full` (print full page content).
+Options: `--query` (relevance hint), `--max-age <sec>` (cache age, 300–31536000), `--images`, `--videos`, `--audio`, `--favicon`, `--format` (markdown|text), `--fetch-timeout <sec>` (1–60), `--full` (print full page content).
 
 Pretty output truncates page content to ~500 chars for readability; pass `--full` to print the whole thing (or `--json` for the raw response).
 

@@ -45,19 +45,34 @@ describe("buildExtractRequest", () => {
     expect(req.urls).toEqual(["https://example.com", "http://other.com"]);
   });
 
-  it("clamps maxAge 100 → 300", () => {
-    const req = buildExtractRequest(["https://example.com"], { maxAge: 100 });
-    expect(req.max_age_seconds).toBe(300);
+  it("rejects maxAge below the 300s minimum", () => {
+    expect(() => buildExtractRequest(["https://example.com"], { maxAge: 100 })).toThrow(
+      OctenValidationError,
+    );
   });
 
-  it("clamps maxAge 99999999999 → 31536000", () => {
-    const req = buildExtractRequest(["https://example.com"], { maxAge: 99_999_999_999 });
-    expect(req.max_age_seconds).toBe(31_536_000);
+  it("rejects maxAge above the maximum", () => {
+    expect(() =>
+      buildExtractRequest(["https://example.com"], { maxAge: 99_999_999_999 }),
+    ).toThrow(OctenValidationError);
   });
 
-  it("does not clamp maxAge within valid range", () => {
-    const req = buildExtractRequest(["https://example.com"], { maxAge: 86400 });
-    expect(req.max_age_seconds).toBe(86400);
+  it("accepts maxAge at the boundaries and within range", () => {
+    expect((buildExtractRequest(["https://example.com"], { maxAge: 300 })).max_age_seconds).toBe(300);
+    expect((buildExtractRequest(["https://example.com"], { maxAge: 86400 })).max_age_seconds).toBe(86400);
+  });
+
+  it("rejects a bare word that is not a plausible URL", () => {
+    expect(() => buildExtractRequest(["not-a-valid-url"], {})).toThrow(OctenValidationError);
+  });
+
+  it("rejects non-http(s) schemes", () => {
+    expect(() => buildExtractRequest(["ftp://example.com"], {})).toThrow(OctenValidationError);
+  });
+
+  it("accepts localhost and IP hosts", () => {
+    expect(() => buildExtractRequest(["localhost:3000"], {})).not.toThrow();
+    expect(() => buildExtractRequest(["http://127.0.0.1:8080"], {})).not.toThrow();
   });
 
   it("maps fetchTimeout to timeout in body", () => {

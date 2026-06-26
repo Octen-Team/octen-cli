@@ -31,6 +31,30 @@ export interface ExtractOpts {
   favicon?: boolean;
 }
 
+/**
+ * Auto-prefix bare hosts with https:// and reject inputs that are not plausible
+ * http(s) URLs, so obvious typos fail client-side instead of being silently
+ * sent to the server (which reports them as failed but still accepts the call).
+ */
+export function normalizeExtractUrl(raw: string): string {
+  const candidate = raw.includes("://") ? raw : `https://${raw}`;
+  let parsed: URL;
+  try {
+    parsed = new URL(candidate);
+  } catch {
+    throw new OctenValidationError(`invalid URL: ${raw}`);
+  }
+  if (parsed.protocol !== "http:" && parsed.protocol !== "https:")
+    throw new OctenValidationError(`invalid URL (only http/https): ${raw}`);
+  const host = parsed.hostname;
+  // A real host is a domain (has a dot), an IP/IPv6 (has a colon), or localhost.
+  if (host !== "localhost" && !host.includes(".") && !host.includes(":"))
+    throw new OctenValidationError(
+      `invalid URL: ${raw} (expected a domain like example.com or a full https:// URL)`,
+    );
+  return candidate;
+}
+
 export function buildExtractRequest(urls: string[], o: ExtractOpts): Record<string, unknown> {
   if (urls.length < LIMITS.extractUrls.min || urls.length > LIMITS.extractUrls.max)
     throw new OctenValidationError(
@@ -42,14 +66,13 @@ export function buildExtractRequest(urls: string[], o: ExtractOpts): Record<stri
       `fetch-timeout must be ${LIMITS.extractTimeout.min}-${LIMITS.extractTimeout.max}`,
     );
 
-  // Auto-prefix bare hosts
-  const normalizedUrls = urls.map((u) => (u.includes("://") ? u : `https://${u}`));
+  if (o.maxAge != null && (o.maxAge < LIMITS.cacheWindow.min || o.maxAge > LIMITS.cacheWindow.max))
+    throw new OctenValidationError(
+      `max-age must be ${LIMITS.cacheWindow.min}-${LIMITS.cacheWindow.max} seconds`,
+    );
 
-  // Clamp maxAge
-  const maxAge =
-    o.maxAge != null
-      ? Math.min(LIMITS.cacheWindow.max, Math.max(LIMITS.cacheWindow.min, o.maxAge))
-      : undefined;
+  const normalizedUrls = urls.map(normalizeExtractUrl);
+  const maxAge = o.maxAge;
 
   const req: Record<string, unknown> = { urls: normalizedUrls };
   const put = (k: string, v: unknown) => { if (v != null) req[k] = v; };

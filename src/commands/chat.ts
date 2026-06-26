@@ -8,12 +8,86 @@ import { chooseMode, emit } from "../output/render.js";
 import { renderChat } from "../output/pretty/chat.js";
 import { makeClient, parseIntOpt, parseFloatOpt } from "./utils.js";
 
+export interface ReplStreams {
+  input: NodeJS.ReadableStream;
+  /** prompts, errors and notices (stderr) */
+  promptOut: NodeJS.WritableStream;
+  /** assistant replies (stdout) */
+  replyOut: NodeJS.WritableStream;
+}
+
+/**
+ * Drive an interactive chat REPL until the input closes (EOF, /exit, /quit).
+ * `send` performs one round-trip given the running history and returns the reply.
+ *
+ * Every readline operation is guarded by a `closed` flag: piped/scripted input
+ * can hit EOF (and close the interface) while a request is still in flight, and
+ * resuming/prompting a closed readline throws ERR_USE_AFTER_CLOSE.
+ */
+export async function runChatRepl(
+  streams: ReplStreams,
+  send: (history: ChatMessage[]) => Promise<string>,
+  system?: string,
+): Promise<void> {
+  const history: ChatMessage[] = [];
+  if (system) history.push({ role: "system", content: system });
+
+  const rl = createInterface({ input: streams.input, output: streams.promptOut, prompt: "> " });
+  let closed = false;
+  const prompt = () => {
+    if (!closed) rl.prompt();
+  };
+
+  await new Promise<void>((resolve) => {
+    rl.on("close", () => {
+      closed = true;
+      resolve();
+    });
+
+    rl.on("line", async (line: string) => {
+      const trimmed = line.trim();
+      if (trimmed === "/exit" || trimmed === "/quit") {
+        rl.close();
+        return;
+      }
+      if (trimmed === "/reset") {
+        history.length = 0;
+        if (system) history.push({ role: "system", content: system });
+        streams.promptOut.write("(conversation reset)\n");
+        prompt();
+        return;
+      }
+      if (!trimmed) {
+        prompt();
+        return;
+      }
+
+      history.push({ role: "user", content: trimmed });
+      rl.pause();
+      try {
+        const reply = await send(history);
+        history.push({ role: "assistant", content: reply });
+        streams.replyOut.write(reply + "\n");
+      } catch (err) {
+        streams.promptOut.write(`error: ${(err as Error).message}\n`);
+      } finally {
+        if (!closed) {
+          rl.resume();
+          rl.prompt();
+        }
+      }
+    });
+
+    rl.prompt();
+  });
+}
+
 export function registerChat(program: Command) {
   program
     .command("chat")
     .argument("[prompt]", "prompt (or read stdin / use -i)")
     .description("Chat completion")
-    .option("-m, --model <id>", "model ID")
+    .option("-m, --model <id>", "model ID, e.g. anthropic/claude-haiku-4.5 (required unless OCTEN_CHAT_MODEL is set)")
     .option("--system <s>", "system message")
     .option("--web-search <onoff>", "on|off")
     .option("--temperature <n>", "sampling temperature", parseFloatOpt("--temperature"))
@@ -47,44 +121,15 @@ export function registerChat(program: Command) {
 
       // ── REPL mode ──────────────────────────────────────────────────────────
       if (opts.interactive) {
-        const history: ChatMessage[] = [];
-        if (opts.system) history.push({ role: "system", content: opts.system });
-
-        const rl = createInterface({ input: process.stdin, output: process.stderr, prompt: "> " });
-        rl.prompt();
-
-        rl.on("line", async (line: string) => {
-          const trimmed = line.trim();
-          if (trimmed === "/exit" || trimmed === "/quit") {
-            rl.close();
-            return;
-          }
-          if (trimmed === "/reset") {
-            history.length = 0;
-            if (opts.system) history.push({ role: "system", content: opts.system });
-            process.stderr.write("(conversation reset)\n");
-            rl.prompt();
-            return;
-          }
-          if (!trimmed) { rl.prompt(); return; }
-
-          history.push({ role: "user", content: trimmed });
-          rl.pause();
-          try {
+        await runChatRepl(
+          { input: process.stdin, promptOut: process.stderr, replyOut: process.stdout },
+          async (history) => {
             const req = buildChatRequest(history, model, chatOpts);
             const res = await client.request<ChatCompletion>(ENDPOINTS.chat, req);
-            const reply: string = res?.choices?.[0]?.message?.content ?? "";
-            history.push({ role: "assistant", content: reply });
-            process.stdout.write(reply + "\n");
-          } catch (err) {
-            process.stderr.write(`error: ${(err as Error).message}\n`);
-          } finally {
-            rl.resume();
-            rl.prompt();
-          }
-        });
-
-        await new Promise<void>((resolve) => rl.on("close", resolve));
+            return res?.choices?.[0]?.message?.content ?? "";
+          },
+          opts.system,
+        );
         return;
       }
 

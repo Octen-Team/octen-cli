@@ -13,6 +13,29 @@ function validateEnum(flag: string, value: unknown, allowed: readonly string[]):
     throw new OctenValidationError(`${flag} must be one of: ${allowed.join(", ")}`);
 }
 
+/**
+ * Normalize a time bound to an ISO 8601 datetime the API accepts.
+ * A bare date (YYYY-MM-DD) is expanded to the start (00:00:00Z) or end
+ * (23:59:59Z) of that day; a full datetime passes through. Anything else is
+ * rejected client-side with a clear message instead of a server 400.
+ */
+export function normalizeTimeBound(
+  flag: string,
+  value: string | undefined,
+  endOfDay: boolean,
+): string | undefined {
+  if (value == null) return undefined;
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return endOfDay ? `${value}T23:59:59Z` : `${value}T00:00:00Z`;
+  }
+  if (/^\d{4}-\d{2}-\d{2}T/.test(value) && !Number.isNaN(Date.parse(value))) {
+    return value;
+  }
+  throw new OctenValidationError(
+    `${flag} must be a date (YYYY-MM-DD) or ISO datetime (e.g. 2024-01-01T00:00:00Z)`,
+  );
+}
+
 /** A single search result. All fields optional — the server is untyped. */
 export interface SearchResult {
   title?: string;
@@ -56,6 +79,10 @@ export function buildSearchRequest(query: string, o: SearchOpts): Record<string,
     throw new OctenValidationError(`include-text max ${LIMITS.includeText}`);
   if (o.excludeText && o.excludeText.length > LIMITS.excludeText)
     throw new OctenValidationError(`exclude-text max ${LIMITS.excludeText}`);
+  if (o.highlightMaxTokens != null && o.highlightMaxTokens < LIMITS.highlightMaxTokens.min)
+    throw new OctenValidationError(
+      `highlight-max-tokens must be at least ${LIMITS.highlightMaxTokens.min}`,
+    );
   validateEnum("--topic", o.topic, TOPIC_OPTIONS);
   validateEnum("--time-basis", o.timeBasis, TIME_BASIS_OPTIONS);
   validateEnum("--time-range", o.timeRange, TIME_RANGE_OPTIONS);
@@ -68,7 +95,8 @@ export function buildSearchRequest(query: string, o: SearchOpts): Record<string,
   put("include_domains", o.includeDomains); put("exclude_domains", o.excludeDomains);
   put("include_text", o.includeText); put("exclude_text", o.excludeText);
   put("time_basis", o.timeBasis); put("time_range", o.timeRange);
-  put("start_time", o.startTime); put("end_time", o.endTime);
+  put("start_time", normalizeTimeBound("--start-time", o.startTime, false));
+  put("end_time", normalizeTimeBound("--end-time", o.endTime, true));
   put("format", o.format); put("safesearch", o.safesearch);
   put("include_images", o.images); put("include_videos", o.videos);
   if (o.highlight) req.highlight = { enable: true, ...(o.highlightMaxTokens ? { max_tokens: o.highlightMaxTokens } : {}) };

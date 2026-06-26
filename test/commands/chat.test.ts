@@ -293,6 +293,35 @@ describe("chat REPL (-i) interactive mode", () => {
     // No further requests after /exit.
     expect(fetchSpy).toHaveBeenCalledTimes(3);
   });
+
+  it("does not resume/prompt after the interface closes mid-request (P1: ERR_USE_AFTER_CLOSE guard)", async () => {
+    // Hold the in-flight request open so we can close the readline first.
+    let resolveFetch!: (r: Response) => void;
+    vi.spyOn(globalThis, "fetch").mockReturnValue(
+      new Promise<Response>((r) => {
+        resolveFetch = r;
+      }) as unknown as Promise<Response>,
+    );
+
+    const prog = makeProgram();
+    const done = prog.parseAsync([
+      "node", "octen", "chat", "-i",
+      "-m", "test-model",
+      "--api-key", "k",
+    ]);
+
+    const rl = fakeRlHolder.current!;
+    // Start a turn but DON'T await — its request is still pending.
+    const turn = rl.emitLine("hi");
+    // EOF arrives while the request is in flight (the piped-input scenario).
+    rl.emitClose();
+    // Now the request completes; the finally block must NOT touch the closed rl.
+    resolveFetch(jsonResponse({ choices: [{ message: { content: "late reply" } }] }));
+    await turn;
+    await done;
+
+    expect(rl.resume).not.toHaveBeenCalled();
+  });
 });
 
 describe("chat piped stdin prompt", () => {

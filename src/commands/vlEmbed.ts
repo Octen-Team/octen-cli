@@ -76,7 +76,7 @@ export function registerVlEmbed(program: Command) {
     .command("vl-embed")
     .argument("<content...>", "ordered content tokens: text:... image:... video:...")
     .description("Create multimodal embeddings")
-    .option("-m, --model <id>", "model: base | large | full id")
+    .option("-m, --model <id>", "model (required): base | large | full id")
     .option("--dimension <n>", "output vector dimension", parseIntOpt("--dimension"))
     .option("--fps <n>", "video frames per second to sample", parseFloatOpt("--fps"))
     .option("--instruct <s>", "task instruction for embedding")

@@ -36,4 +36,23 @@ describe("buildSearchRequest", () => {
   it("rejects an invalid format", () => {
     expect(() => buildSearchRequest("hi", { format: "x" as never })).toThrow(OctenValidationError);
   });
+  it("rejects highlight-max-tokens below the 100 minimum", () => {
+    expect(() => buildSearchRequest("hi", { highlight: true, highlightMaxTokens: 50 })).toThrow(
+      OctenValidationError,
+    );
+  });
+  it("expands a bare start/end date to start/end of day", () => {
+    expect(buildSearchRequest("hi", { startTime: "2024-01-01", endTime: "2024-12-31" })).toMatchObject({
+      start_time: "2024-01-01T00:00:00Z",
+      end_time: "2024-12-31T23:59:59Z",
+    });
+  });
+  it("passes a full ISO datetime through unchanged", () => {
+    expect(buildSearchRequest("hi", { startTime: "2024-01-01T08:30:00Z" })).toMatchObject({
+      start_time: "2024-01-01T08:30:00Z",
+    });
+  });
+  it("rejects an unparseable time bound", () => {
+    expect(() => buildSearchRequest("hi", { startTime: "last tuesday" })).toThrow(OctenValidationError);
+  });
 });
