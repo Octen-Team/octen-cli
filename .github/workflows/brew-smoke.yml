@@ -18,3 +18,9 @@ jobs:
           which octen
           octen --version
           octen completion zsh | head -1
+      - name: Uninstall round-trip
+        run: |
+          brew uninstall octen
+          brew untap Octen-Team/tap
+          if brew list octen >/dev/null 2>&1; then echo "ERROR: still installed"; exit 1; fi
+          echo "uninstalled cleanly"
