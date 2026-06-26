@@ -86,8 +86,18 @@ function bashScript(model: CompletionModel): string {
 
 function zshScript(model: CompletionModel): string {
   // Reuse the bash function through zsh's bashcompinit shim. This is reliable
-  // and stays in sync with the bash implementation.
-  return `#compdef octen\n# octen zsh completion. Source via: eval "$(octen completion zsh)"\nif ! whence -w bashcompinit >/dev/null 2>&1; then\n  autoload -Uz bashcompinit\nfi\nbashcompinit\n${bashFunction(model)}\n`;
+  // and stays in sync with the bash implementation. bashcompinit depends on the
+  // zsh completion system, so initialize compinit first if the user's shell
+  // hasn't already (makes a bare `source`/`eval` work without extra setup).
+  const preamble = [
+    "#compdef octen",
+    '# octen zsh completion. Source via: eval "$(octen completion zsh)"',
+    "if ! whence compdef >/dev/null 2>&1; then",
+    "  autoload -Uz compinit && compinit -u",
+    "fi",
+    "autoload -Uz bashcompinit && bashcompinit",
+  ].join("\n");
+  return `${preamble}\n${bashFunction(model)}\n`;
 }
 
 /** Strip leading dashes for fish's `-l`/`-s` which want bare names. */

@@ -73,6 +73,8 @@ describe("completion command", () => {
     const out = await run("zsh");
     expect(out.length).toBeGreaterThan(0);
     expect(out).toContain("bashcompinit");
+    // self-initializes compinit so a bare source/eval works without extra setup
+    expect(out).toContain("autoload -Uz compinit");
     expect(out).toContain("search");
     expect(out).toContain("fetch");
     expect(out).toContain("configure-mcp");

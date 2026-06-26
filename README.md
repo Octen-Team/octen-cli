@@ -8,6 +8,12 @@ Command-line tool for Octen — web search, extract, chat, embeddings, and one-c
 npm i -g @octen.ai/cli
 ```
 
+Then enable tab-completion (one-time; `bash` / `zsh` / `fish`):
+
+```sh
+octen completion zsh --install     # writes to ~/.zshrc — then: source ~/.zshrc
+```
+
 Or run without installing:
 
 ```sh
