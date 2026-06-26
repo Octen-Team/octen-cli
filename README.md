@@ -11,6 +11,7 @@ npm i -g @octen.ai/cli
 ```
 
 Or run without installing: `npx @octen.ai/cli <command>`. Requires Node.js 18+.
+Uninstall: `npm uninstall -g @octen.ai/cli`.
 
 ### Without Node.js — Homebrew (macOS/Linux)
 
