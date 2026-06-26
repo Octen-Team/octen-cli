@@ -184,17 +184,22 @@ Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, plus per-cli
 
 ## Shell completion
 
-`octen completion <shell>` prints a completion script for `bash`, `zsh`, or `fish`. It completes subcommand names and each subcommand's flags.
+`octen completion <shell>` (bash | zsh | fish) sets up tab-completion for subcommands and flags.
+
+**Easiest — `--install`** writes it into your shell config for you (idempotent):
 
 ```sh
-# zsh — add to ~/.zshrc
-eval "$(octen completion zsh)"
+octen completion zsh --install     # appends to ~/.zshrc
+octen completion bash --install    # appends to ~/.bashrc
+octen completion fish --install    # writes ~/.config/fish/completions/octen.fish
+```
 
-# bash — add to ~/.bashrc
-eval "$(octen completion bash)"
+Then `source ~/.zshrc` (or open a new terminal) to activate it in the current session.
 
-# fish — write to the completions dir
-octen completion fish > ~/.config/fish/completions/octen.fish
+**Manual** — print the script and source it yourself (a subprocess can't change your running shell, so this is how to activate it immediately in the current shell):
+
+```sh
+eval "$(octen completion zsh)"     # add this line to ~/.zshrc to persist
 ```
 
 ---

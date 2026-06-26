@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Command } from "commander";
 import { OctenValidationError } from "../../src/api/errors.js";
 import { registerSearch } from "../../src/commands/search.js";
@@ -90,5 +93,42 @@ describe("completion command", () => {
     await expect(
       prog.parseAsync(["node", "octen", "completion", "powershell"]),
     ).rejects.toThrow(OctenValidationError);
+  });
+
+  it("--install appends an idempotent eval line to ~/.zshrc under injected home", async () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-comp-"));
+    try {
+      const make = () => {
+        const prog = new Command();
+        prog.name("octen").exitOverride();
+        registerCompletion(prog, { home });
+        return prog;
+      };
+      await make().parseAsync(["node", "octen", "completion", "zsh", "--install"]);
+      const rc = join(home, ".zshrc");
+      const evalLine = 'eval "$(octen completion zsh)"';
+      expect(readFileSync(rc, "utf8")).toContain(evalLine);
+      // Idempotent: a second install does not duplicate the line.
+      await make().parseAsync(["node", "octen", "completion", "zsh", "--install"]);
+      const occurrences = readFileSync(rc, "utf8").split(evalLine).length - 1;
+      expect(occurrences).toBe(1);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("--install writes fish completion into the completions dir", async () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-comp-"));
+    try {
+      const prog = new Command();
+      prog.name("octen").exitOverride();
+      registerCompletion(prog, { home });
+      await prog.parseAsync(["node", "octen", "completion", "fish", "--install"]);
+      const file = join(home, ".config/fish/completions/octen.fish");
+      expect(existsSync(file)).toBe(true);
+      expect(readFileSync(file, "utf8")).toContain("complete -c octen");
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

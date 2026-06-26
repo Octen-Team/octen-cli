@@ -1,5 +1,9 @@
+import { existsSync, readFileSync, appendFileSync, writeFileSync, mkdirSync } from "node:fs";
+import os from "node:os";
+import { join } from "node:path";
 import type { Command, Option } from "commander";
 import { OctenValidationError } from "../api/errors.js";
+import { quotePath } from "../util/quotePath.js";
 
 const SUPPORTED_SHELLS = ["bash", "zsh", "fish"] as const;
 type Shell = (typeof SUPPORTED_SHELLS)[number];
@@ -138,13 +142,72 @@ export function buildCompletionScript(program: Command, shell: string): string {
   }
 }
 
-export function registerCompletion(program: Command) {
+interface CompletionInternalOpts {
+  /** Injected home dir (for testing); defaults to os.homedir() */
+  home?: string;
+}
+
+/**
+ * Persist completion into the user's shell config.
+ * - bash/zsh: append an idempotent `eval "$(octen completion <shell>)"` line to
+ *   the rc file, so it stays in sync with the CLI and loads in new shells.
+ * - fish: write the generated script into the auto-loaded completions dir.
+ */
+function installCompletion(
+  shell: Shell,
+  program: Command,
+  home: string,
+): { action: "installed" | "already" | "written"; path: string } {
+  if (shell === "fish") {
+    const dir = join(home, ".config/fish/completions");
+    mkdirSync(dir, { recursive: true });
+    const file = join(dir, "octen.fish");
+    writeFileSync(file, buildCompletionScript(program, "fish"), "utf8");
+    return { action: "written", path: file };
+  }
+
+  const rc = shell === "zsh" ? join(home, ".zshrc") : join(home, ".bashrc");
+  const line = `eval "$(octen completion ${shell})"`;
+  const existing = existsSync(rc) ? readFileSync(rc, "utf8") : "";
+  if (existing.includes(line)) {
+    return { action: "already", path: rc };
+  }
+  const prefix = existing === "" || existing.endsWith("\n") ? "" : "\n";
+  appendFileSync(rc, `${prefix}\n# octen CLI completion\n${line}\n`, "utf8");
+  return { action: "installed", path: rc };
+}
+
+export function registerCompletion(program: Command, internal: CompletionInternalOpts = {}) {
   program
     .command("completion")
     .argument("<shell>", "bash | zsh | fish")
-    .description("Output a shell completion script")
-    .action((shell: string) => {
+    .description("Output a shell completion script (or --install it into your shell config)")
+    .option("--install", "write the completion into your shell config instead of printing")
+    .action((shell: string, opts: { install?: boolean }) => {
+      // Validates the shell (throws OctenValidationError for unknown shells).
       const script = buildCompletionScript(program, shell);
-      process.stdout.write(script);
+
+      if (!opts.install) {
+        process.stdout.write(script);
+        return;
+      }
+
+      const home = internal.home ?? os.homedir();
+      const result = installCompletion(shell as Shell, program, home);
+      if (result.action === "already") {
+        process.stdout.write(`completion already installed in ${quotePath(result.path)}\n`);
+      } else if (result.action === "written") {
+        process.stdout.write(
+          `wrote fish completion to ${quotePath(result.path)} (new shells pick it up automatically)\n`,
+        );
+      } else {
+        process.stdout.write(`added octen completion to ${quotePath(result.path)}\n`);
+      }
+      if (shell !== "fish") {
+        const rc = shell === "zsh" ? "~/.zshrc" : "~/.bashrc";
+        process.stdout.write(
+          `run \`source ${rc}\` (or open a new terminal) to activate it now\n`,
+        );
+      }
     });
 }
