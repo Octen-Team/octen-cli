@@ -29,7 +29,11 @@ describe("search command", () => {
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({ results: [{ title: "T", url: "https://x.com" }] }),
+      jsonResponse({
+        data: { results: [{ title: "T", url: "https://x.com" }] },
+        code: 0,
+        msg: "success",
+      }),
     );
     writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   });
@@ -51,11 +55,24 @@ describe("search command", () => {
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body).toMatchObject({ query: "hi" });
 
-    // Verify output is parseable JSON
+    // Verify output is parseable JSON — the raw API envelope is dumped verbatim
     expect(writeSpy).toHaveBeenCalled();
     const captured = writeSpy.mock.calls.map((c) => String(c[0])).join("");
     const parsed = JSON.parse(captured);
-    expect(parsed).toMatchObject({ results: [{ title: "T", url: "https://x.com" }] });
+    expect(parsed).toMatchObject({ data: { results: [{ title: "T", url: "https://x.com" }] } });
+  });
+
+  it("joins an unquoted multi-word query into a single query string", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "search", "openai", "latest", "news",
+      "--json", "--api-key", "k",
+    ]);
+
+    expect(fetchSpy).toHaveBeenCalledOnce();
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).toMatchObject({ query: "openai latest news" });
   });
 
   it("news command forces topic=news in request body", async () => {

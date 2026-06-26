@@ -1,23 +1,29 @@
 import { describe, it, expect } from "vitest";
 import { renderExtract } from "../../../src/output/pretty/extract.js";
 
+// Primary fixture mirrors the REAL Octen API envelope: results live at data.results.
 const fixture = {
-  items: [
-    {
-      url: "https://example.com/article",
-      status: "success",
-      title: "Example Article",
-      category: { primary: "Technology", secondary: "AI" },
-      page_structure: { primary: "article", secondary: "blog" },
-      time_published: "2024-01-01",
-      highlights: ["This is a key highlight from the article."],
-    },
-    {
-      url: "https://broken.com/page",
-      status: "failed",
-      error_message: "Connection timed out",
-    },
-  ],
+  data: {
+    results: [
+      {
+        url: "https://example.com/article",
+        status: "success",
+        title: "Example Article",
+        category: { primary: "Technology", secondary: "AI" },
+        page_structure: { primary: "article", secondary: "blog" },
+        time_last_crawled: "2024-01-01",
+        highlights: ["This is a key highlight from the article."],
+      },
+      {
+        url: "https://broken.com/page",
+        status: "failed",
+        error_message: "Connection timed out",
+      },
+    ],
+  },
+  code: 0,
+  msg: "success",
+  request_id: "req-1",
 };
 
 describe("renderExtract", () => {
@@ -52,8 +58,8 @@ describe("renderExtract", () => {
     expect(out).toContain("Connection timed out");
   });
 
-  it("handles empty items array", () => {
-    const out = renderExtract({ items: [] });
+  it("handles empty results array", () => {
+    const out = renderExtract({ data: { results: [] }, code: 0, msg: "success" });
     expect(typeof out).toBe("string");
     expect(out.length).toBeGreaterThan(0);
   });
@@ -64,9 +70,9 @@ describe("renderExtract", () => {
     expect(out.length).toBeGreaterThan(0);
   });
 
-  it("falls back to results array if items is absent", () => {
+  it("still renders an un-enveloped (top-level items) response via the ?? data fallback", () => {
     const data = {
-      results: [
+      items: [
         {
           url: "https://results.com",
           status: "success",
@@ -81,17 +87,25 @@ describe("renderExtract", () => {
     expect(out).toContain("Some content here from full_content field.");
   });
 
+  it("surfaces an app-level API error (non-zero code) instead of 'No results.'", () => {
+    const out = renderExtract({ data: {}, code: 40001, msg: "invalid url" });
+    expect(out).toContain("error");
+    expect(out).toContain("invalid url");
+  });
+
   it("truncates long full_content to ~500 chars when no highlights", () => {
     const longContent = "A".repeat(1000);
     const data = {
-      items: [
-        {
-          url: "https://long.com",
-          status: "success",
-          title: "Long Article",
-          full_content: longContent,
-        },
-      ],
+      data: {
+        results: [
+          {
+            url: "https://long.com",
+            status: "success",
+            title: "Long Article",
+            full_content: longContent,
+          },
+        ],
+      },
     };
     const out = renderExtract(data);
     // Should be truncated, not full 1000 chars

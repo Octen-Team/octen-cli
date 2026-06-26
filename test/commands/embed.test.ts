@@ -9,9 +9,14 @@ function jsonResponse(body: unknown, status = 200) {
   });
 }
 
+// Mirrors the REAL Octen API envelope: results live at data.results.
 const MOCK_RESPONSE = {
-  model: "octen-embedding-4b",
-  data: [{ embedding: [1, 2, 3] }],
+  data: {
+    model: "octen-embedding-4b",
+    results: [{ index: 0, embedding: [1, 2, 3] }],
+  },
+  code: 0,
+  msg: "success",
 };
 
 function makeProgram() {

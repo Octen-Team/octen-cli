@@ -28,7 +28,11 @@ describe("fetch command", () => {
 
   beforeEach(() => {
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({ items: [{ url: "https://x.com", status: "success", title: "T" }] }),
+      jsonResponse({
+        data: { results: [{ url: "https://x.com", status: "success", title: "T" }] },
+        code: 0,
+        msg: "success",
+      }),
     );
     writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   });
@@ -51,7 +55,7 @@ describe("fetch command", () => {
     expect(writeSpy).toHaveBeenCalled();
     const captured = writeSpy.mock.calls.map((c) => String(c[0])).join("");
     const parsed = JSON.parse(captured);
-    expect(parsed).toMatchObject({ items: [{ url: "https://x.com", status: "success", title: "T" }] });
+    expect(parsed).toMatchObject({ data: { results: [{ url: "https://x.com", status: "success", title: "T" }] } });
   });
 
   it("auto-prefixes bare host to https:// in request body", async () => {

@@ -1,12 +1,29 @@
 import pc from "picocolors";
-import type { SearchResponse, SearchResult } from "../../api/search.js";
+import type { SearchResult } from "../../api/search.js";
 
 const MAX_SNIPPET = 300;
 
-export function renderSearch(data: SearchResponse): string {
-  const res: SearchResult[] = data?.results ?? [];
+export function renderSearch(data: any): string {
+  // The Octen API wraps the payload in an envelope: { data: { results }, code, msg, ... }.
+  // Unwrap to the inner body only when `data.data` is a non-array object (the real
+  // API shape); fall back to the raw object otherwise so un-enveloped inputs still work.
+  const inner = (data as any)?.data;
+  const body: any =
+    data && typeof data === "object" && inner && typeof inner === "object" && !Array.isArray(inner)
+      ? inner
+      : data;
 
-  if (!res.length) return pc.dim("No results.");
+  const res: SearchResult[] = body?.results ?? [];
+
+  if (!res.length) {
+    // Surface app-level API errors (non-zero code) instead of a bland "No results."
+    const code = (data as any)?.code;
+    const msg = (data as any)?.msg;
+    if (code != null && code !== 0 && msg) {
+      return pc.red(`error: ${msg}`);
+    }
+    return pc.dim("No results.");
+  }
 
   return res
     .map((r, i) => {

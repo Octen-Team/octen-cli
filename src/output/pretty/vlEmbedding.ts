@@ -1,26 +1,35 @@
 import pc from "picocolors";
-import type { VLEmbeddingResponse } from "../../api/vlEmbedding.js";
 
 /**
  * Render an Octen /vl-embedding response in a compact table.
  *
- * Response shape is handled robustly:
- *   - item list at data.data ?? data.embeddings ?? data.items ?? []
+ * The Octen API wraps the payload in an envelope: { data: { results }, code, msg, ... }.
+ * We unwrap to the inner body when present, then handle the shape robustly:
+ *   - item list at body.results ?? body.data ?? body.embeddings ?? body.items ?? []
  *   - each item's vector at item.embedding ?? item.vector ?? item (bare array)
  *   - item type label at item.type (e.g. "fusion" | "vl") when present
- *   - model from data.model
+ *   - model from body.model ?? data.model
  *
  * Raw float arrays are never printed — use --json for those.
  */
-export function renderVlEmbedding(data: VLEmbeddingResponse): string {
+export function renderVlEmbedding(data: any): string {
+  // Unwrap the envelope only when `data.data` is a non-array object (the real
+  // API shape). When `data.data` is itself an array (legacy un-enveloped shape),
+  // keep `data` as-is so the `?? data` fallback paths below still work.
+  const inner = (data as any)?.data;
+  const body: any =
+    data && typeof data === "object" && inner && typeof inner === "object" && !Array.isArray(inner)
+      ? inner
+      : data;
+
   const items: unknown[] =
-    (data?.data ?? data?.embeddings ?? data?.items ?? []) as unknown[];
+    (body?.results ?? body?.data ?? body?.embeddings ?? body?.items ?? []) as unknown[];
 
   if (!items.length) {
     return pc.dim("No embeddings returned.");
   }
 
-  const model: string | undefined = data?.model;
+  const model: string | undefined = body?.model ?? (data as any)?.model;
   const modelLabel = model ? pc.dim(` (${model})`) : "";
 
   const lines: string[] = [];

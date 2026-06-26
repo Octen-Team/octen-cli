@@ -1,13 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { renderVlEmbedding } from "../../../src/output/pretty/vlEmbedding.js";
 
+// Primary fixture mirrors the REAL Octen API envelope: results live at data.results.
 const fixture = {
-  model: "octen-vl-embedding",
-  data: [{ embedding: [1, 2, 3, 4], type: "vl" }],
+  data: {
+    model: "octen-vl-embedding",
+    results: [{ index: 0, embedding: [1, 2, 3, 4], type: "vl" }],
+  },
+  code: 0,
+  msg: "success",
 };
 
 describe("renderVlEmbedding", () => {
-  it("renders dimension count (4)", () => {
+  it("unwraps the envelope and renders dimension count (4)", () => {
     const out = renderVlEmbedding(fixture);
     expect(out).toContain("4");
   });
@@ -33,7 +38,18 @@ describe("renderVlEmbedding", () => {
     expect(out).not.toContain("1, 2, 3");
   });
 
-  it("handles data.embeddings as alternative array", () => {
+  it("still renders an un-enveloped (top-level data) response via the ?? data fallback", () => {
+    const flat = {
+      model: "octen-vl-embedding",
+      data: [{ embedding: [1, 2, 3, 4], type: "vl" }],
+    };
+    const out = renderVlEmbedding(flat);
+    expect(out).toContain("4");
+    expect(out).toContain("vl");
+    expect(out).toContain("octen-vl-embedding");
+  });
+
+  it("handles embeddings as alternative array", () => {
     const alt = {
       model: "octen-vl-embedding",
       embeddings: [{ embedding: [1, 2, 3, 4, 5], type: "fusion" }],
@@ -43,7 +59,7 @@ describe("renderVlEmbedding", () => {
     expect(out).toContain("fusion");
   });
 
-  it("handles data.items as alternative array", () => {
+  it("handles items as alternative array", () => {
     const alt = {
       model: "octen-vl-embedding",
       items: [{ embedding: [1, 2], type: "vl" }],
@@ -54,8 +70,7 @@ describe("renderVlEmbedding", () => {
 
   it("handles item.vector as alternative to item.embedding", () => {
     const alt = {
-      model: "octen-vl-embedding",
-      data: [{ vector: [1, 2, 3], type: "vl" }],
+      data: { results: [{ vector: [1, 2, 3], type: "vl" }] },
     };
     const out = renderVlEmbedding(alt);
     expect(out).toContain("3");
@@ -63,7 +78,7 @@ describe("renderVlEmbedding", () => {
 
   it("handles bare array item", () => {
     const alt = {
-      data: [[0.1, 0.2, 0.3, 0.4, 0.5]],
+      data: { results: [[0.1, 0.2, 0.3, 0.4, 0.5]] },
     };
     const out = renderVlEmbedding(alt);
     expect(out).toContain("5");
@@ -71,11 +86,13 @@ describe("renderVlEmbedding", () => {
 
   it("handles multiple items", () => {
     const multi = {
-      model: "octen-vl-embedding",
-      data: [
-        { embedding: [1, 2, 3], type: "vl" },
-        { embedding: [1, 2, 3, 4, 5, 6], type: "fusion" },
-      ],
+      data: {
+        model: "octen-vl-embedding",
+        results: [
+          { embedding: [1, 2, 3], type: "vl" },
+          { embedding: [1, 2, 3, 4, 5, 6], type: "fusion" },
+        ],
+      },
     };
     const out = renderVlEmbedding(multi);
     expect(out).toContain("3");
@@ -83,8 +100,8 @@ describe("renderVlEmbedding", () => {
     expect(out).toContain("fusion");
   });
 
-  it("handles empty data with a friendly fallback message", () => {
-    const out = renderVlEmbedding({ data: [] });
+  it("handles empty results with a friendly fallback message", () => {
+    const out = renderVlEmbedding({ data: { results: [] } });
     expect(typeof out).toBe("string");
     expect(out.length).toBeGreaterThan(0);
   });

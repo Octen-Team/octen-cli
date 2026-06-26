@@ -1,16 +1,21 @@
 import { describe, it, expect } from "vitest";
 import { renderEmbedding } from "../../../src/output/pretty/embedding.js";
 
+// Primary fixture mirrors the REAL Octen API envelope: results live at data.results.
 const fixture = {
-  model: "octen-embedding-4b",
-  data: [
-    { embedding: [0.1, 0.2, 0.3] },
-    { embedding: [0.4, 0.5, 0.6] },
-  ],
+  data: {
+    model: "octen-embedding-4b",
+    results: [
+      { index: 0, embedding: [0.1, 0.2, 0.3] },
+      { index: 1, embedding: [0.4, 0.5, 0.6] },
+    ],
+  },
+  code: 0,
+  msg: "success",
 };
 
 describe("renderEmbedding", () => {
-  it("renders dimension count (3) for each vector", () => {
+  it("unwraps the envelope and renders dimension count (3) for each vector", () => {
     const out = renderEmbedding(fixture);
     expect(out).toContain("3");
   });
@@ -31,7 +36,17 @@ describe("renderEmbedding", () => {
     expect(out).not.toContain("0.4");
   });
 
-  it("handles embeddings field as alternative to data array", () => {
+  it("still renders an un-enveloped (top-level data) response via the ?? data fallback", () => {
+    const flat = {
+      model: "octen-embedding-4b",
+      data: [{ embedding: [1, 2, 3, 4] }],
+    };
+    const out = renderEmbedding(flat);
+    expect(out).toContain("4");
+    expect(out).toContain("octen-embedding-4b");
+  });
+
+  it("handles embeddings field as alternative to results array", () => {
     const alt = {
       model: "octen-embedding-4b",
       embeddings: [{ embedding: [1, 2, 3, 4] }],
@@ -42,7 +57,7 @@ describe("renderEmbedding", () => {
 
   it("handles item.vector as alternative to item.embedding", () => {
     const alt = {
-      data: [{ vector: [1, 2, 3, 4, 5] }],
+      data: { results: [{ vector: [1, 2, 3, 4, 5] }] },
     };
     const out = renderEmbedding(alt);
     expect(out).toContain("5");
@@ -50,14 +65,14 @@ describe("renderEmbedding", () => {
 
   it("handles item itself being the array (bare array item)", () => {
     const alt = {
-      data: [[0.1, 0.2, 0.3, 0.4]],
+      data: { results: [[0.1, 0.2, 0.3, 0.4]] },
     };
     const out = renderEmbedding(alt);
     expect(out).toContain("4");
   });
 
-  it("handles empty data gracefully with friendly message", () => {
-    const out = renderEmbedding({ data: [] });
+  it("handles empty results gracefully with friendly message", () => {
+    const out = renderEmbedding({ data: { results: [] } });
     expect(typeof out).toBe("string");
     expect(out.length).toBeGreaterThan(0);
   });

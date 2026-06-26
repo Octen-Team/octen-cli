@@ -7,7 +7,7 @@ import { makeClient, parseIntOpt } from "./utils.js";
 
 export function registerSearch(program: Command, fixedTopic?: "news") {
   const cmd = program.command(fixedTopic ?? "search")
-    .argument("<query>", "search query")
+    .argument("<query...>", "search query")
     .description(fixedTopic ? "News-focused web search" : "Search the live web")
     .option("-n, --count <n>", "results 1-100", parseIntOpt("--count"))
     .option("--include-domains <list>", "comma list", (v) => v.split(","))
@@ -22,9 +22,10 @@ export function registerSearch(program: Command, fixedTopic?: "news") {
     .option("--images").option("--videos");
   if (!fixedTopic) cmd.option("--topic <t>", "general|news");
 
-  cmd.action(async (query: string, opts: SearchOpts, command: Command) => {
+  cmd.action(async (queryArg: string[] | string, opts: SearchOpts, command: Command) => {
     const g = command.optsWithGlobals();
     const client = makeClient(g);
+    const query = Array.isArray(queryArg) ? queryArg.join(" ") : queryArg;
     const searchOpts: SearchOpts = { ...opts, topic: fixedTopic ?? opts.topic };
     const req = buildSearchRequest(query, searchOpts);
     const res = await client.request<SearchResponse>(ENDPOINTS.search, req);

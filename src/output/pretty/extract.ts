@@ -1,15 +1,32 @@
 import pc from "picocolors";
-import type { ExtractItem, ExtractResponse } from "../../api/extract.js";
+import type { ExtractItem } from "../../api/extract.js";
 
 const MAX_CONTENT = 500;
 
-export function renderExtract(data: ExtractResponse): string {
+export function renderExtract(data: any): string {
+  // The Octen API wraps the payload in an envelope: { data: { results }, code, msg, ... }.
+  // Unwrap to the inner body only when `data.data` is a non-array object (the real
+  // API shape); fall back to the raw object otherwise so un-enveloped inputs still work.
+  const inner = (data as any)?.data;
+  const body: any =
+    data && typeof data === "object" && inner && typeof inner === "object" && !Array.isArray(inner)
+      ? inner
+      : data;
+
   const items: ExtractItem[] =
-    data?.items ??
-    data?.results ??
+    body?.items ??
+    body?.results ??
     [];
 
-  if (!items.length) return pc.dim("No results.");
+  if (!items.length) {
+    // Surface app-level API errors (non-zero code) instead of a bland "No results."
+    const code = (data as any)?.code;
+    const msg = (data as any)?.msg;
+    if (code != null && code !== 0 && msg) {
+      return pc.red(`error: ${msg}`);
+    }
+    return pc.dim("No results.");
+  }
 
   return items
     .map((item) => {

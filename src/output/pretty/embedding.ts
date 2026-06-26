@@ -1,24 +1,34 @@
 import pc from "picocolors";
-import type { EmbeddingResponse } from "../../api/embedding.js";
 
 /**
  * Render an OpenAI-style /embedding response in a compact table.
- * The response shape is handled robustly:
- *   - vectors at data.data ?? data.embeddings ?? []
+ *
+ * The Octen API wraps the payload in an envelope: { data: { results }, code, msg, ... }.
+ * We unwrap to the inner body when present, then handle the shape robustly:
+ *   - vectors at body.results ?? body.data ?? body.embeddings ?? []
  *   - each item's vector at item.embedding ?? item.vector ?? item (item may itself be the array)
- *   - model at data.model
+ *   - model at body.model ?? data.model
  *
  * Raw float arrays are never printed in pretty mode.
  */
-export function renderEmbedding(data: EmbeddingResponse): string {
+export function renderEmbedding(data: any): string {
+  // Unwrap the envelope only when `data.data` is a non-array object (the real
+  // API shape). When `data.data` is itself an array (legacy un-enveloped shape),
+  // keep `data` as-is so the `?? data` fallback paths below still work.
+  const inner = (data as any)?.data;
+  const body: any =
+    data && typeof data === "object" && inner && typeof inner === "object" && !Array.isArray(inner)
+      ? inner
+      : data;
+
   const items: unknown[] =
-    (data?.data ?? data?.embeddings ?? []) as unknown[];
+    (body?.results ?? body?.data ?? body?.embeddings ?? []) as unknown[];
 
   if (!items.length) {
     return pc.dim("No embeddings returned.");
   }
 
-  const model: string | undefined = data?.model;
+  const model: string | undefined = body?.model ?? (data as any)?.model;
 
   const lines: string[] = [];
 
