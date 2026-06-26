@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
@@ -22,7 +22,11 @@ afterEach(() => {
   process.exitCode = undefined;
 });
 
-function makeProgram(home: string, cwd: string) {
+function makeProgram(
+  home: string,
+  cwd: string,
+  isInstalled: (id: string) => boolean = () => true,
+) {
   const prog = new Command();
   prog
     .name("octen")
@@ -32,7 +36,7 @@ function makeProgram(home: string, cwd: string) {
     .option("--pretty", "human-readable output")
     .exitOverride();
   // Inject temp dirs and disable claude CLI to avoid real side effects
-  registerConfigureMcp(prog, { home, cwd, hasClaudeCli: false });
+  registerConfigureMcp(prog, { home, cwd, hasClaudeCli: false, isInstalled });
   return prog;
 }
 
@@ -165,6 +169,76 @@ describe("configure-mcp per-client error isolation", () => {
 
     // (c) Exit code set to 1.
     expect(process.exitCode).toBe(1);
+  });
+});
+
+describe("configure-mcp client-installed detection", () => {
+  it("--cursor with client not installed writes nothing and warns", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home, () => false);
+
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await prog.parseAsync([
+      "node", "octen", "configure-mcp", "--cursor", "--api-key", "k",
+    ]);
+
+    // No file should be written.
+    expect(existsSync(join(home, ".cursor/mcp.json"))).toBe(false);
+
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(stderr).toMatch(/not detected/);
+  });
+
+  it("--cursor with --force configures even when client not detected", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home, () => false);
+
+    await prog.parseAsync([
+      "node", "octen", "configure-mcp", "--cursor", "--api-key", "k", "--force",
+    ]);
+
+    const obj = JSON.parse(readFileSync(join(home, ".cursor/mcp.json"), "utf8"));
+    expect(obj.mcpServers.octen.command).toBe("npx");
+  });
+
+  it("--all configures only detected clients and prints skipped list", async () => {
+    const home = makeTmp();
+    const installedMap: Record<string, boolean> = {
+      "claude-code": false,
+      "claude-desktop": false,
+      cursor: true,
+      windsurf: false,
+      vscode: false,
+      codex: true,
+    };
+    const prog = makeProgram(home, home, (id) => installedMap[id] ?? false);
+
+    const stdoutLines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdoutLines.push(String(chunk));
+      return true;
+    });
+
+    await prog.parseAsync([
+      "node", "octen", "configure-mcp", "--all", "--api-key", "k",
+    ]);
+
+    // Detected clients configured.
+    expect(existsSync(join(home, ".cursor/mcp.json"))).toBe(true);
+    expect(existsSync(join(home, ".codex/config.toml"))).toBe(true);
+    // Undetected clients NOT configured.
+    expect(existsSync(join(home, ".claude.json"))).toBe(false);
+    expect(
+      existsSync(
+        join(home, "Library/Application Support/Claude/claude_desktop_config.json"),
+      ),
+    ).toBe(false);
+
+    const output = stdoutLines.join("");
+    expect(output).toMatch(/skipped \(not installed\):/);
   });
 });
 

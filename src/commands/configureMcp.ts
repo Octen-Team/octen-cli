@@ -5,6 +5,7 @@ import { MCP_CLIENTS } from "../mcp/clients.js";
 import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
+import { isClientInstalled } from "../util/detectClient.js";
 
 interface ConfigureMcpInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -13,6 +14,8 @@ interface ConfigureMcpInternalOpts {
   cwd?: string;
   /** Override claude CLI detection (for testing) */
   hasClaudeCli?: boolean;
+  /** Override client-installed detection (for testing) */
+  isInstalled?: (id: string) => boolean;
 }
 
 // Exported so tests can call with injected dirs
@@ -36,6 +39,7 @@ export function registerConfigureMcp(
       "user",
     )
     .option("--pin <ver>", "pin octen-mcp to a specific version, e.g. 0.2.1")
+    .option("--force", "configure even if the client is not detected")
     .action(async (_opts: Record<string, any>, command: Command) => {
       const g = command.optsWithGlobals();
       const opts = command.opts() as {
@@ -48,6 +52,7 @@ export function registerConfigureMcp(
         codex?: boolean;
         scope: string;
         pin?: string;
+        force?: boolean;
       };
 
       const scope = (opts.scope === "project" ? "project" : "user") as
@@ -75,6 +80,8 @@ export function registerConfigureMcp(
       // Determine the effective home/cwd
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();
+      const isInstalled =
+        internal.isInstalled ?? ((id: string) => isClientInstalled(id, { home }));
 
       const installOpts: InstallOpts = { hasClaudeCli: internal.hasClaudeCli };
 
@@ -106,13 +113,40 @@ export function registerConfigureMcp(
         return;
       }
 
-      // INSTALL MODE
-      const selected = opts.all
-        ? MCP_CLIENTS
-        : MCP_CLIENTS.filter((c) => {
-            const flagName = clientFlagMap[c.id];
-            return flagName ? Boolean((opts as Record<string, unknown>)[flagName]) : false;
-          });
+      // INSTALL MODE — determine which clients to act on, gated by detection.
+      let selected: typeof MCP_CLIENTS;
+      if (opts.all) {
+        // Start from the full registry, then filter to installed ones.
+        const skipped: string[] = [];
+        selected = MCP_CLIENTS.filter((c) => {
+          if (isInstalled(c.id)) return true;
+          skipped.push(c.label);
+          return false;
+        });
+        if (skipped.length > 0) {
+          process.stdout.write(
+            `skipped (not installed): ${skipped.join(", ")}\n`,
+          );
+        }
+      } else {
+        // Explicit per-client flags: warn + skip not-installed unless --force.
+        const requested = MCP_CLIENTS.filter((c) => {
+          const flagName = clientFlagMap[c.id];
+          return flagName ? Boolean((opts as Record<string, unknown>)[flagName]) : false;
+        });
+        selected = requested.filter((c) => {
+          if (opts.force || isInstalled(c.id)) return true;
+          process.stderr.write(
+            `warning: ${c.label} not detected — skipping (use --force to configure anyway)\n`,
+          );
+          return false;
+        });
+      }
+
+      if (selected.length === 0) {
+        process.stdout.write("no installed clients to configure\n");
+        return;
+      }
 
       let anyFailed = false;
       for (const client of selected) {

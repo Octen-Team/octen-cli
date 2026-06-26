@@ -8,6 +8,7 @@ import { resolveSkillsDir } from "../skills/source.js";
 import { installSkills, skillStatus } from "../skills/install.js";
 import { setClientEnvKey } from "../skills/setkey.js";
 import { OctenValidationError } from "../api/errors.js";
+import { isClientInstalled } from "../util/detectClient.js";
 
 interface ConfigureSkillsInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -16,6 +17,8 @@ interface ConfigureSkillsInternalOpts {
   cwd?: string;
   /** Injected fetch implementation (for testing); defaults to global fetch */
   fetchImpl?: typeof fetch;
+  /** Override client-installed detection (for testing) */
+  isInstalled?: (id: string) => boolean;
 }
 
 // Exported so tests can call with injected dirs
@@ -49,6 +52,7 @@ export function registerConfigureSkills(
       "--set-key",
       "also write OCTEN_API_KEY into each selected client's env config",
     )
+    .option("--force", "configure even if the client is not detected")
     .action(async (_opts: Record<string, any>, command: Command) => {
       const opts = command.opts() as {
         all?: boolean;
@@ -64,6 +68,7 @@ export function registerConfigureSkills(
         bundled?: boolean;
         offline?: boolean;
         setKey?: boolean;
+        force?: boolean;
       };
 
       const scope = (opts.scope === "project" ? "project" : "user") as
@@ -77,6 +82,8 @@ export function registerConfigureSkills(
 
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();
+      const isInstalled =
+        internal.isInstalled ?? ((id: string) => isClientInstalled(id, { home }));
 
       // Both dist/commands/ (published) and src/commands/ (tsx tests) are two levels below the
       // package root, so ../../skills resolves to the package-root skills/ dir in both.
@@ -120,15 +127,42 @@ export function registerConfigureSkills(
         return;
       }
 
-      // INSTALL MODE
-      const selected = opts.all
-        ? SKILL_CLIENTS
-        : SKILL_CLIENTS.filter((c) => {
-            const flagName = clientFlagMap[c.id];
-            return flagName
-              ? Boolean((opts as Record<string, unknown>)[flagName])
-              : false;
-          });
+      // INSTALL MODE — determine which clients to act on, gated by detection.
+      let selected: typeof SKILL_CLIENTS;
+      if (opts.all) {
+        // Start from the full registry, then filter to installed ones.
+        const skipped: string[] = [];
+        selected = SKILL_CLIENTS.filter((c) => {
+          if (isInstalled(c.id)) return true;
+          skipped.push(c.label);
+          return false;
+        });
+        if (skipped.length > 0) {
+          process.stdout.write(
+            `skipped (not installed): ${skipped.join(", ")}\n`,
+          );
+        }
+      } else {
+        // Explicit per-client flags: warn + skip not-installed unless --force.
+        const requested = SKILL_CLIENTS.filter((c) => {
+          const flagName = clientFlagMap[c.id];
+          return flagName
+            ? Boolean((opts as Record<string, unknown>)[flagName])
+            : false;
+        });
+        selected = requested.filter((c) => {
+          if (opts.force || isInstalled(c.id)) return true;
+          process.stderr.write(
+            `warning: ${c.label} not detected — skipping (use --force to configure anyway)\n`,
+          );
+          return false;
+        });
+      }
+
+      if (selected.length === 0) {
+        process.stdout.write("no installed clients to configure\n");
+        return;
+      }
 
       // Resolve skills source (custom dir, or remote/bundled)
       let srcDir: string;

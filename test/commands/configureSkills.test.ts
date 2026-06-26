@@ -24,7 +24,12 @@ afterEach(() => {
   process.exitCode = undefined;
 });
 
-function makeProgram(home: string, cwd: string, fetchImpl?: typeof fetch) {
+function makeProgram(
+  home: string,
+  cwd: string,
+  fetchImpl?: typeof fetch,
+  isInstalled: (id: string) => boolean = () => true,
+) {
   const prog = new Command();
   prog
     .name("octen")
@@ -33,7 +38,7 @@ function makeProgram(home: string, cwd: string, fetchImpl?: typeof fetch) {
     .option("--json", "raw JSON output")
     .option("--pretty", "human-readable output")
     .exitOverride();
-  registerConfigureSkills(prog, { home, cwd, fetchImpl });
+  registerConfigureSkills(prog, { home, cwd, fetchImpl, isInstalled });
   return prog;
 }
 
@@ -315,6 +320,76 @@ describe("configure-skills --set-key", () => {
       if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
       else process.env.OCTEN_API_KEY = prevKey;
     }
+  });
+});
+
+describe("configure-skills client-installed detection", () => {
+  it("--cursor with client not installed writes nothing and warns", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home, undefined, () => false);
+
+    const stderrSpy = vi
+      .spyOn(process.stderr, "write")
+      .mockImplementation(() => true);
+
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--cursor", "--offline",
+    ]);
+
+    // Nothing should be written — ~/.cursor/skills must NOT be created.
+    expect(existsSync(join(home, ".cursor/skills"))).toBe(false);
+
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(stderr).toMatch(/not detected/);
+  });
+
+  it("--cursor with --force installs even when client not detected", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home, undefined, () => false);
+
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--cursor", "--offline", "--force",
+    ]);
+
+    expect(existsSync(join(home, ".cursor/skills"))).toBe(true);
+  });
+
+  it("--all installs only detected clients and prints skipped list", async () => {
+    const home = makeTmp();
+    const installedMap: Record<string, boolean> = {
+      "claude-code": true,
+      cursor: false,
+      codex: false,
+      openclaw: false,
+      hermes: false,
+    };
+    const prog = makeProgram(
+      home,
+      home,
+      undefined,
+      (id) => installedMap[id] ?? false,
+    );
+
+    const stdoutLines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdoutLines.push(String(chunk));
+      return true;
+    });
+
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--all", "--offline",
+    ]);
+
+    // Only claude-code installed.
+    expect(existsSync(join(home, ".claude/skills"))).toBe(true);
+    expect(existsSync(join(home, ".cursor/skills"))).toBe(false);
+    expect(existsSync(join(home, ".codex/skills"))).toBe(false);
+    expect(existsSync(join(home, ".openclaw/skills"))).toBe(false);
+    expect(existsSync(join(home, ".hermes/skills"))).toBe(false);
+
+    const output = stdoutLines.join("");
+    expect(output).toMatch(/skipped \(not installed\):/);
+    expect(output).toMatch(/Cursor/);
   });
 });
 

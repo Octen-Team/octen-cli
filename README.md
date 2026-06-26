@@ -123,7 +123,9 @@ octen configure-mcp --all --pin 0.2.1
 
 Supported clients: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex.
 
-Options: `--all`, `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--scope` (user|project), `--pin <version>`.
+Only clients detected as installed are configured; `--all` skips the rest, and an explicitly-named client that isn't detected is skipped unless you pass `--force`.
+
+Options: `--all`, `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--scope` (user|project), `--pin <version>`, `--force` (configure even if the client is not detected).
 
 Run without flags to print current status for each client.
 
@@ -151,7 +153,9 @@ Supported clients: Claude Code, Cursor, Codex, OpenClaw, Hermes.
 
 `--set-key` also writes OCTEN_API_KEY into the client's env config (Claude Code `~/.claude/settings.json`, Codex `config.toml`, OpenClaw `.env`); Cursor/Hermes print a shell-profile hint. The key comes from `--api-key` or the `OCTEN_API_KEY` environment variable.
 
-Options: `--all`, `--claude-code`, `--cursor`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project), `--ref <ref>` (default: main), `--bundled`/`--offline` (use vendored skills), `--only <names>` (comma-separated skill names), `--skills-dir <path>` (custom source directory), `--set-key` (write OCTEN_API_KEY into the client's env config).
+Only clients detected as installed are configured; `--all` skips the rest, and an explicitly-named client that isn't detected is skipped unless you pass `--force`.
+
+Options: `--all`, `--claude-code`, `--cursor`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project), `--ref <ref>` (default: main), `--bundled`/`--offline` (use vendored skills), `--only <names>` (comma-separated skill names), `--skills-dir <path>` (custom source directory), `--set-key` (write OCTEN_API_KEY into the client's env config), `--force` (configure even if the client is not detected).
 
 Run without flags to show installed skills per client.
 
