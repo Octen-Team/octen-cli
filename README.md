@@ -169,6 +169,23 @@ Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, plus per-cli
 
 ---
 
+## Shell completion
+
+`octen completion <shell>` prints a completion script for `bash`, `zsh`, or `fish`. It completes subcommand names and each subcommand's flags.
+
+```sh
+# zsh — add to ~/.zshrc
+eval "$(octen completion zsh)"
+
+# bash — add to ~/.bashrc
+eval "$(octen completion bash)"
+
+# fish — write to the completions dir
+octen completion fish > ~/.config/fish/completions/octen.fish
+```
+
+---
+
 ## Output
 
 All commands print human-readable output when stdout is a TTY. When stdout is piped or `--json` is passed, commands emit raw JSON. Use `--pretty` to force human-readable output even when piped. `--no-color` disables ANSI colors.

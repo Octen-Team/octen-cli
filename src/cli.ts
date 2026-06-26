@@ -13,6 +13,7 @@ import { registerVlEmbed } from "./commands/vlEmbed.js";
 import { registerConfigureMcp } from "./commands/configureMcp.js";
 import { registerConfigureSkills } from "./commands/configureSkills.js";
 import { registerReset } from "./commands/reset.js";
+import { registerCompletion } from "./commands/completion.js";
 
 const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
 
@@ -37,6 +38,9 @@ registerFetch(program);
 registerChat(program);
 registerEmbed(program);
 registerVlEmbed(program);
+
+// Register LAST so introspection sees every command and its flags.
+registerCompletion(program);
 
 program.parseAsync().catch((err) => {
   process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
