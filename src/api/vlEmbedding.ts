@@ -1,4 +1,4 @@
-import { VL_EMBEDDING_MODELS } from "./constants.js";
+import { LIMITS, VL_EMBEDDING_MODELS } from "./constants.js";
 import { OctenValidationError } from "./errors.js";
 
 // A single content item — exactly one of text, image, or video.
@@ -63,17 +63,17 @@ export function buildVlEmbeddingRequest(
   if (contents.length === 0) {
     throw new OctenValidationError("contents must not be empty");
   }
-  if (contents.length > 20) {
+  if (contents.length > LIMITS.vlContents) {
     throw new OctenValidationError("contents must not exceed 20 items total");
   }
 
   const imageCount = contents.filter((c) => "image" in c).length;
-  if (imageCount > 5) {
+  if (imageCount > LIMITS.vlImages) {
     throw new OctenValidationError("contents must not include more than 5 images");
   }
 
   const videoCount = contents.filter((c) => "video" in c).length;
-  if (videoCount > 1) {
+  if (videoCount > LIMITS.vlVideos) {
     throw new OctenValidationError("contents must not include more than 1 video");
   }
 

@@ -120,7 +120,7 @@ export function registerChat(program: Command) {
       // Streaming pretty mode
       const httpRes = await client.stream(ENDPOINTS.chat, req);
       for await (const ev of parseSSE(httpRes)) {
-        const piece: string | undefined = ev?.choices?.[0]?.delta?.content;
+        const piece: string | undefined = (ev as any)?.choices?.[0]?.delta?.content;
         if (piece) process.stdout.write(piece);
       }
       process.stdout.write("\n");

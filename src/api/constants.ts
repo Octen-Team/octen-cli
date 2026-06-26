@@ -27,6 +27,9 @@ export const LIMITS = {
   extractUrls: { min: 1, max: 20 },
   extractTimeout: { min: 1, max: 60 },
   cacheWindow: { min: 300, max: 31_536_000, default: 86_400 },
+  vlContents: 20,
+  vlImages: 5,
+  vlVideos: 1,
 } as const;
 
 export const SKILLS_REPO = "Octen-Team/web-search-skills";

@@ -20,6 +20,7 @@ export class OctenClient {
   private retryBaseMs: number;
 
   constructor(opts: OctenClientOptions) {
+    if (!opts.apiKey) throw new OctenAuthError("API key is required");
     this.apiKey = opts.apiKey;
     this.baseUrl = (opts.baseUrl ?? DEFAULT_BASE_URL).replace(/\/$/, "");
     this.timeoutMs = opts.timeoutMs ?? DEFAULT_TIMEOUT_MS;
@@ -28,6 +29,7 @@ export class OctenClient {
   }
 
   private headers(endpoint: string): Record<string, string> {
+    // Chat uses the OpenAI-compatible /v1/chat/completions surface (Authorization: Bearer); native Octen endpoints use x-api-key.
     const h: Record<string, string> = { "Content-Type": "application/json" };
     if (endpoint === ENDPOINTS.chat) h["Authorization"] = `Bearer ${this.apiKey}`;
     else h["x-api-key"] = this.apiKey;
@@ -35,6 +37,7 @@ export class OctenClient {
   }
 
   async request<T = unknown>(endpoint: string, body: unknown, timeoutMs?: number): Promise<T> {
+    // Retry policy: retry only on 429/5xx with exponential backoff; 4xx (except 429) and timeouts are NOT retried; the timeout is per-attempt, not total.
     let lastErr: unknown;
     for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
       const ac = new AbortController();
@@ -46,13 +49,21 @@ export class OctenClient {
           body: JSON.stringify(body),
           signal: ac.signal,
         });
-        if (res.ok) return (await res.json()) as T;
-        const errBody = await res.json().catch(() => ({}));
+        if (res.ok) {
+          try {
+            return (await res.json()) as T;
+          } catch {
+            throw new OctenAPIError("API returned a 2xx response with an invalid JSON body", res.status);
+          }
+        }
+        const rawText = await res.text().catch(() => "");
+        let errBody: unknown = {};
+        try { errBody = rawText ? JSON.parse(rawText) : {}; } catch { /* keep raw text */ }
+        const msg = (errBody as any)?.msg ?? (errBody as any)?.error ?? (rawText ? rawText.slice(0, 500) : `HTTP ${res.status}`);
         if (RETRYABLE.has(res.status) && attempt < this.maxRetries) {
           await sleep(this.retryBaseMs * 2 ** attempt);
           continue;
         }
-        const msg = (errBody as any)?.msg ?? (errBody as any)?.error ?? `HTTP ${res.status}`;
         if (res.status === 401) throw new OctenAuthError(msg);
         throw new OctenAPIError(msg, res.status, errBody);
       } catch (e) {
@@ -81,8 +92,11 @@ export class OctenClient {
         signal: ac.signal,
       });
       if (!res.ok) {
-        const errBody = await res.json().catch(() => ({}));
-        throw new OctenAPIError((errBody as any)?.msg ?? `HTTP ${res.status}`, res.status, errBody);
+        const rawText = await res.text().catch(() => "");
+        let errBody: unknown = {};
+        try { errBody = rawText ? JSON.parse(rawText) : {}; } catch { /* keep raw text */ }
+        const msg = (errBody as any)?.msg ?? (errBody as any)?.error ?? (rawText ? rawText.slice(0, 500) : `HTTP ${res.status}`);
+        throw new OctenAPIError(msg, res.status, errBody);
       }
       return res;
     } finally {

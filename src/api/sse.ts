@@ -3,7 +3,7 @@
  * Yields parsed JSON objects from `data:` lines, stops at `data: [DONE]`.
  * Tolerates non-JSON keepalive/comment lines by skipping them.
  */
-export async function* parseSSE(res: Response): AsyncGenerator<any> {
+export async function* parseSSE(res: Response): AsyncGenerator<unknown> {
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -45,8 +45,9 @@ export async function* parseSSE(res: Response): AsyncGenerator<any> {
       try {
         yield JSON.parse(payload);
       } catch {
-        // skip
+        // Skip non-JSON keepalive or malformed lines
       }
     }
   }
+  // A stream ending without [DONE] is treated as a normal end; the chat command owns user-facing truncation messaging.
 }

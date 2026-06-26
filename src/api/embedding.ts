@@ -24,8 +24,6 @@ export function buildEmbeddingRequest(
   const req: Record<string, unknown> = { input };
 
   // Use `put` for optional fields that are null/undefined when absent.
-  // For truncation we need a special check because `false` is a valid value
-  // but `false != null` is true — so the standard put idiom correctly preserves it.
   const put = (k: string, v: unknown) => {
     if (v != null) req[k] = v;
   };
@@ -34,7 +32,7 @@ export function buildEmbeddingRequest(
   put("dimension", o.dimension);
   put("input_type", o.inputType);
 
-  // truncation: must preserve `false`, so check for undefined explicitly
+  // truncation is tri-state: forward an explicit true/false, omit when undefined.
   if (o.truncation !== undefined) {
     req["truncation"] = o.truncation;
   }
