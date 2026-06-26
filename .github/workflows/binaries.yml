@@ -34,10 +34,14 @@ jobs:
           TARGETS: ${{ matrix.targets }}
         run: |
           mkdir -p dist-bin
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version: $VERSION"
           for t in $TARGETS; do
             name="octen-${t#bun-}"
             echo "building $name ($t)"
-            bun build ./src/cli.ts --compile --target="$t" --outfile "dist-bin/$name"
+            bun build ./src/cli.ts --compile --target="$t" \
+              --define "__OCTEN_VERSION__=\"$VERSION\"" \
+              --outfile "dist-bin/$name"
           done
           ls -la dist-bin
       - name: Smoke test the native binary

@@ -15,13 +15,23 @@ import { registerConfigureSkills } from "./commands/configureSkills.js";
 import { registerReset } from "./commands/reset.js";
 import { registerCompletion } from "./commands/completion.js";
 
-const pkg = JSON.parse(readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"));
+// Injected at build time for standalone binaries (bun --compile --define),
+// which have no package.json on disk to read at runtime.
+declare const __OCTEN_VERSION__: string | undefined;
+
+function resolveVersion(): string {
+  if (typeof __OCTEN_VERSION__ !== "undefined") return __OCTEN_VERSION__;
+  const pkg = JSON.parse(
+    readFileSync(fileURLToPath(new URL("../package.json", import.meta.url)), "utf8"),
+  );
+  return pkg.version as string;
+}
 
 const program = new Command();
 program
   .name("octen")
   .description("Octen CLI — search, extract, chat, embeddings, and MCP/Skills setup")
-  .version(pkg.version)
+  .version(resolveVersion())
   .option("--api-key <key>", "Octen API key")
   .option("--base-url <url>", "API base URL")
   .option("--json", "raw JSON output")
