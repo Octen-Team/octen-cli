@@ -6,6 +6,7 @@ on:
 
 permissions:
   contents: read
+  id-token: write # npm OIDC trusted publishing (+ provenance); no token needed
 
 jobs:
   publish:
@@ -30,10 +31,11 @@ jobs:
         run: npx tsc --noEmit
       - name: Test
         run: npm test
-      # `npm publish` runs prepublishOnly (npm run build), so dist/ is built before packing.
-      - name: Publish to npm
+      # OIDC trusted publishing requires npm >= 11.5.1 (newer than the bundled npm).
+      - name: Upgrade npm for OIDC
+        run: npm install -g npm@latest
+      # No NODE_AUTH_TOKEN: with id-token:write + a trusted publisher configured on
+      # npmjs.com (repo Octen-Team/octen-cli, workflow release.yml), npm authenticates
+      # via OIDC and attaches provenance automatically. `npm publish` runs prepublishOnly (build).
+      - name: Publish to npm (OIDC)
         run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      # Repo is private, so npm provenance is omitted. When this repo becomes public,
-      # add `--provenance` to the publish command and `id-token: write` to permissions above.
