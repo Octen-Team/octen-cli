@@ -5,6 +5,12 @@
   "type": "module",
   "license": "MIT",
   "author": "Octen <hello@octen.ai>",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Octen-Team/octen-cli.git"
+  },
+  "homepage": "https://github.com/Octen-Team/octen-cli#readme",
+  "bugs": "https://github.com/Octen-Team/octen-cli/issues",
   "publishConfig": {
     "access": "public"
   },
