@@ -158,6 +158,78 @@ describe("reset --all", () => {
   });
 });
 
+describe("reset per-client error isolation", () => {
+  it("MCP: one client fails, the other still has octen removed, warns to stderr, exitCode=1", async () => {
+    const home = makeTmp();
+
+    // FAILING client: cursor. Pre-create ~/.cursor/mcp.json as a DIRECTORY so
+    // removeMcpServer's existsSync() is true but readFileSync() throws EISDIR.
+    mkdirSync(join(home, ".cursor/mcp.json"), { recursive: true });
+
+    // HEALTHY client: claude-desktop with a valid config containing octen.
+    const desktopDir = join(home, "Library/Application Support/Claude");
+    mkdirSync(desktopDir, { recursive: true });
+    const desktopPath = join(desktopDir, "claude_desktop_config.json");
+    writeFileSync(
+      desktopPath,
+      JSON.stringify({
+        mcpServers: { octen: { command: "npx" }, keep: { command: "keep" } },
+      }),
+      "utf8",
+    );
+
+    const prog = makeProgram(home, home);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await prog.parseAsync([
+      "node", "octen", "reset", "--mcp", "--cursor", "--claude-desktop",
+    ]);
+
+    // (a) Healthy client processed: octen removed, keep survives.
+    const desktopCfg = JSON.parse(readFileSync(desktopPath, "utf8"));
+    expect(desktopCfg.mcpServers.octen).toBeUndefined();
+    expect(desktopCfg.mcpServers.keep).toBeDefined();
+
+    // (b) Warning written to stderr for the failing client.
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(stderr).toMatch(/warning: failed to remove MCP from Cursor/);
+
+    // (c) Exit code set to 1.
+    expect(process.exitCode).toBe(1);
+  });
+
+  it("skills: one client fails, the other still has skills removed, warns to stderr, exitCode=1", async () => {
+    const home = makeTmp();
+
+    // FAILING client: cursor. Pre-create ~/.cursor/skills as a FILE so
+    // removeSkills' existsSync() is true but readdirSync() throws ENOTDIR.
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    writeFileSync(join(home, ".cursor/skills"), "not a directory", "utf8");
+
+    // HEALTHY client: claude-code with an octen skill in ~/.claude/skills.
+    const claudeSkillsDir = join(home, ".claude/skills");
+    mkdirSync(join(claudeSkillsDir, "octen-web-search"), { recursive: true });
+    writeFileSync(join(claudeSkillsDir, "octen-web-search", "SKILL.md"), "# octen\n", "utf8");
+
+    const prog = makeProgram(home, home);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    await prog.parseAsync([
+      "node", "octen", "reset", "--skills", "--cursor", "--claude-code",
+    ]);
+
+    // (a) Healthy client processed: octen-web-search removed.
+    expect(existsSync(join(claudeSkillsDir, "octen-web-search"))).toBe(false);
+
+    // (b) Warning written to stderr for the failing client.
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(stderr).toMatch(/warning: failed to remove skills from Cursor/);
+
+    // (c) Exit code set to 1.
+    expect(process.exitCode).toBe(1);
+  });
+});
+
 describe("reset --mcp --cursor (octen not present)", () => {
   it("reports octen not present without error", async () => {
     const home = makeTmp();

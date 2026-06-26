@@ -102,6 +102,62 @@ describe("resolveSkillsDir – fetchImpl throws", () => {
   });
 });
 
+/**
+ * Build a real .tar.gz Buffer whose root is NOT `web-search-skills-<ref>/skills/...`.
+ * The extracted layout therefore lacks the expected skills/ dir, so the
+ * readdirSync(skillsDir) locate step throws and resolveSkillsDir falls back.
+ */
+async function buildWrongLayoutTarball(rootName: string): Promise<Buffer> {
+  const srcDir = makeTmp();
+  mkdirSync(join(srcDir, rootName, "skills", "octen-search"), { recursive: true });
+  writeFileSync(join(srcDir, rootName, "skills", "octen-search", "SKILL.md"), "# octen-search\n");
+
+  const tarPath = join(makeTmp(), "wrong.tar.gz");
+  await tar.create({ gzip: true, file: tarPath, cwd: srcDir }, [rootName]);
+
+  const { readFileSync } = await import("node:fs");
+  return readFileSync(tarPath);
+}
+
+describe("resolveSkillsDir – valid tarball, unexpected internal layout", () => {
+  it("falls back to bundled and warns when the expected skills/ dir is absent", async () => {
+    const bundledDir = makeTmp();
+    const cacheDir = makeTmp();
+
+    // Root is "wrong-root/skills/..." instead of "web-search-skills-main/skills/...".
+    const buffer = await buildWrongLayoutTarball("wrong-root");
+
+    const stderrLines: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr as any).write = (chunk: unknown) => {
+      stderrLines.push(String(chunk));
+      return true;
+    };
+
+    try {
+      const fetchImpl = async (): Promise<Response> => new Response(buffer);
+
+      const result = await resolveSkillsDir({
+        ref: "main",
+        offline: false,
+        cacheDir,
+        bundledDir,
+        fetchImpl: fetchImpl as typeof fetch,
+      });
+
+      // The readdirSync(skillsDir) locate step fails (ENOENT), so it falls back.
+      expect(result.source).toBe("bundled");
+      expect(result.dir).toBe(bundledDir);
+
+      const combined = stderrLines.join("");
+      expect(combined).toMatch(/warning/);
+      expect(combined).toMatch(/bundled/);
+    } finally {
+      (process.stderr as any).write = origWrite;
+    }
+  });
+});
+
 describe("resolveSkillsDir – happy path (real tarball)", () => {
   it("extracts tarball and returns remote skills dir containing octen-* subdirs", async () => {
     const bundledDir = makeTmp();

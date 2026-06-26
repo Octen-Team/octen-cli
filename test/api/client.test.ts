@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OctenClient } from "../../src/api/client.js";
+import { ENDPOINTS } from "../../src/api/constants.js";
 import { OctenAPIError, OctenAuthError, OctenTimeoutError } from "../../src/api/errors.js";
 
 function jsonResponse(body: unknown, status = 200) {
@@ -58,5 +59,28 @@ describe("OctenClient.request", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ msg: "bad key" }, 401));
     const c = new OctenClient({ apiKey: "k" });
     await expect(c.request("/search", {})).rejects.toBeInstanceOf(OctenAuthError);
+  });
+});
+
+describe("OctenClient.stream", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  it("throws OctenAPIError (status 401) when the response is not OK", async () => {
+    // stream() does not special-case 401 into OctenAuthError (unlike request()),
+    // so a non-OK 401 surfaces as an OctenAPIError carrying status 401.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ msg: "bad key" }, 401));
+    const c = new OctenClient({ apiKey: "k" });
+    await expect(
+      c.stream(ENDPOINTS.chat, { model: "m", messages: [] }),
+    ).rejects.toBeInstanceOf(OctenAPIError);
+
+    // Re-run to inspect the thrown error's status field.
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ msg: "bad key" }, 401));
+    const c2 = new OctenClient({ apiKey: "k" });
+    const err = await c2
+      .stream(ENDPOINTS.chat, { model: "m", messages: [] })
+      .catch((e) => e);
+    expect(err).toBeInstanceOf(OctenAPIError);
+    expect((err as OctenAPIError).status).toBe(401);
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
@@ -18,6 +18,8 @@ afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
     tmpDir = "";
   }
+  // Reset exit code so a failure path doesn't leak into other tests.
+  process.exitCode = undefined;
 });
 
 function makeProgram(home: string, cwd: string) {
@@ -132,6 +134,37 @@ describe("configure-mcp status mode (no client flags)", () => {
     expect(output).toMatch(/Windsurf/);
     // All should be absent (temp dir is empty)
     expect(output).toMatch(/absent/);
+  });
+});
+
+describe("configure-mcp per-client error isolation", () => {
+  it("one client fails, the other is still configured, warns to stderr, exitCode=1", async () => {
+    const home = makeTmp();
+
+    // FAILING client: cursor. Pre-create ~/.cursor/mcp.json as a DIRECTORY so
+    // upsertMcpServer's readJsonFile() (existsSync true) then readFileSync()
+    // throws EISDIR.
+    mkdirSync(join(home, ".cursor/mcp.json"), { recursive: true });
+
+    const prog = makeProgram(home, home);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    // HEALTHY client: claude-desktop (writes a fresh JSON file).
+    await prog.parseAsync([
+      "node", "octen", "configure-mcp", "--cursor", "--claude-desktop", "--api-key", "k",
+    ]);
+
+    // (a) Healthy client still configured: file written with octen entry.
+    const desktopPath = join(home, "Library/Application Support/Claude/claude_desktop_config.json");
+    const desktopCfg = JSON.parse(readFileSync(desktopPath, "utf8"));
+    expect(desktopCfg.mcpServers.octen.command).toBe("npx");
+
+    // (b) Warning written to stderr for the failing client.
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(stderr).toMatch(/error configuring Cursor/);
+
+    // (c) Exit code set to 1.
+    expect(process.exitCode).toBe(1);
   });
 });
 

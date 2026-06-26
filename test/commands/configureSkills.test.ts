@@ -20,6 +20,8 @@ afterEach(() => {
     rmSync(d, { recursive: true, force: true });
   }
   tmpDirs = [];
+  // Reset exit code so a failure path doesn't leak into other tests.
+  process.exitCode = undefined;
 });
 
 function makeProgram(home: string, cwd: string, fetchImpl?: typeof fetch) {
@@ -228,6 +230,39 @@ describe("configure-skills output messages", () => {
     const output = stdoutLines.join("");
     expect(output).toMatch(/OCTEN_API_KEY/);
     expect(output).toMatch(/octen\.ai/);
+  });
+});
+
+describe("configure-skills per-client error isolation", () => {
+  it("one client fails, the other still installs skills, warns to stderr, exitCode=1", async () => {
+    const home = makeTmp();
+
+    // FAILING client: cursor. Pre-create ~/.cursor/skills as a FILE so
+    // installSkills' mkdirSync(targetDir, {recursive:true}) throws EEXIST.
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    writeFileSync(join(home, ".cursor/skills"), "not a directory", "utf8");
+
+    const prog = makeProgram(home, home);
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    // HEALTHY client: claude-code (fresh ~/.claude/skills dir). Use --offline
+    // to stay hermetic (bundled skills, no network).
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--cursor", "--claude-code", "--offline",
+    ]);
+
+    // (a) Healthy client still installed at least one octen-* skill.
+    const claudeSkillsDir = join(home, ".claude/skills");
+    const installedSearch = existsSync(join(claudeSkillsDir, "octen-search", "SKILL.md"));
+    const installedWeb = existsSync(join(claudeSkillsDir, "octen-web-search", "SKILL.md"));
+    expect(installedSearch || installedWeb).toBe(true);
+
+    // (b) Warning written to stderr for the failing client.
+    const stderr = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(stderr).toMatch(/error installing skills for Cursor/);
+
+    // (c) Exit code set to 1.
+    expect(process.exitCode).toBe(1);
   });
 });
 

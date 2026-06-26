@@ -81,4 +81,50 @@ describe("parseSSE", () => {
     expect(collected).toHaveLength(1);
     expect(collected[0].choices[0].delta.content).toBe("X");
   });
+
+  // --- trailing-buffer flush: stream ends without a trailing "\n\n" ---
+
+  it("flushes a final complete data event with no trailing newline", async () => {
+    // The last bytes are a complete `data: {...}` event but lack the trailing
+    // "\n\n", so it never gets split out by the main loop and must be flushed
+    // from the leftover buffer.
+    const body =
+      'data: {"choices":[{"delta":{"content":"A"}}]}\n\n' +
+      'data: {"choices":[{"delta":{"content":"B"}}]}';
+
+    const res = makeSSEResponse([body]);
+    const collected: any[] = [];
+    for await (const ev of parseSSE(res)) collected.push(ev);
+
+    expect(collected).toHaveLength(2);
+    expect(collected[0].choices[0].delta.content).toBe("A");
+    expect(collected[1].choices[0].delta.content).toBe("B");
+  });
+
+  it("stops cleanly on a trailing [DONE] with no trailing newline (no extra event)", async () => {
+    const body =
+      'data: {"choices":[{"delta":{"content":"A"}}]}\n\n' + "data: [DONE]";
+
+    const res = makeSSEResponse([body]);
+    const collected: any[] = [];
+    for await (const ev of parseSSE(res)) collected.push(ev);
+
+    // Only the first event is yielded; the trailing [DONE] in the leftover
+    // buffer terminates the generator without adding an event.
+    expect(collected).toHaveLength(1);
+    expect(collected[0].choices[0].delta.content).toBe("A");
+  });
+
+  it("skips a trailing invalid-JSON data line with no trailing newline (no throw)", async () => {
+    const body =
+      'data: {"choices":[{"delta":{"content":"A"}}]}\n\n' + "data: {invalid json";
+
+    const res = makeSSEResponse([body]);
+    const collected: any[] = [];
+    // Must not throw; the malformed leftover line is skipped.
+    for await (const ev of parseSSE(res)) collected.push(ev);
+
+    expect(collected).toHaveLength(1);
+    expect(collected[0].choices[0].delta.content).toBe("A");
+  });
 });
