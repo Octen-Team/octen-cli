@@ -1,33 +1,12 @@
 import pc from "picocolors";
-
-interface ExtractCategory {
-  primary?: string;
-  secondary?: string;
-}
-
-interface ExtractItem {
-  url: string;
-  status: "success" | "failed";
-  title?: string;
-  category?: ExtractCategory;
-  page_structure?: ExtractCategory;
-  time_published?: string;
-  full_content?: string;
-  highlights?: string[];
-  error_message?: string;
-}
-
-interface ExtractResponse {
-  items?: ExtractItem[];
-  results?: ExtractItem[];
-}
+import type { ExtractItem, ExtractResponse } from "../../api/extract.js";
 
 const MAX_CONTENT = 500;
 
-export function renderExtract(data: any): string {
+export function renderExtract(data: ExtractResponse): string {
   const items: ExtractItem[] =
-    (data as ExtractResponse)?.items ??
-    (data as ExtractResponse)?.results ??
+    data?.items ??
+    data?.results ??
     [];
 
   if (!items.length) return pc.dim("No results.");

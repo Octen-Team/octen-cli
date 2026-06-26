@@ -1,6 +1,7 @@
 import pc from "picocolors";
+import type { ChatCompletion } from "../../api/chat.js";
 
-export function renderChat(data: any): string {
+export function renderChat(data: ChatCompletion): string {
   const content: string = data?.choices?.[0]?.message?.content ?? "";
   const usage = data?.usage;
 

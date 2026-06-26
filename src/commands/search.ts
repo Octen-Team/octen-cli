@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
-import { buildSearchRequest, type SearchOpts } from "../api/search.js";
+import { buildSearchRequest, type SearchOpts, type SearchResponse } from "../api/search.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderSearch } from "../output/pretty/search.js";
 import { makeClient, parseIntOpt } from "./utils.js";
@@ -27,7 +27,7 @@ export function registerSearch(program: Command, fixedTopic?: "news") {
     const client = makeClient(g);
     const searchOpts: SearchOpts = { ...opts, topic: fixedTopic ?? opts.topic };
     const req = buildSearchRequest(query, searchOpts);
-    const res = await client.request(ENDPOINTS.search, req);
+    const res = await client.request<SearchResponse>(ENDPOINTS.search, req);
     emit(res, chooseMode(g, process.stdout.isTTY ?? false), renderSearch);
   });
 }

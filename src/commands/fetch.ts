@@ -1,6 +1,6 @@
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
-import { buildExtractRequest, type ExtractOpts } from "../api/extract.js";
+import { buildExtractRequest, type ExtractOpts, type ExtractResponse } from "../api/extract.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderExtract } from "../output/pretty/extract.js";
 import { makeClient, parseIntOpt } from "./utils.js";
@@ -22,7 +22,7 @@ export function registerFetch(program: Command) {
       const g = command.optsWithGlobals();
       const client = makeClient(g);
       const req = buildExtractRequest(urls, opts);
-      const res = await client.request(ENDPOINTS.extract, req);
+      const res = await client.request<ExtractResponse>(ENDPOINTS.extract, req);
       emit(res, chooseMode(g, process.stdout.isTTY ?? false), renderExtract);
     });
 }

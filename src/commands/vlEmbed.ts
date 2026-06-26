@@ -4,7 +4,7 @@ import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
 import { OctenValidationError } from "../api/errors.js";
 import { parseContentTokens, buildVlEmbeddingRequest } from "../api/vlEmbedding.js";
-import type { VLContent } from "../api/vlEmbedding.js";
+import type { VLContent, VLEmbeddingResponse } from "../api/vlEmbedding.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderVlEmbedding } from "../output/pretty/vlEmbedding.js";
 import { makeClient, parseIntOpt, parseFloatOpt } from "./utils.js";
@@ -109,7 +109,7 @@ export function registerVlEmbed(program: Command) {
         instruct: opts.instruct,
       });
 
-      const res = await client.request(ENDPOINTS.vlEmbedding, req);
+      const res = await client.request<VLEmbeddingResponse>(ENDPOINTS.vlEmbedding, req);
       emit(res, chooseMode(g, process.stdout.isTTY ?? false), renderVlEmbedding);
     });
 }

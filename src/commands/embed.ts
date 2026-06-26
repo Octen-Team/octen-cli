@@ -1,7 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
-import { buildEmbeddingRequest } from "../api/embedding.js";
+import { buildEmbeddingRequest, type EmbeddingResponse } from "../api/embedding.js";
 import { OctenValidationError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderEmbedding } from "../output/pretty/embedding.js";
@@ -66,7 +66,7 @@ export function registerEmbed(program: Command) {
         truncation,
       });
 
-      const res = await client.request(ENDPOINTS.embedding, req);
+      const res = await client.request<EmbeddingResponse>(ENDPOINTS.embedding, req);
       emit(res, chooseMode(g, process.stdout.isTTY ?? false), renderEmbedding);
     });
 }

@@ -1,6 +1,25 @@
 import { LIMITS } from "./constants.js";
 import { OctenValidationError } from "./errors.js";
 
+/** A single extracted item. All fields optional — the server is untyped. */
+export interface ExtractItem {
+  url?: string;
+  status?: string;
+  title?: string;
+  category?: { primary?: string; secondary?: string };
+  page_structure?: { primary?: string; secondary?: string };
+  time_published?: string;
+  full_content?: string;
+  highlights?: string[];
+  error_message?: string;
+}
+
+/** Response shape for the /extract endpoint. */
+export interface ExtractResponse {
+  items?: ExtractItem[];
+  results?: ExtractItem[];
+}
+
 export interface ExtractOpts {
   query?: string;
   maxAge?: number;

@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import type { VLEmbeddingResponse } from "../../api/vlEmbedding.js";
 
 /**
  * Render an Octen /vl-embedding response in a compact table.
@@ -11,7 +12,7 @@ import pc from "picocolors";
  *
  * Raw float arrays are never printed — use --json for those.
  */
-export function renderVlEmbedding(data: any): string {
+export function renderVlEmbedding(data: VLEmbeddingResponse): string {
   const items: unknown[] =
     (data?.data ?? data?.embeddings ?? data?.items ?? []) as unknown[];
 

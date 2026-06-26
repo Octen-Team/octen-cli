@@ -1,6 +1,19 @@
 import { EMBEDDING_MODELS } from "./constants.js";
 import { OctenValidationError } from "./errors.js";
 
+/** A single embedding item. All fields optional — the server is untyped. */
+export interface EmbeddingItem {
+  embedding?: number[];
+  vector?: number[];
+}
+
+/** Response shape for the /embedding endpoint. */
+export interface EmbeddingResponse {
+  model?: string;
+  data?: EmbeddingItem[];
+  embeddings?: (number[] | EmbeddingItem)[];
+}
+
 export interface EmbeddingOpts {
   model?: string;
   dimension?: number;

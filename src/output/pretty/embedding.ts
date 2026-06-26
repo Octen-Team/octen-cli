@@ -1,4 +1,5 @@
 import pc from "picocolors";
+import type { EmbeddingResponse } from "../../api/embedding.js";
 
 /**
  * Render an OpenAI-style /embedding response in a compact table.
@@ -9,7 +10,7 @@ import pc from "picocolors";
  *
  * Raw float arrays are never printed in pretty mode.
  */
-export function renderEmbedding(data: any): string {
+export function renderEmbedding(data: EmbeddingResponse): string {
   const items: unknown[] =
     (data?.data ?? data?.embeddings ?? []) as unknown[];
 

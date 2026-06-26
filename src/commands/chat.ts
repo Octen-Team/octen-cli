@@ -1,7 +1,7 @@
 import { createInterface } from "node:readline";
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
-import { buildChatRequest, type ChatMessage, type ChatOpts } from "../api/chat.js";
+import { buildChatRequest, type ChatMessage, type ChatOpts, type ChatCompletion, type StreamEvent } from "../api/chat.js";
 import { parseSSE } from "../api/sse.js";
 import { OctenValidationError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
@@ -72,7 +72,7 @@ export function registerChat(program: Command) {
           rl.pause();
           try {
             const req = buildChatRequest(history, model, chatOpts);
-            const res = await client.request<any>(ENDPOINTS.chat, req);
+            const res = await client.request<ChatCompletion>(ENDPOINTS.chat, req);
             const reply: string = res?.choices?.[0]?.message?.content ?? "";
             history.push({ role: "assistant", content: reply });
             process.stdout.write(reply + "\n");
@@ -112,7 +112,7 @@ export function registerChat(program: Command) {
 
       // --json forces the non-stream path: we emit one JSON object, not a token stream.
       if (mode === "json" || opts.stream === false) {
-        const res = await client.request<any>(ENDPOINTS.chat, req);
+        const res = await client.request<ChatCompletion>(ENDPOINTS.chat, req);
         emit(res, mode, renderChat);
         return;
       }
@@ -120,7 +120,8 @@ export function registerChat(program: Command) {
       // Streaming pretty mode
       const httpRes = await client.stream(ENDPOINTS.chat, req);
       for await (const ev of parseSSE(httpRes)) {
-        const piece: string | undefined = (ev as any)?.choices?.[0]?.delta?.content;
+        const e = ev as StreamEvent;
+        const piece: string | undefined = e.choices?.[0]?.delta?.content;
         if (piece) process.stdout.write(piece);
       }
       process.stdout.write("\n");

@@ -1,21 +1,10 @@
 import pc from "picocolors";
-
-interface SearchResult {
-  title?: string;
-  url?: string;
-  highlight?: string;
-  full_content?: string;
-  time_published?: string;
-}
-
-interface SearchResponse {
-  results?: SearchResult[];
-}
+import type { SearchResponse, SearchResult } from "../../api/search.js";
 
 const MAX_SNIPPET = 300;
 
-export function renderSearch(data: any): string {
-  const res: SearchResult[] = (data as SearchResponse)?.results ?? [];
+export function renderSearch(data: SearchResponse): string {
+  const res: SearchResult[] = data?.results ?? [];
 
   if (!res.length) return pc.dim("No results.");
 

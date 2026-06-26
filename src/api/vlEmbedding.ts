@@ -7,6 +7,21 @@ export type VLContent =
   | { image: string }
   | { video: string };
 
+/** A single VL embedding item. All fields optional — the server is untyped. */
+export interface VLEmbeddingItem {
+  embedding?: number[];
+  vector?: number[];
+  type?: string;
+}
+
+/** Response shape for the /vl-embedding endpoint. */
+export interface VLEmbeddingResponse {
+  model?: string;
+  data?: (number[] | VLEmbeddingItem)[];
+  embeddings?: (number[] | VLEmbeddingItem)[];
+  items?: (number[] | VLEmbeddingItem)[];
+}
+
 export interface VLEmbeddingOpts {
   model?: string;
   /** tri-state: true/false = explicit enable_fusion; undefined = omit from request */

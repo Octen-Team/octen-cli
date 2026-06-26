@@ -1,6 +1,20 @@
 import { LIMITS } from "./constants.js";
 import { OctenValidationError } from "./errors.js";
 
+/** A single search result. All fields optional — the server is untyped. */
+export interface SearchResult {
+  title?: string;
+  url?: string;
+  highlight?: string;
+  full_content?: string;
+  time_published?: string;
+}
+
+/** Response shape for the /search endpoint. */
+export interface SearchResponse {
+  results?: SearchResult[];
+}
+
 export interface SearchOpts {
   topic?: "general" | "news";
   count?: number;

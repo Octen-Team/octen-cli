@@ -5,6 +5,17 @@ export type ChatMessage = {
   content: string;
 };
 
+/** Non-stream chat completion response. All fields optional — the server is untyped. */
+export interface ChatCompletion {
+  choices?: Array<{ message?: { content?: string } }>;
+  usage?: Record<string, unknown>;
+}
+
+/** A single SSE stream event from the chat endpoint. */
+export interface StreamEvent {
+  choices?: Array<{ delta?: { content?: string } }>;
+}
+
 export interface ChatOpts {
   webSearch?: "on" | "off";
   maxTokens?: number;
