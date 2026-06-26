@@ -3,7 +3,7 @@ import type { ExtractItem } from "../../api/extract.js";
 
 const MAX_CONTENT = 500;
 
-export function renderExtract(data: any): string {
+export function renderExtract(data: any, full = false): string {
   // The Octen API wraps the payload in an envelope: { data: { results }, code, msg, ... }.
   // Unwrap to the inner body only when `data.data` is a non-array object (the real
   // API shape); fall back to the raw object otherwise so un-enveloped inputs still work.
@@ -55,7 +55,7 @@ export function renderExtract(data: any): string {
         } else if (item.full_content) {
           const raw = item.full_content;
           const snippet =
-            raw.length > MAX_CONTENT ? raw.slice(0, MAX_CONTENT) + "…" : raw;
+            !full && raw.length > MAX_CONTENT ? raw.slice(0, MAX_CONTENT) + "…" : raw;
           lines.push(`  ${snippet}`);
         }
       }

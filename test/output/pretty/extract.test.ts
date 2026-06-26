@@ -111,4 +111,24 @@ describe("renderExtract", () => {
     // Should be truncated, not full 1000 chars
     expect(out.length).toBeLessThan(900);
   });
+
+  it("prints full content untruncated when full=true", () => {
+    const longContent = "A".repeat(1000);
+    const data = {
+      data: {
+        results: [
+          {
+            url: "https://long.com",
+            status: "success",
+            title: "Long Article",
+            full_content: longContent,
+          },
+        ],
+      },
+    };
+    const out = renderExtract(data, true);
+    // The complete 1000-char body is present and not ellipsized.
+    expect(out).toContain(longContent);
+    expect(out).not.toContain("…");
+  });
 });

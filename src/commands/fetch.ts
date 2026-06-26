@@ -18,11 +18,12 @@ export function registerFetch(program: Command) {
     .option("--videos", "include videos")
     .option("--audio", "include audio")
     .option("--favicon", "include favicon")
-    .action(async (urls: string[], opts: ExtractOpts, command: Command) => {
+    .option("--full", "print full page content untruncated (pretty mode)")
+    .action(async (urls: string[], opts: ExtractOpts & { full?: boolean }, command: Command) => {
       const g = command.optsWithGlobals();
       const client = makeClient(g);
       const req = buildExtractRequest(urls, opts);
       const res = await client.request<ExtractResponse>(ENDPOINTS.extract, req);
-      emit(res, chooseMode(g, process.stdout.isTTY ?? false), renderExtract);
+      emit(res, chooseMode(g, process.stdout.isTTY ?? false), (d) => renderExtract(d, opts.full));
     });
 }
