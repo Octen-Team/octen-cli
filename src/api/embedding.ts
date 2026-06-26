@@ -34,7 +34,9 @@ export function buildEmbeddingRequest(
   // full ids and unknown values pass through unchanged.
   const model = o.model != null ? (EMBEDDING_MODELS[o.model] ?? o.model) : undefined;
 
-  const req: Record<string, unknown> = { input };
+  // The /embedding endpoint requires `input` to be an array — a bare string
+  // returns 400 "Invalid params" — so always send an array (single or batch).
+  const req: Record<string, unknown> = { input: Array.isArray(input) ? input : [input] };
 
   // Use `put` for optional fields that are null/undefined when absent.
   const put = (k: string, v: unknown) => {

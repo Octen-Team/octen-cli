@@ -52,7 +52,7 @@ describe("embed command", () => {
     expect((init as RequestInit).method).toBe("POST");
 
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ input: "hello" });
+    expect(body).toMatchObject({ input: ["hello"] });
 
     expect(writeSpy).toHaveBeenCalled();
     const captured = writeSpy.mock.calls.map((c) => String(c[0])).join("");
@@ -66,7 +66,7 @@ describe("embed command", () => {
 
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ input: "hello", model: "octen-embedding-4b" });
+    expect(body).toMatchObject({ input: ["hello"], model: "octen-embedding-4b" });
   });
 
   it("multiple positional args → input is an array", async () => {
