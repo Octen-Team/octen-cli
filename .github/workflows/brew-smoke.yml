@@ -1,0 +1,22 @@
+name: Brew smoke
+
+on:
+  workflow_dispatch: {}
+
+jobs:
+  brew:
+    runs-on: macos-14
+    env:
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      # Skip the interactive third-party-tap trust prompt (Homebrew 6+).
+      HOMEBREW_NO_REQUIRE_TAP_TRUST: "1"
+    steps:
+      - name: Tap + install via short name
+        run: |
+          brew tap Octen-Team/tap
+          brew install octen
+      - name: Verify the installed binary
+        run: |
+          which octen
+          octen --version
+          octen completion zsh | head -1
