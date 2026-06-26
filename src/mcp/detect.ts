@@ -35,7 +35,8 @@ export function mcpStatus(
       }
       return "absent";
     }
-  } catch {
+  } catch (e) {
+    process.stderr.write(`warning: could not parse ${filePath}: ${(e as Error).message}\n`);
     return "absent";
   }
 }

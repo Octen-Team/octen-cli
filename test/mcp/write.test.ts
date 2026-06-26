@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { parse as tomlParse, stringify as tomlStringify } from "smol-toml";
 import { upsertMcpServer, removeMcpServer } from "../../src/mcp/write.js";
+import { OctenValidationError } from "../../src/api/errors.js";
 
 const ENTRY = { command: "npx", args: ["-y", "octen-mcp"], env: { OCTEN_API_KEY: "k" } };
 
@@ -220,6 +221,37 @@ describe("removeMcpServer", () => {
     const result = removeMcpServer(filePath, "json-servers");
 
     expect(result).toBe(false);
+  });
+});
+
+describe("malformed config handling", () => {
+  it("upsertMcpServer throws OctenValidationError naming the file on invalid JSON", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+    writeFileSync(filePath, "{ this is not: valid json ", "utf8");
+
+    expect(() => upsertMcpServer(filePath, "json-mcpServers", ENTRY)).toThrow(
+      OctenValidationError,
+    );
+    expect(() => upsertMcpServer(filePath, "json-mcpServers", ENTRY)).toThrow(filePath);
+  });
+
+  it("upsertMcpServer throws OctenValidationError naming the file on invalid TOML", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "config.toml");
+    writeFileSync(filePath, "this = = not valid toml\n[unterminated\n", "utf8");
+
+    expect(() => upsertMcpServer(filePath, "toml", ENTRY)).toThrow(OctenValidationError);
+    expect(() => upsertMcpServer(filePath, "toml", ENTRY)).toThrow(filePath);
+  });
+
+  it("removeMcpServer throws the clear error on a malformed file (shares readers)", () => {
+    const dir = makeTmp();
+    const filePath = join(dir, "mcp.json");
+    writeFileSync(filePath, "{ broken json", "utf8");
+
+    expect(() => removeMcpServer(filePath, "json-mcpServers")).toThrow(OctenValidationError);
+    expect(() => removeMcpServer(filePath, "json-mcpServers")).toThrow(filePath);
   });
 });
 
