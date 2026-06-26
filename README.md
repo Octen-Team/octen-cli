@@ -1,17 +1,17 @@
-# @octen/cli
+# @octen.ai/cli
 
 Command-line tool for Octen — web search, extract, chat, embeddings, and one-command MCP/Skills setup for Claude Code, Cursor, and more.
 
 ## Install
 
 ```sh
-npm i -g @octen/cli
+npm i -g @octen.ai/cli
 ```
 
 Or run without installing:
 
 ```sh
-npx @octen/cli <command>
+npx @octen.ai/cli <command>
 ```
 
 Requires Node.js 18+.
@@ -177,8 +177,8 @@ All commands print human-readable output when stdout is a TTY. When stdout is pi
 
 - **MCP server**: `octen-mcp` is invoked via `npx` so it auto-pulls the latest version on each run. Pin a version with `--pin` if you need stability.
 - **Skills**: re-run `octen configure-skills --all` to fetch the latest skills from upstream.
-- **CLI itself**: `npm i -g @octen/cli@latest`
+- **CLI itself**: `npm i -g @octen.ai/cli@latest`
 
 ## About
 
-`@octen/cli` wraps the Octen API (web search, content extraction, chat completions, text and multimodal embeddings) and handles one-command setup of the [Octen MCP server](https://www.npmjs.com/package/octen-mcp) and Agent Skills across Claude Code (CLI and Desktop app), Cursor, Claude Desktop, Windsurf, VS Code, Codex, OpenClaw, and Hermes.
+`@octen.ai/cli` wraps the Octen API (web search, content extraction, chat completions, text and multimodal embeddings) and handles one-command setup of the [Octen MCP server](https://www.npmjs.com/package/octen-mcp) and Agent Skills across Claude Code (CLI and Desktop app), Cursor, Claude Desktop, Windsurf, VS Code, Codex, OpenClaw, and Hermes.
