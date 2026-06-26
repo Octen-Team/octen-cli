@@ -40,7 +40,7 @@ const CHAT_MODEL_FALLBACK = "openai/gpt-5.4";
 
 // A small image URL for VL embedding image content.
 const IMAGE_URL =
-  "https://upload.wikimedia.org/wikipedia/commons/3/36/SD_Card.jpg";
+  "https://upload.wikimedia.org/wikipedia/commons/a/a9/Example.jpg";
 
 const client = new OctenClient({
   apiKey: API_KEY ?? "missing",
