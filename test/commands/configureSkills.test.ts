@@ -266,6 +266,58 @@ describe("configure-skills per-client error isolation", () => {
   });
 });
 
+describe("configure-skills --set-key", () => {
+  it("installs the skill AND writes OCTEN_API_KEY into ~/.claude/settings.json", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+
+    const stdoutLines: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdoutLines.push(String(chunk));
+      return true;
+    });
+
+    await prog.parseAsync([
+      "node", "octen", "configure-skills",
+      "--claude-code", "--offline", "--set-key", "--api-key", "testkey",
+    ]);
+
+    // Skill installed
+    expect(existsSync(join(home, ".claude/skills"))).toBe(true);
+
+    // Env key written
+    const settingsPath = join(home, ".claude/settings.json");
+    expect(existsSync(settingsPath)).toBe(true);
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    expect(settings.env.OCTEN_API_KEY).toBe("testkey");
+
+    // Output confirms the env write
+    const output = stdoutLines.join("");
+    expect(output).toMatch(/set OCTEN_API_KEY in Claude Code/);
+  });
+
+  it("rejects when --set-key is passed with no key available", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prevKey = process.env.OCTEN_API_KEY;
+    delete process.env.OCTEN_API_KEY;
+    try {
+      await expect(
+        prog.parseAsync([
+          "node", "octen", "configure-skills",
+          "--claude-code", "--offline", "--set-key",
+        ]),
+      ).rejects.toThrow(/needs a key/);
+    } finally {
+      if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
+      else process.env.OCTEN_API_KEY = prevKey;
+    }
+  });
+});
+
 describe("configure-skills default remote path", () => {
   it("installs skills from remote tarball when no --offline flag is given", async () => {
     const home = makeTmp();

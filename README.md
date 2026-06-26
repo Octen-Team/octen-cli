@@ -142,11 +142,16 @@ octen configure-skills --all --offline
 
 # Fetch from a specific git ref
 octen configure-skills --claude-code --ref v0.3.0
+
+# Also write OCTEN_API_KEY into the client's env config
+octen configure-skills --claude-code --set-key --api-key <key>
 ```
 
 Supported clients: Claude Code, Cursor, Codex, OpenClaw, Hermes.
 
-Options: `--all`, `--claude-code`, `--cursor`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project), `--ref <ref>` (default: main), `--bundled`/`--offline` (use vendored skills), `--only <names>` (comma-separated skill names), `--skills-dir <path>` (custom source directory).
+`--set-key` also writes OCTEN_API_KEY into the client's env config (Claude Code `~/.claude/settings.json`, Codex `config.toml`, OpenClaw `.env`); Cursor/Hermes print a shell-profile hint. The key comes from `--api-key` or the `OCTEN_API_KEY` environment variable.
+
+Options: `--all`, `--claude-code`, `--cursor`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project), `--ref <ref>` (default: main), `--bundled`/`--offline` (use vendored skills), `--only <names>` (comma-separated skill names), `--skills-dir <path>` (custom source directory), `--set-key` (write OCTEN_API_KEY into the client's env config).
 
 Run without flags to show installed skills per client.
 

@@ -6,6 +6,8 @@ import type { Command } from "commander";
 import { SKILL_CLIENTS } from "../skills/clients.js";
 import { resolveSkillsDir } from "../skills/source.js";
 import { installSkills, skillStatus } from "../skills/install.js";
+import { setClientEnvKey } from "../skills/setkey.js";
+import { OctenValidationError } from "../api/errors.js";
 
 interface ConfigureSkillsInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -43,6 +45,10 @@ export function registerConfigureSkills(
     .option("--ref <ref>", "upstream git ref to fetch skills from", "main")
     .option("--bundled", "force use of bundled (vendored) skills — no network")
     .option("--offline", "alias for --bundled")
+    .option(
+      "--set-key",
+      "also write OCTEN_API_KEY into each selected client's env config",
+    )
     .action(async (_opts: Record<string, any>, command: Command) => {
       const opts = command.opts() as {
         all?: boolean;
@@ -57,6 +63,7 @@ export function registerConfigureSkills(
         ref: string;
         bundled?: boolean;
         offline?: boolean;
+        setKey?: boolean;
       };
 
       const scope = (opts.scope === "project" ? "project" : "user") as
@@ -165,9 +172,29 @@ export function registerConfigureSkills(
         process.exitCode = 1;
       }
 
-      // Print API key setup reminder
-      process.stdout.write(
-        "\nSet OCTEN_API_KEY in each client's environment — see https://octen.ai\n",
-      );
+      if (opts.setKey) {
+        const g = command.optsWithGlobals() as { apiKey?: string };
+        const key = g.apiKey || process.env.OCTEN_API_KEY;
+        if (!key) {
+          throw new OctenValidationError(
+            "--set-key needs a key: pass --api-key or set OCTEN_API_KEY",
+          );
+        }
+        for (const client of selected) {
+          const result = setClientEnvKey(client.id, key, scope, home, cwd);
+          if (result.written) {
+            process.stdout.write(
+              `set OCTEN_API_KEY in ${client.label} (${result.path})\n`,
+            );
+          } else {
+            process.stdout.write(`${client.label}: ${result.hint}\n`);
+          }
+        }
+      } else {
+        // Print API key setup reminder
+        process.stdout.write(
+          "\nSet OCTEN_API_KEY in each client's environment — see https://octen.ai\n",
+        );
+      }
     });
 }

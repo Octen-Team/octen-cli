@@ -1,5 +1,5 @@
 import { DEFAULT_BASE_URL, DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT_MS, ENDPOINTS } from "./constants.js";
-import { OctenAPIError, OctenAuthError, OctenTimeoutError } from "./errors.js";
+import { OctenAPIError, OctenAuthError, OctenNetworkError, OctenTimeoutError } from "./errors.js";
 
 export interface OctenClientOptions {
   apiKey: string;
@@ -71,7 +71,9 @@ export class OctenClient {
         if ((e as Error).name === "AbortError") throw new OctenTimeoutError("request timed out");
         lastErr = e;
         if (attempt < this.maxRetries) { await sleep(this.retryBaseMs * 2 ** attempt); continue; }
-        throw lastErr;
+        // Out of retries on a non-Octen, non-abort error: surface the underlying network cause.
+        const cause = (e as any)?.cause?.code ?? (e as any)?.cause?.message ?? (e as Error).message;
+        throw new OctenNetworkError(`network error reaching ${this.baseUrl}: ${cause}`);
       } finally {
         clearTimeout(t);
       }
@@ -99,6 +101,11 @@ export class OctenClient {
         throw new OctenAPIError(msg, res.status, errBody);
       }
       return res;
+    } catch (e) {
+      if (e instanceof OctenAPIError || e instanceof OctenAuthError) throw e;
+      if ((e as Error).name === "AbortError") throw new OctenTimeoutError("request timed out");
+      const cause = (e as any)?.cause?.code ?? (e as any)?.cause?.message ?? (e as Error).message;
+      throw new OctenNetworkError(`network error reaching ${this.baseUrl}: ${cause}`);
     } finally {
       clearTimeout(t);
     }

@@ -222,6 +222,72 @@ describe("resolveSkillsDir – happy path (real tarball)", () => {
   });
 });
 
+describe("resolveSkillsDir – retry before fallback", () => {
+  it("retries transient fetch failures and succeeds on the 3rd attempt (source: remote)", async () => {
+    const bundledDir = makeTmp();
+    const cacheDir = makeTmp();
+
+    const ref = "main";
+    const buffer = await buildTarball(ref, ["octen-search"]);
+
+    let attempts = 0;
+    const fetchImpl = async (): Promise<Response> => {
+      attempts += 1;
+      if (attempts < 3) throw new Error("fetch failed");
+      return new Response(buffer);
+    };
+
+    const result = await resolveSkillsDir({
+      ref,
+      offline: false,
+      cacheDir,
+      bundledDir,
+      fetchImpl: fetchImpl as typeof fetch,
+    });
+
+    expect(attempts).toBe(3);
+    expect(result.source).toBe("remote");
+    expect(existsSync(join(result.dir, "octen-search", "SKILL.md"))).toBe(true);
+  });
+
+  it("falls back to bundled and warns after all attempts throw", async () => {
+    const bundledDir = makeTmp();
+    const cacheDir = makeTmp();
+
+    const stderrLines: string[] = [];
+    const origWrite = process.stderr.write.bind(process.stderr);
+    (process.stderr as any).write = (chunk: unknown) => {
+      stderrLines.push(String(chunk));
+      return true;
+    };
+
+    try {
+      let attempts = 0;
+      const fetchImpl = async (): Promise<Response> => {
+        attempts += 1;
+        throw new Error("network error");
+      };
+
+      const result = await resolveSkillsDir({
+        ref: "main",
+        offline: false,
+        cacheDir,
+        bundledDir,
+        fetchImpl: fetchImpl as typeof fetch,
+      });
+
+      expect(attempts).toBe(3);
+      expect(result.source).toBe("bundled");
+      expect(result.dir).toBe(bundledDir);
+      const combined = stderrLines.join("");
+      expect(combined).toMatch(/warning/);
+      expect(combined).toMatch(/bundled/);
+    } finally {
+      (process.stderr as any).write = origWrite;
+    }
+  });
+});
+
 describe("resolveSkillsDir – ref validation", () => {
   it("throws OctenValidationError for a malicious ref before any fetch", async () => {
     const bundledDir = makeTmp();

@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OctenClient } from "../../src/api/client.js";
 import { ENDPOINTS } from "../../src/api/constants.js";
-import { OctenAPIError, OctenAuthError, OctenTimeoutError } from "../../src/api/errors.js";
+import { OctenAPIError, OctenAuthError, OctenNetworkError, OctenTimeoutError } from "../../src/api/errors.js";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
@@ -59,6 +59,17 @@ describe("OctenClient.request", () => {
     vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ msg: "bad key" }, 401));
     const c = new OctenClient({ apiKey: "k" });
     await expect(c.request("/search", {})).rejects.toBeInstanceOf(OctenAuthError);
+  });
+
+  it("wraps a non-abort network failure as OctenNetworkError with cause + base url", async () => {
+    vi.spyOn(globalThis, "fetch").mockRejectedValue(
+      Object.assign(new TypeError("fetch failed"), { cause: { code: "EADDRNOTAVAIL" } }),
+    );
+    const c = new OctenClient({ apiKey: "k", baseUrl: "https://api.octen.ai", maxRetries: 0 });
+    const err = await c.request("/search", {}).catch((e) => e);
+    expect(err).toBeInstanceOf(OctenNetworkError);
+    expect((err as OctenNetworkError).message).toContain("EADDRNOTAVAIL");
+    expect((err as OctenNetworkError).message).toContain("https://api.octen.ai");
   });
 });
 
