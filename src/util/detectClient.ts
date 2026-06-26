@@ -43,7 +43,14 @@ export function isClientInstalled(id: string, opts?: DetectOpts): boolean {
 
   switch (id) {
     case "claude-code":
-      return binOnPath("claude") || existsSync(join(home, ".claude.json"));
+      // Covers the Claude Code CLI (binary / ~/.claude.json) AND the desktop app,
+      // which bundles the Claude Code engine and shares the same ~/.claude config.
+      return (
+        binOnPath("claude") ||
+        existsSync(join(home, ".claude.json")) ||
+        appExists("Claude") ||
+        existsSync(join(home, "Library/Application Support/Claude/claude-code"))
+      );
     case "cursor":
       return binOnPath("cursor") || appExists("Cursor");
     case "codex":

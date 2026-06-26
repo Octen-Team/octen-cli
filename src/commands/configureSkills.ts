@@ -31,6 +31,10 @@ export function registerConfigureSkills(
     .description("Install Octen Agent Skills into AI clients")
     .option("--all", "install into all supported clients")
     .option("--claude-code", "install into Claude Code")
+    .option(
+      "--claude-desktop",
+      "install for Claude Desktop (shares Claude Code's ~/.claude/skills)",
+    )
     .option("--cursor", "install into Cursor")
     .option("--codex", "install into Codex")
     .option("--openclaw", "install into OpenClaw")
@@ -57,6 +61,7 @@ export function registerConfigureSkills(
       const opts = command.opts() as {
         all?: boolean;
         claudeCode?: boolean;
+        claudeDesktop?: boolean;
         cursor?: boolean;
         codex?: boolean;
         openclaw?: boolean;
@@ -92,18 +97,10 @@ export function registerConfigureSkills(
       );
       const cacheDir = join(home, ".cache/octen-cli/skills");
 
-      // Determine selected clients
-      const clientFlagMap: Record<string, string> = {
-        "claude-code": "claudeCode",
-        cursor: "cursor",
-        codex: "codex",
-        openclaw: "openclaw",
-        hermes: "hermes",
-      };
-
       const anySelected =
         opts.all ||
         opts.claudeCode ||
+        opts.claudeDesktop ||
         opts.cursor ||
         opts.codex ||
         opts.openclaw ||
@@ -144,12 +141,15 @@ export function registerConfigureSkills(
         }
       } else {
         // Explicit per-client flags: warn + skip not-installed unless --force.
-        const requested = SKILL_CLIENTS.filter((c) => {
-          const flagName = clientFlagMap[c.id];
-          return flagName
-            ? Boolean((opts as Record<string, unknown>)[flagName])
-            : false;
-        });
+        // --claude-desktop maps to claude-code: Claude Desktop reads the same
+        // ~/.claude/skills, so it's configured once there (deduped).
+        const wantedIds = new Set<string>();
+        if (opts.claudeCode || opts.claudeDesktop) wantedIds.add("claude-code");
+        if (opts.cursor) wantedIds.add("cursor");
+        if (opts.codex) wantedIds.add("codex");
+        if (opts.openclaw) wantedIds.add("openclaw");
+        if (opts.hermes) wantedIds.add("hermes");
+        const requested = SKILL_CLIENTS.filter((c) => wantedIds.has(c.id));
         selected = requested.filter((c) => {
           if (opts.force || isInstalled(c.id)) return true;
           process.stderr.write(
@@ -204,6 +204,12 @@ export function registerConfigureSkills(
 
       if (anyFailed) {
         process.exitCode = 1;
+      }
+
+      if (opts.claudeDesktop) {
+        process.stdout.write(
+          "note: Claude Desktop reads ~/.claude/skills (shared with Claude Code) — installed skills apply to both.\n",
+        );
       }
 
       if (opts.setKey) {

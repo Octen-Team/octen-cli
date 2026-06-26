@@ -425,4 +425,15 @@ describe("configure-skills default remote path", () => {
     const output = stdoutLines.join("");
     expect(output).toMatch(/source: remote/);
   });
+
+  it("--claude-desktop installs to Claude Code's shared ~/.claude/skills", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--claude-desktop", "--offline",
+    ]);
+    // Claude Desktop reads the same dir as Claude Code, so skills land there.
+    expect(existsSync(join(home, ".claude/skills", "octen-search", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(home, ".claude/skills", "octen-design", "SKILL.md"))).toBe(true);
+  });
 });

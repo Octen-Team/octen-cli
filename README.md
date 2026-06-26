@@ -151,6 +151,8 @@ octen configure-skills --claude-code --set-key --api-key <key>
 
 Supported clients: Claude Code, Cursor, Codex, OpenClaw, Hermes.
 
+Claude Desktop reads the same `~/.claude/skills` as Claude Code, so `--claude-code` already installs skills the desktop app will use. `--claude-desktop` is accepted as an explicit alias for that shared target.
+
 `--set-key` also writes OCTEN_API_KEY into the client's env config (Claude Code `~/.claude/settings.json`, Codex `config.toml`, OpenClaw `.env`); Cursor/Hermes print a shell-profile hint. The key comes from `--api-key` or the `OCTEN_API_KEY` environment variable.
 
 Only clients detected as installed are configured; `--all` skips the rest, and an explicitly-named client that isn't detected is skipped unless you pass `--force`.
