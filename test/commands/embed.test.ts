@@ -136,6 +136,19 @@ describe("embed command", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
+  it("rejects --file with a missing path with /file not found/ and does not call fetch", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "embed",
+        "--file", "/no/such/file.txt",
+        "-m", "4b",
+        "--api-key", "k",
+      ]),
+    ).rejects.toThrow(/file not found/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("throws OctenValidationError when no input is provided and stdin is a TTY", async () => {
     // Force stdin to look like a TTY so the command doesn't block waiting for piped input
     const origIsTTY = process.stdin.isTTY;

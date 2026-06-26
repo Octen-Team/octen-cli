@@ -71,9 +71,8 @@ export function registerConfigureSkills(
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();
 
-      // bundledDir: the package's skills/ directory
-      // From dist/commands/configureSkills.js: ../../skills → repo-root/skills
-      // From src/commands/configureSkills.ts (tsx tests): ../../skills → repo-root/skills
+      // Both dist/commands/ (published) and src/commands/ (tsx tests) are two levels below the
+      // package root, so ../../skills resolves to the package-root skills/ dir in both.
       const bundledDir = fileURLToPath(
         new URL("../../skills", import.meta.url),
       );

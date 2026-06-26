@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import "./util/preflightColor.js";
 import { Command } from "commander";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { readFileSync, existsSync, statSync } from "node:fs";
 import { extname } from "node:path";
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
@@ -44,6 +44,13 @@ function resolveContentValue(value: string): string {
   // Local file path — read and encode as base64 data URI.
   if (!existsSync(value)) {
     throw new OctenValidationError(`file not found: ${value}`);
+  }
+  const MAX_INLINE_BYTES = 10 * 1024 * 1024; // 10 MB
+  const { size } = statSync(value);
+  if (size > MAX_INLINE_BYTES) {
+    throw new OctenValidationError(
+      `file ${value} is ${(size / 1048576).toFixed(1)}MB; max 10MB for inline embedding — pass an https URL instead`,
+    );
   }
   const buf = readFileSync(value);
   const ext = extname(value);

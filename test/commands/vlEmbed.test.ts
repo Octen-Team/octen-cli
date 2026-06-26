@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { writeFileSync, rmSync } from "node:fs";
+import { writeFileSync, rmSync, writeSync, openSync, closeSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
@@ -286,5 +286,28 @@ describe("vl-embed command", () => {
       ]),
     ).rejects.toThrow(/not found/);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("rejects a local file over 10MB with /max 10MB/", async () => {
+    const file = join(tmpdir(), `octen-vl-big-${Date.now()}.png`);
+    // Write a sparse ~11MB file: open, seek past 11MB, write a single byte.
+    const fd = openSync(file, "w");
+    const OVER_LIMIT = 11 * 1024 * 1024;
+    writeSync(fd, Buffer.alloc(1), 0, 1, OVER_LIMIT);
+    closeSync(fd);
+    try {
+      const prog = makeProgram();
+      await expect(
+        prog.parseAsync([
+          "node", "octen", "vl-embed",
+          `image:${file}`,
+          "-m", "base",
+          "--api-key", "k",
+        ]),
+      ).rejects.toThrow(/max 10MB/);
+      expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      rmSync(file, { force: true });
+    }
   });
 });

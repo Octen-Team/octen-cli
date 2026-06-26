@@ -1,4 +1,4 @@
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
 import { buildEmbeddingRequest } from "../api/embedding.js";
@@ -36,6 +36,7 @@ export function registerEmbed(program: Command) {
         // Single arg → string; multiple → array
         input = textArgs.length === 1 ? textArgs[0] : textArgs;
       } else if (opts.file) {
+        if (!existsSync(opts.file)) throw new OctenValidationError(`file not found: ${opts.file}`);
         const raw = readFileSync(opts.file, "utf8");
         const lines = raw.split("\n").map((l: string) => l.trim()).filter(Boolean);
         input = lines.length === 1 ? lines[0] : lines;
