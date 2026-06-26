@@ -14,7 +14,7 @@ export function registerSearch(program: Command, fixedTopic?: "news") {
     .option("--exclude-domains <list>", "comma list", (v) => v.split(","))
     .option("--include-text <list>", "comma list", (v) => v.split(","))
     .option("--exclude-text <list>", "comma list", (v) => v.split(","))
-    .option("--time-basis <b>").option("--time-range <r>")
+    .option("--time-basis <b>", "auto|published|crawled").option("--time-range <r>", "day|week|month|year (or d|w|m|y)")
     .option("--start-time <iso>").option("--end-time <iso>")
     .option("--format <f>", "text|markdown").option("--safesearch <s>", "off|strict")
     .option("--highlight").option("--highlight-max-tokens <n>", "max tokens per highlight", parseIntOpt("--highlight-max-tokens"))

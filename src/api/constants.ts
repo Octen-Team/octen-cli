@@ -32,6 +32,12 @@ export const LIMITS = {
   vlVideos: 1,
 } as const;
 
+export const TOPIC_OPTIONS = ["general", "news"] as const;
+export const TIME_BASIS_OPTIONS = ["auto", "published", "crawled"] as const;
+export const TIME_RANGE_OPTIONS = ["day", "week", "month", "year", "d", "w", "m", "y"] as const;
+export const SAFESEARCH_OPTIONS = ["off", "strict"] as const;
+export const FORMAT_OPTIONS = ["text", "markdown"] as const;
+
 export const SKILLS_REPO = "Octen-Team/octen-skills";
 export const SKILLS_REPO_TARBALL = (ref: string) =>
   `https://github.com/${SKILLS_REPO}/archive/${ref}.tar.gz`;

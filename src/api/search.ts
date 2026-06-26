@@ -1,5 +1,17 @@
-import { LIMITS } from "./constants.js";
+import {
+  LIMITS,
+  TOPIC_OPTIONS,
+  TIME_BASIS_OPTIONS,
+  TIME_RANGE_OPTIONS,
+  SAFESEARCH_OPTIONS,
+  FORMAT_OPTIONS,
+} from "./constants.js";
 import { OctenValidationError } from "./errors.js";
+
+function validateEnum(flag: string, value: unknown, allowed: readonly string[]): void {
+  if (value != null && !allowed.includes(value as string))
+    throw new OctenValidationError(`${flag} must be one of: ${allowed.join(", ")}`);
+}
 
 /** A single search result. All fields optional — the server is untyped. */
 export interface SearchResult {
@@ -44,6 +56,11 @@ export function buildSearchRequest(query: string, o: SearchOpts): Record<string,
     throw new OctenValidationError(`include-text max ${LIMITS.includeText}`);
   if (o.excludeText && o.excludeText.length > LIMITS.excludeText)
     throw new OctenValidationError(`exclude-text max ${LIMITS.excludeText}`);
+  validateEnum("--topic", o.topic, TOPIC_OPTIONS);
+  validateEnum("--time-basis", o.timeBasis, TIME_BASIS_OPTIONS);
+  validateEnum("--time-range", o.timeRange, TIME_RANGE_OPTIONS);
+  validateEnum("--safesearch", o.safesearch, SAFESEARCH_OPTIONS);
+  validateEnum("--format", o.format, FORMAT_OPTIONS);
 
   const req: Record<string, unknown> = { query };
   const put = (k: string, v: unknown) => { if (v != null) req[k] = v; };

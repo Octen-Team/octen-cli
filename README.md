@@ -33,10 +33,10 @@ You can also pass `--api-key <key>` on any command. To point at a self-hosted or
 Search the live web.
 
 ```sh
-octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range 7d
+octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight`, `--time-range`, `--start-time`, `--end-time`, `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
+Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight`, `--time-range` (day|week|month|year or d|w|m|y), `--start-time`, `--end-time`, `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
 
 ---
 
@@ -45,7 +45,7 @@ Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight`, `
 News-focused web search (same flags as `search` minus `--topic`).
 
 ```sh
-octen news "OpenAI announcement" --highlight --time-range 1d
+octen news "OpenAI announcement" --highlight --time-range day
 ```
 
 ---
