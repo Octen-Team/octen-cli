@@ -58,7 +58,9 @@ Extract content from one or more URLs (1–20).
 octen fetch https://example.com --query "pricing" --max-age 3600 --images
 ```
 
-Options: `--query` (relevance hint), `--max-age <sec>` (cache age), `--images`, `--videos`, `--audio`, `--favicon`, `--format` (markdown|text), `--fetch-timeout <sec>`.
+Options: `--query` (relevance hint), `--max-age <sec>` (cache age), `--images`, `--videos`, `--audio`, `--favicon`, `--format` (markdown|text), `--fetch-timeout <sec>`, `--full` (print full page content).
+
+Pretty output truncates page content to ~500 chars for readability; pass `--full` to print the whole thing (or `--json` for the raw response).
 
 ---
 
@@ -67,7 +69,7 @@ Options: `--query` (relevance hint), `--max-age <sec>` (cache age), `--images`, 
 Chat completion with optional streaming.
 
 ```sh
-octen chat "Summarize the Octen docs" -m octen-r1
+octen chat "Summarize the Octen docs" -m anthropic/claude-haiku-4.5
 ```
 
 Streaming is on by default when output is a TTY; use `--no-stream` to get a single JSON response. Pass `-i` for interactive REPL mode. Set `OCTEN_CHAT_MODEL` to avoid specifying `-m` every time.
