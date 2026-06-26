@@ -1,0 +1,39 @@
+name: Release
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          registry-url: "https://registry.npmjs.org"
+      - run: npm ci
+      - name: Verify tag matches package.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG="$(node -p "require('./package.json').version")"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "Tag '$GITHUB_REF_NAME' (=$TAG) does not match package.json version '$PKG'"
+            exit 1
+          fi
+      - name: Type-check
+        run: npx tsc --noEmit
+      - name: Test
+        run: npm test
+      # `npm publish` runs prepublishOnly (npm run build), so dist/ is built before packing.
+      - name: Publish to npm
+        run: npm publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+      # Repo is private, so npm provenance is omitted. When this repo becomes public,
+      # add `--provenance` to the publish command and `id-token: write` to permissions above.
