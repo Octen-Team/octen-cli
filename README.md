@@ -18,7 +18,9 @@ from the [latest release](https://github.com/Octen-Team/octen-cli/releases/lates
 `chmod +x` it, and put it on your `PATH`. On macOS/Linux you can also use Homebrew:
 
 ```sh
-brew install Octen-Team/tap/octen
+brew tap Octen-Team/tap
+brew install octen
+# Homebrew 6+ may ask you to trust the tap first: brew trust octen-team/tap
 ```
 
 Then enable tab-completion (one-time; `bash` / `zsh` / `fish`):
