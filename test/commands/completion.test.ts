@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { OctenValidationError } from "../../src/api/errors.js";
 import { registerSearch } from "../../src/commands/search.js";
-import { registerFetch } from "../../src/commands/fetch.js";
+import { registerExtract } from "../../src/commands/extract.js";
 import { registerChat } from "../../src/commands/chat.js";
 import { registerEmbed } from "../../src/commands/embed.js";
 import { registerVlEmbed } from "../../src/commands/vlEmbed.js";
@@ -30,7 +30,7 @@ function makeProgram() {
   registerConfigureSkills(prog);
   registerSearch(prog);
   registerSearch(prog, "news");
-  registerFetch(prog);
+  registerExtract(prog);
   registerChat(prog);
   registerEmbed(prog);
   registerVlEmbed(prog);
@@ -62,11 +62,11 @@ describe("completion command", () => {
     expect(out).toContain("_octen()");
     // Subcommand names
     expect(out).toContain("search");
-    expect(out).toContain("fetch");
+    expect(out).toContain("extract");
     expect(out).toContain("configure-mcp");
     // Known per-subcommand flags
     expect(out).toContain("--count"); // from search
-    expect(out).toContain("--full"); // from fetch
+    expect(out).toContain("--full"); // from extract
   });
 
   it("emits a non-empty zsh script containing subcommands", async () => {
@@ -76,7 +76,7 @@ describe("completion command", () => {
     // self-initializes compinit so a bare source/eval works without extra setup
     expect(out).toContain("autoload -Uz compinit");
     expect(out).toContain("search");
-    expect(out).toContain("fetch");
+    expect(out).toContain("extract");
     expect(out).toContain("configure-mcp");
   });
 
@@ -84,7 +84,7 @@ describe("completion command", () => {
     const out = await run("fish");
     expect(out).toContain("complete -c octen");
     expect(out).toContain("search");
-    expect(out).toContain("fetch");
+    expect(out).toContain("extract");
     expect(out).toContain("configure-mcp");
     // fish uses -l for the bare long name (no leading dashes)
     expect(out).toContain("-l count");

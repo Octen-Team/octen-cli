@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
-import { registerFetch } from "../../src/commands/fetch.js";
+import { registerExtract } from "../../src/commands/extract.js";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -18,11 +18,11 @@ function makeProgram() {
     .option("--json", "raw JSON output")
     .option("--pretty", "human-readable output")
     .exitOverride();
-  registerFetch(prog);
+  registerExtract(prog);
   return prog;
 }
 
-describe("fetch command", () => {
+describe("extract command", () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>;
   let writeSpy: ReturnType<typeof vi.spyOn>;
 
@@ -43,7 +43,7 @@ describe("fetch command", () => {
 
   it("calls /extract with urls body and outputs JSON when --json is set", async () => {
     const prog = makeProgram();
-    await prog.parseAsync(["node", "octen", "fetch", "https://x.com", "--json", "--api-key", "k"]);
+    await prog.parseAsync(["node", "octen", "extract", "https://x.com", "--json", "--api-key", "k"]);
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [url, init] = fetchSpy.mock.calls[0];
@@ -60,7 +60,7 @@ describe("fetch command", () => {
 
   it("auto-prefixes bare host to https:// in request body", async () => {
     const prog = makeProgram();
-    await prog.parseAsync(["node", "octen", "fetch", "example.com", "--json", "--api-key", "k"]);
+    await prog.parseAsync(["node", "octen", "extract", "example.com", "--json", "--api-key", "k"]);
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [, init] = fetchSpy.mock.calls[0];
@@ -71,7 +71,7 @@ describe("fetch command", () => {
   it("passes --query to request body", async () => {
     const prog = makeProgram();
     await prog.parseAsync([
-      "node", "octen", "fetch", "https://x.com",
+      "node", "octen", "extract", "https://x.com",
       "--json", "--api-key", "k", "--query", "AI trends",
     ]);
 
@@ -83,7 +83,7 @@ describe("fetch command", () => {
   it("passes --format to request body", async () => {
     const prog = makeProgram();
     await prog.parseAsync([
-      "node", "octen", "fetch", "https://x.com",
+      "node", "octen", "extract", "https://x.com",
       "--json", "--api-key", "k", "--format", "text",
     ]);
 
@@ -95,7 +95,7 @@ describe("fetch command", () => {
   it("passes --fetch-timeout to request body as timeout", async () => {
     const prog = makeProgram();
     await prog.parseAsync([
-      "node", "octen", "fetch", "https://x.com",
+      "node", "octen", "extract", "https://x.com",
       "--json", "--api-key", "k", "--fetch-timeout", "30",
     ]);
 
@@ -107,7 +107,7 @@ describe("fetch command", () => {
   it("passes --images flag to request body", async () => {
     const prog = makeProgram();
     await prog.parseAsync([
-      "node", "octen", "fetch", "https://x.com",
+      "node", "octen", "extract", "https://x.com",
       "--json", "--api-key", "k", "--images",
     ]);
 
@@ -119,7 +119,7 @@ describe("fetch command", () => {
   it("rejects non-integer --fetch-timeout", async () => {
     const prog = makeProgram();
     await expect(
-      prog.parseAsync(["node", "octen", "fetch", "https://x.com", "--fetch-timeout", "abc", "--api-key", "k"]),
+      prog.parseAsync(["node", "octen", "extract", "https://x.com", "--fetch-timeout", "abc", "--api-key", "k"]),
     ).rejects.toThrow(/integer/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
@@ -127,7 +127,7 @@ describe("fetch command", () => {
   it("accepts multiple URLs", async () => {
     const prog = makeProgram();
     await prog.parseAsync([
-      "node", "octen", "fetch", "https://a.com", "https://b.com",
+      "node", "octen", "extract", "https://a.com", "https://b.com",
       "--json", "--api-key", "k",
     ]);
 

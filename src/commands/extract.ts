@@ -5,9 +5,9 @@ import { chooseMode, emit } from "../output/render.js";
 import { renderExtract } from "../output/pretty/extract.js";
 import { makeClient, parseIntOpt } from "./utils.js";
 
-export function registerFetch(program: Command) {
+export function registerExtract(program: Command) {
   program
-    .command("fetch")
+    .command("extract")
     .argument("<urls...>", "one or more URLs (1-20)")
     .description("Extract content from URLs")
     .option("--query <q>", "optional search query for relevance")

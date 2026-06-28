@@ -75,12 +75,12 @@ octen news "OpenAI announcement" --highlight --time-range day
 
 ---
 
-### `octen fetch`
+### `octen extract`
 
 Extract content from one or more URLs (1–20).
 
 ```sh
-octen fetch https://example.com --query "pricing" --max-age 3600 --images
+octen extract https://example.com --query "pricing" --max-age 3600 --images
 ```
 
 Options: `--query` (relevance hint), `--max-age <sec>` (cache age, 300–31536000), `--images`, `--videos`, `--audio`, `--favicon`, `--format` (markdown|text), `--fetch-timeout <sec>` (1–60), `--full` (print full page content).

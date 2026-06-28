@@ -11,7 +11,7 @@ describe("cli", () => {
   });
   it("lists commands in help", () => {
     const help = runCli(["--help"]);
-    for (const c of ["search", "fetch", "chat", "embed", "vl-embed", "configure-mcp", "configure-skills", "reset"]) {
+    for (const c of ["search", "extract", "chat", "embed", "vl-embed", "configure-mcp", "configure-skills", "reset"]) {
       expect(help).toContain(c);
     }
   });

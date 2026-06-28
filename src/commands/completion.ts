@@ -9,7 +9,7 @@ const SUPPORTED_SHELLS = ["bash", "zsh", "fish"] as const;
 type Shell = (typeof SUPPORTED_SHELLS)[number];
 
 interface CompletionModel {
-  /** All subcommand names, e.g. ["search", "fetch", ...]. */
+  /** All subcommand names, e.g. ["search", "extract", ...]. */
   subcommands: string[];
   /** Global flags in `--flag` / `-f` form. */
   globalFlags: string[];

@@ -365,7 +365,7 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
   // -------------------------------------------------------------------------
   // fetch / extract
   // -------------------------------------------------------------------------
-  describe("fetch", () => {
+  describe("extract", () => {
     const URLS = ["https://example.com"];
 
     it(

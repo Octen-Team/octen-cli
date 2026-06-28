@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { exitCodeFor } from "./api/errors.js";
 import { registerSearch } from "./commands/search.js";
-import { registerFetch } from "./commands/fetch.js";
+import { registerExtract } from "./commands/extract.js";
 import { registerChat } from "./commands/chat.js";
 import { registerEmbed } from "./commands/embed.js";
 import { registerVlEmbed } from "./commands/vlEmbed.js";
@@ -44,7 +44,7 @@ registerConfigureSkills(program);
 
 registerSearch(program);
 registerSearch(program, "news");
-registerFetch(program);
+registerExtract(program);
 registerChat(program);
 registerEmbed(program);
 registerVlEmbed(program);
