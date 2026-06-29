@@ -8,7 +8,7 @@ import {
 } from "./constants.js";
 import { OctenValidationError } from "./errors.js";
 
-function validateEnum(flag: string, value: unknown, allowed: readonly string[]): void {
+export function validateEnum(flag: string, value: unknown, allowed: readonly string[]): void {
   if (value != null && !allowed.includes(value as string))
     throw new OctenValidationError(`${flag} must be one of: ${allowed.join(", ")}`);
 }

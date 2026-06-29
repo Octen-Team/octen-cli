@@ -11,6 +11,8 @@ import { registerExtract } from "./commands/extract.js";
 import { registerChat } from "./commands/chat.js";
 import { registerEmbed } from "./commands/embed.js";
 import { registerVlEmbed } from "./commands/vlEmbed.js";
+import { registerImageSearch } from "./commands/imageSearch.js";
+import { registerVideoSearch } from "./commands/videoSearch.js";
 import { registerConfigureMcp } from "./commands/configureMcp.js";
 import { registerConfigureSkills } from "./commands/configureSkills.js";
 import { registerReset } from "./commands/reset.js";
@@ -50,6 +52,8 @@ registerExtract(program);
 registerChat(program);
 registerEmbed(program);
 registerVlEmbed(program);
+registerImageSearch(program);
+registerVideoSearch(program);
 
 // Register LAST so introspection sees every command and its flags.
 registerCompletion(program);

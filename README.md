@@ -145,6 +145,38 @@ Options: `-m/--model` (base|large or full ID), `--fusion`/`--no-fusion`, `--dime
 
 ---
 
+### `octen image-search`
+
+**In Beta** — contact us to request beta access.
+
+Search the web for images by text query and/or an example image.
+
+```sh
+octen image-search "red sports car" -n 10 --topic design --time-range week
+octen image-search --image https://example.com/car.jpg
+octen image-search "similar to this" --image ./car.png
+```
+
+`--image` accepts a public URL or a local file path (read inline as base64, max 5MB). At least one of a query or `--image` is required.
+
+Options: `--image <url|path>`, `--topic` (general|design), `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--safesearch` (off|strict), `--html-snippet` (+`--html-snippet-max-tokens`).
+
+---
+
+### `octen video-search`
+
+**In Beta** — contact us to request beta access.
+
+Search the web for videos by text query.
+
+```sh
+octen video-search "how to make espresso" -n 10 --time-range month
+```
+
+Options: `-n` (result count 1–10), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--safesearch` (off|strict).
+
+---
+
 ### `octen configure-mcp`
 
 Configure the Octen MCP server in AI clients (merges into existing config, does not clobber).
