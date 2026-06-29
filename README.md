@@ -79,6 +79,8 @@ octen news "OpenAI announcement" --highlight --time-range day
 
 Broad multi-angle web search (alias: `octen broad`). Decomposes the query into sub-queries searched concurrently, returning results grouped by sub-query for comprehensive coverage.
 
+Use it for comparisons across many sources (pricing, products, vendors), surveys/research, and multi-angle questions — cases where a single `octen search` only reaches a few subtopics. Pass the query as-is (sub-queries are generated for you); raise `--max-queries` for broader coverage, or use `octen search` for a single focused query.
+
 ```sh
 octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
 ```
