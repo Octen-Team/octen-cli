@@ -113,7 +113,21 @@ octen chat "Summarize the Octen docs" -m anthropic/claude-haiku-4.5
 
 Streaming is on by default when output is a TTY; use `--no-stream` to get a single JSON response. Pass `-i` for interactive REPL mode. Set `OCTEN_CHAT_MODEL` to avoid specifying `-m` every time.
 
-Options: `-m/--model`, `--system`, `--web-search` (on|off), `--temperature`, `--top-p`, `--max-tokens`, `--reasoning-effort` (low|medium|high), `--frequency-penalty`, `--presence-penalty`, `--stop`, `--seed`, `--no-stream`, `-i/--interactive`.
+**Web search** is now powered by the built-in `octen_search` tool. Pass `--search` to let the model search the web (the old `--web-search on` flag has been removed):
+
+```sh
+octen chat "What launched at the latest Octen event?" -m anthropic/claude-haiku-4.5 --search --search-count 10
+```
+
+When search runs, cited sources are listed after the answer (pretty mode) and the raw response includes `search_results` and per-message `annotations`.
+
+Core options: `-m/--model`, `--system`, `--cache-system` (mark the system message as a cache_control ephemeral block), `--no-stream`, `-i/--interactive`.
+
+Sampling: `--temperature`, `--top-p`, `--top-k`, `--min-p`, `--top-a`, `--repetition-penalty`, `--frequency-penalty`, `--presence-penalty`, `--max-tokens`, `--stop`, `--seed`, `--verbosity` (low|medium|high).
+
+Reasoning: `--reasoning-effort` (xhigh|high|medium|low|minimal|none), `--reasoning-max-tokens`. When a model emits reasoning it is shown under a dim `reasoning:` prefix in pretty mode.
+
+Web search (only meaningful with `--search`): `--search-max-searches <n>` (default 5), `--search-count <n>` (1-100), `--search-include-domains <list>`, `--search-exclude-domains <list>`, `--search-time-basis` (auto|published|crawled), `--search-start-time <when>`, `--search-end-time <when>`, `--search-format` (markdown|text), `--search-safesearch` (off|strict), `--search-full-content` (+`--search-full-content-max-tokens <n>`), `--search-highlight-max-tokens <n>`.
 
 ---
 

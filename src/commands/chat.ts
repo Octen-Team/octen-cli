@@ -1,12 +1,26 @@
 import { createInterface } from "node:readline";
 import type { Command } from "commander";
 import { ENDPOINTS } from "../api/constants.js";
-import { buildChatRequest, type ChatMessage, type ChatOpts, type ChatCompletion, type StreamEvent } from "../api/chat.js";
+import {
+  buildChatRequest,
+  type ChatMessage,
+  type ChatOpts,
+  type ChatCompletion,
+  type StreamEvent,
+  type ReasoningEffort,
+  type Verbosity,
+  type SearchTimeBasis,
+  type SearchSafesearch,
+  type SearchFormat,
+} from "../api/chat.js";
+import pc from "picocolors";
 import { parseSSE } from "../api/sse.js";
 import { OctenValidationError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderChat } from "../output/pretty/chat.js";
 import { makeClient, parseIntOpt, parseFloatOpt } from "./utils.js";
+
+const splitList = (v: string): string[] => v.split(",").map((s) => s.trim()).filter(Boolean);
 
 export interface ReplStreams {
   input: NodeJS.ReadableStream;
@@ -89,13 +103,35 @@ export function registerChat(program: Command) {
     .description("Chat completion")
     .option("-m, --model <id>", "model ID, e.g. anthropic/claude-haiku-4.5 (required unless OCTEN_CHAT_MODEL is set)")
     .option("--system <s>", "system message")
-    .option("--web-search <onoff>", "on|off")
+    .option("--cache-system", "send the system message as a cache_control ephemeral block")
+    // ── Web search (octen_search tool) ──────────────────────────────────────
+    .option("--search", "enable web search via the built-in octen_search tool")
+    .option("--search-max-searches <n>", "octen_search: max searches (default 5)", parseIntOpt("--search-max-searches"))
+    .option("--search-count <n>", "octen_search: results per search (1-100)", parseIntOpt("--search-count"))
+    .option("--search-include-domains <list>", "octen_search: comma-separated domains to include", splitList)
+    .option("--search-exclude-domains <list>", "octen_search: comma-separated domains to exclude", splitList)
+    .option("--search-time-basis <b>", "octen_search: auto|published|crawled")
+    .option("--search-start-time <when>", "octen_search: start time filter")
+    .option("--search-end-time <when>", "octen_search: end time filter")
+    .option("--search-format <f>", "octen_search: markdown|text")
+    .option("--search-safesearch <s>", "octen_search: off|strict")
+    .option("--search-full-content", "octen_search: include full page content")
+    .option("--search-full-content-max-tokens <n>", "octen_search: max tokens for full content", parseIntOpt("--search-full-content-max-tokens"))
+    .option("--search-highlight-max-tokens <n>", "octen_search: max tokens for highlights", parseIntOpt("--search-highlight-max-tokens"))
+    // ── Sampling ────────────────────────────────────────────────────────────
     .option("--temperature <n>", "sampling temperature", parseFloatOpt("--temperature"))
     .option("--top-p <n>", "nucleus sampling top-p", parseFloatOpt("--top-p"))
+    .option("--top-k <n>", "top-k sampling", parseIntOpt("--top-k"))
+    .option("--min-p <n>", "min-p sampling", parseFloatOpt("--min-p"))
+    .option("--top-a <n>", "top-a sampling", parseFloatOpt("--top-a"))
+    .option("--repetition-penalty <n>", "repetition penalty", parseFloatOpt("--repetition-penalty"))
     .option("--frequency-penalty <n>", "frequency penalty", parseFloatOpt("--frequency-penalty"))
     .option("--presence-penalty <n>", "presence penalty", parseFloatOpt("--presence-penalty"))
     .option("--max-tokens <n>", "max output tokens", parseIntOpt("--max-tokens"))
-    .option("--reasoning-effort <e>", "low|medium|high")
+    .option("--max-completion-tokens <n>", "max completion tokens (includes reasoning tokens)", parseIntOpt("--max-completion-tokens"))
+    .option("--verbosity <v>", "low|medium|high")
+    .option("--reasoning-effort <e>", "xhigh|high|medium|low|minimal|none")
+    .option("--reasoning-max-tokens <n>", "max reasoning tokens", parseIntOpt("--reasoning-max-tokens"))
     .option("--stop <list>", "comma-separated stop sequences", (v) => v.split(","))
     .option("--seed <n>", "random seed", parseIntOpt("--seed"))
     .option("--no-stream", "disable streaming (use request/response)")
@@ -108,15 +144,37 @@ export function registerChat(program: Command) {
       const model: string | undefined = opts.model ?? process.env.OCTEN_CHAT_MODEL;
 
       const chatOpts: ChatOpts = {
-        webSearch: opts.webSearch as "on" | "off" | undefined,
+        search: {
+          enabled: Boolean(opts.search),
+          maxSearches: opts.searchMaxSearches,
+          count: opts.searchCount,
+          includeDomains: opts.searchIncludeDomains,
+          excludeDomains: opts.searchExcludeDomains,
+          timeBasis: opts.searchTimeBasis as SearchTimeBasis | undefined,
+          startTime: opts.searchStartTime,
+          endTime: opts.searchEndTime,
+          format: opts.searchFormat as SearchFormat | undefined,
+          safesearch: opts.searchSafesearch as SearchSafesearch | undefined,
+          fullContent: Boolean(opts.searchFullContent),
+          fullContentMaxTokens: opts.searchFullContentMaxTokens,
+          highlightMaxTokens: opts.searchHighlightMaxTokens,
+        },
         maxTokens: opts.maxTokens,
+        maxCompletionTokens: opts.maxCompletionTokens,
         temperature: opts.temperature,
         topP: opts.topP,
+        topK: opts.topK,
+        minP: opts.minP,
+        topA: opts.topA,
+        repetitionPenalty: opts.repetitionPenalty,
         frequencyPenalty: opts.frequencyPenalty,
         presencePenalty: opts.presencePenalty,
         stop: opts.stop,
         seed: opts.seed,
-        reasoningEffort: opts.reasoningEffort as "low" | "medium" | "high" | undefined,
+        verbosity: opts.verbosity as Verbosity | undefined,
+        reasoningEffort: opts.reasoningEffort as ReasoningEffort | undefined,
+        reasoningMaxTokens: opts.reasoningMaxTokens,
+        cacheSystem: Boolean(opts.cacheSystem),
       };
 
       // ── REPL mode ──────────────────────────────────────────────────────────
@@ -162,13 +220,43 @@ export function registerChat(program: Command) {
         return;
       }
 
-      // Streaming pretty mode
+      // Streaming pretty mode. The new protocol emits typed chunks
+      // (search_done / content / finish / usage) terminated by [DONE].
       const httpRes = await client.stream(ENDPOINTS.chat, req);
+      let noted = false;
+      let reasoningNoted = false;
+      const sources: Array<{ title?: string; url?: string }> = [];
       for await (const ev of parseSSE(httpRes)) {
         const e = ev as StreamEvent;
+        if (e.type === "search_done") {
+          if (!noted) {
+            process.stderr.write("(web search complete)\n");
+            noted = true;
+          }
+          // Collect cited sources to list after the answer.
+          for (const grp of ((e as any).search_results ?? []) as Array<{ results?: Array<{ title?: string; url?: string }> }>)
+            for (const r of grp.results ?? []) sources.push({ title: r.title, url: r.url });
+          continue;
+        }
+        // Reasoning trace streams to stderr (keeps stdout = answer only).
+        const reasoning: string | undefined = e.choices?.[0]?.delta?.reasoning;
+        if (reasoning) {
+          if (!reasoningNoted) {
+            process.stderr.write(pc.dim("reasoning: "));
+            reasoningNoted = true;
+          }
+          process.stderr.write(pc.dim(reasoning));
+        }
         const piece: string | undefined = e.choices?.[0]?.delta?.content;
         if (piece) process.stdout.write(piece);
       }
+      if (reasoningNoted) process.stderr.write("\n");
       process.stdout.write("\n");
+      if (sources.length) {
+        process.stderr.write(pc.dim("Sources:\n"));
+        sources.forEach((s, i) =>
+          process.stderr.write(pc.dim(`  [${i + 1}] ${s.title ?? ""} ${s.url ?? ""}\n`)),
+        );
+      }
     });
 }
