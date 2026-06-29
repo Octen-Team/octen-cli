@@ -14,7 +14,7 @@ export function registerImageSearch(program: Command) {
     .command("image-search")
     .argument("[query...]", "search query (optional if --image is given)")
     .description(
-      "In Beta. Contact us to request beta access. — Search the web for images by text and/or image",
+      "In Beta. Contact us to request beta access. — Search the web for images by text and/or image. Use --topic design for UI design references (returns a style summary and html_snippet per result)",
     )
     .option("--image <url|path>", "image input: public URL or local file path")
     .option("--topic <t>", "general|design")
