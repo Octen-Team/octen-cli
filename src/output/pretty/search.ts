@@ -25,7 +25,12 @@ export function renderSearch(data: any): string {
     return pc.dim("No results.");
   }
 
-  return res
+  return formatResultList(res);
+}
+
+/** Render a list of search results as numbered, titled blocks. */
+export function formatResultList(results: SearchResult[]): string {
+  return results
     .map((r, i) => {
       const lines: string[] = [];
 

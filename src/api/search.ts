@@ -50,6 +50,20 @@ export interface SearchResponse {
   results?: SearchResult[];
 }
 
+/** One sub-query's result group in a /broad-search response. */
+export interface SearchResultGroup {
+  query?: string;
+  results?: SearchResult[];
+  latency?: number;
+}
+
+/** Response shape for the /broad-search endpoint. */
+export interface BroadSearchResponse {
+  query?: string;
+  queries?: string[];
+  search_results?: SearchResultGroup[];
+}
+
 export interface SearchOpts {
   topic?: "general" | "news";
   count?: number;
@@ -71,8 +85,13 @@ export interface SearchOpts {
   videos?: boolean;
 }
 
-export function buildSearchRequest(query: string, o: SearchOpts): Record<string, unknown> {
-  if (!query) throw new OctenValidationError("query is required");
+/**
+ * Build the per-query search options object (everything except `query`).
+ * Shared by /search (spread alongside `query`) and /broad-search (nested under
+ * `search_options`). Validates ranges/enums and drops unset fields so server
+ * defaults apply.
+ */
+export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
   if (o.count != null && (o.count < LIMITS.searchCount.min || o.count > LIMITS.searchCount.max))
     throw new OctenValidationError(`count must be ${LIMITS.searchCount.min}-${LIMITS.searchCount.max}`);
   if (o.includeText && o.includeText.length > LIMITS.includeText)
@@ -89,8 +108,8 @@ export function buildSearchRequest(query: string, o: SearchOpts): Record<string,
   validateEnum("--safesearch", o.safesearch, SAFESEARCH_OPTIONS);
   validateEnum("--format", o.format, FORMAT_OPTIONS);
 
-  const req: Record<string, unknown> = { query };
-  const put = (k: string, v: unknown) => { if (v != null) req[k] = v; };
+  const opts: Record<string, unknown> = {};
+  const put = (k: string, v: unknown) => { if (v != null) opts[k] = v; };
   put("topic", o.topic); put("count", o.count);
   put("include_domains", o.includeDomains); put("exclude_domains", o.excludeDomains);
   put("include_text", o.includeText); put("exclude_text", o.excludeText);
@@ -99,7 +118,32 @@ export function buildSearchRequest(query: string, o: SearchOpts): Record<string,
   put("end_time", normalizeTimeBound("--end-time", o.endTime, true));
   put("format", o.format); put("safesearch", o.safesearch);
   put("include_images", o.images); put("include_videos", o.videos);
-  if (o.highlight) req.highlight = { enable: true, ...(o.highlightMaxTokens ? { max_tokens: o.highlightMaxTokens } : {}) };
-  if (o.fullContent) req.full_content = { enable: true, ...(o.fullContentMaxTokens ? { max_tokens: o.fullContentMaxTokens } : {}) };
+  if (o.highlight) opts.highlight = { enable: true, ...(o.highlightMaxTokens ? { max_tokens: o.highlightMaxTokens } : {}) };
+  if (o.fullContent) opts.full_content = { enable: true, ...(o.fullContentMaxTokens ? { max_tokens: o.fullContentMaxTokens } : {}) };
+  return opts;
+}
+
+export function buildSearchRequest(query: string, o: SearchOpts): Record<string, unknown> {
+  if (!query) throw new OctenValidationError("query is required");
+  return { query, ...buildSearchOptions(o) };
+}
+
+export interface BroadSearchOpts extends SearchOpts {
+  maxQueries?: number;
+}
+
+/**
+ * Build a /broad-search request: `{ query, max_queries?, search_options? }`.
+ * The same per-query options as /search go under `search_options`; `query` and
+ * `max_queries` stay at the top level.
+ */
+export function buildBroadSearchRequest(query: string, o: BroadSearchOpts): Record<string, unknown> {
+  if (!query) throw new OctenValidationError("query is required");
+  if (o.maxQueries != null && (o.maxQueries < LIMITS.maxQueries.min || o.maxQueries > LIMITS.maxQueries.max))
+    throw new OctenValidationError(`max-queries must be ${LIMITS.maxQueries.min}-${LIMITS.maxQueries.max}`);
+  const searchOptions = buildSearchOptions(o);
+  const req: Record<string, unknown> = { query };
+  if (o.maxQueries != null) req.max_queries = o.maxQueries;
+  if (Object.keys(searchOptions).length > 0) req.search_options = searchOptions;
   return req;
 }

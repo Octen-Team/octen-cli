@@ -4,6 +4,7 @@ export const DEFAULT_MAX_RETRIES = 3;
 
 export const ENDPOINTS = {
   search: "/search",
+  broadSearch: "/broad-search",
   extract: "/extract",
   embedding: "/embedding",
   vlEmbedding: "/vl-embedding",
@@ -22,6 +23,7 @@ export const VL_EMBEDDING_MODELS: Record<string, string> = {
 
 export const LIMITS = {
   searchCount: { min: 1, max: 100 },
+  maxQueries: { min: 1, max: 30 },
   includeText: 5,
   excludeText: 5,
   extractUrls: { min: 1, max: 20 },

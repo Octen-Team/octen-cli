@@ -75,6 +75,18 @@ octen news "OpenAI announcement" --highlight --time-range day
 
 ---
 
+### `octen broad-search`
+
+Broad multi-angle web search (alias: `octen broad`). Decomposes the query into sub-queries searched concurrently, returning results grouped by sub-query for comprehensive coverage.
+
+```sh
+octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
+```
+
+Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--images`, `--videos`, `--format`, `--safesearch`).
+
+---
+
 ### `octen extract`
 
 Extract content from one or more URLs (1–20).
