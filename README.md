@@ -75,6 +75,20 @@ octen news "OpenAI announcement" --highlight --time-range day
 
 ---
 
+### `octen broad-search`
+
+Broad multi-angle web search (alias: `octen broad`). Decomposes the query into sub-queries searched concurrently, returning results grouped by sub-query for comprehensive coverage.
+
+Use it for comparisons across many sources (pricing, products, vendors), surveys/research, and multi-angle questions — cases where a single `octen search` only reaches a few subtopics. Pass the query as-is (sub-queries are generated for you); raise `--max-queries` for broader coverage, or use `octen search` for a single focused query.
+
+```sh
+octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
+```
+
+Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--images`, `--videos`, `--format`, `--safesearch`).
+
+---
+
 ### `octen extract`
 
 Extract content from one or more URLs (1–20).
@@ -142,6 +156,38 @@ octen vl-embed "text:a red car" "image:https://example.com/car.jpg" -m base --fu
 Content tokens are prefixed with `text:`, `image:`, or `video:`. Image/video values can be URLs or local file paths.
 
 Options: `-m/--model` (base|large or full ID), `--fusion`/`--no-fusion`, `--dimension`, `--fps`, `--instruct`.
+
+---
+
+### `octen image-search`
+
+**In Beta** — contact us to request beta access.
+
+Search the web for images by text query and/or an example image.
+
+```sh
+octen image-search "red sports car" -n 10 --topic design --time-range week
+octen image-search --image https://example.com/car.jpg
+octen image-search "similar to this" --image ./car.png
+```
+
+`--image` accepts a public URL or a local file path (read inline as base64, max 5MB). At least one of a query or `--image` is required.
+
+Options: `--image <url|path>`, `--topic` (general|design), `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--safesearch` (off|strict), `--html-snippet` (+`--html-snippet-max-tokens`).
+
+---
+
+### `octen video-search`
+
+**In Beta** — contact us to request beta access.
+
+Search the web for videos by text query.
+
+```sh
+octen video-search "how to make espresso" -n 10 --time-range month
+```
+
+Options: `-n` (result count 1–10), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--safesearch` (off|strict).
 
 ---
 

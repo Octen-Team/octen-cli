@@ -1,9 +1,9 @@
 import pc from "picocolors";
-import type { SearchResult } from "../../api/search.js";
+import type { ImageSearchResult } from "../../api/mediaSearch.js";
 
 const MAX_SNIPPET = 300;
 
-export function renderSearch(data: any): string {
+export function renderImageSearch(data: any): string {
   // The Octen API wraps the payload in an envelope: { data: { results }, code, msg, ... }.
   // Unwrap to the inner body only when `data.data` is a non-array object (the real
   // API shape); fall back to the raw object otherwise so un-enveloped inputs still work.
@@ -13,7 +13,7 @@ export function renderSearch(data: any): string {
       ? inner
       : data;
 
-  const res: SearchResult[] = body?.results ?? [];
+  const res: ImageSearchResult[] = body?.results ?? [];
 
   if (!res.length) {
     // Surface app-level API errors (non-zero code) instead of a bland "No results."
@@ -25,12 +25,7 @@ export function renderSearch(data: any): string {
     return pc.dim("No results.");
   }
 
-  return formatResultList(res);
-}
-
-/** Render a list of search results as numbered, titled blocks. */
-export function formatResultList(results: SearchResult[]): string {
-  return results
+  return res
     .map((r, i) => {
       const lines: string[] = [];
 
@@ -41,11 +36,14 @@ export function formatResultList(results: SearchResult[]): string {
       // Dim URL
       if (r.url) lines.push(`   ${pc.dim(r.url)}`);
 
-      // Dim publication time
-      if (r.time_published) lines.push(`   ${pc.dim(r.time_published)}`);
+      // Dim source page
+      if (r.source_page) lines.push(`   ${pc.dim(r.source_page)}`);
 
-      // Snippet from highlight or full_content (truncated)
-      const raw = r.highlight ?? r.full_content ?? "";
+      // Dimensions WxH
+      if (r.width != null && r.height != null) lines.push(`   ${pc.dim(`${r.width}x${r.height}`)}`);
+
+      // Snippet from description or summary (truncated)
+      const raw = r.description ?? r.summary ?? "";
       if (raw) {
         const snippet = raw.length > MAX_SNIPPET ? raw.slice(0, MAX_SNIPPET) + "…" : raw;
         lines.push(`   ${snippet}`);
