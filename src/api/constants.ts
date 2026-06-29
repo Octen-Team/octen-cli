@@ -8,6 +8,8 @@ export const ENDPOINTS = {
   embedding: "/embedding",
   vlEmbedding: "/vl-embedding",
   chat: "/v1/chat/completions",
+  imageSearch: "/image-search",
+  videoSearch: "/video-search",
 } as const;
 
 export const EMBEDDING_MODELS: Record<string, string> = {
@@ -31,9 +33,12 @@ export const LIMITS = {
   vlContents: 20,
   vlImages: 5,
   vlVideos: 1,
+  imageCount: { min: 1, max: 10 },
+  videoCount: { min: 1, max: 10 },
 } as const;
 
 export const TOPIC_OPTIONS = ["general", "news"] as const;
+export const IMAGE_TOPIC_OPTIONS = ["general", "design"] as const;
 export const TIME_BASIS_OPTIONS = ["auto", "published", "crawled"] as const;
 export const TIME_RANGE_OPTIONS = ["day", "week", "month", "year", "d", "w", "m", "y"] as const;
 export const SAFESEARCH_OPTIONS = ["off", "strict"] as const;
