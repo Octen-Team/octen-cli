@@ -1,4 +1,6 @@
 import { OctenValidationError } from "./errors.js";
+import { normalizeTimeBound } from "./search.js";
+import { LIMITS } from "./constants.js";
 
 /** A cache_control marker that can ride along on a content block. */
 export interface CacheControl {
@@ -131,6 +133,8 @@ function buildSearchTool(s: SearchOpts): Record<string, unknown> {
   assertEnum(s.timeBasis, SEARCH_TIME_BASIS_OPTIONS, "--search-time-basis");
   assertEnum(s.safesearch, SEARCH_SAFESEARCH_OPTIONS, "--search-safesearch");
   assertEnum(s.format, SEARCH_FORMAT_OPTIONS, "--search-format");
+  if (s.count != null && (s.count < LIMITS.searchCount.min || s.count > LIMITS.searchCount.max))
+    throw new OctenValidationError(`--search-count must be ${LIMITS.searchCount.min}-${LIMITS.searchCount.max}`);
 
   const parameters: Record<string, unknown> = {};
   const put = (k: string, v: unknown) => {
@@ -144,8 +148,8 @@ function buildSearchTool(s: SearchOpts): Record<string, unknown> {
   put("include_text", s.includeText);
   put("exclude_text", s.excludeText);
   put("time_basis", s.timeBasis);
-  put("start_time", s.startTime);
-  put("end_time", s.endTime);
+  put("start_time", normalizeTimeBound("--search-start-time", s.startTime, false));
+  put("end_time", normalizeTimeBound("--search-end-time", s.endTime, true));
   put("format", s.format);
   put("safesearch", s.safesearch);
 

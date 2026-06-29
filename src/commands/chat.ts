@@ -13,6 +13,7 @@ import {
   type SearchSafesearch,
   type SearchFormat,
 } from "../api/chat.js";
+import pc from "picocolors";
 import { parseSSE } from "../api/sse.js";
 import { OctenValidationError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
@@ -127,6 +128,7 @@ export function registerChat(program: Command) {
     .option("--frequency-penalty <n>", "frequency penalty", parseFloatOpt("--frequency-penalty"))
     .option("--presence-penalty <n>", "presence penalty", parseFloatOpt("--presence-penalty"))
     .option("--max-tokens <n>", "max output tokens", parseIntOpt("--max-tokens"))
+    .option("--max-completion-tokens <n>", "max completion tokens (includes reasoning tokens)", parseIntOpt("--max-completion-tokens"))
     .option("--verbosity <v>", "low|medium|high")
     .option("--reasoning-effort <e>", "xhigh|high|medium|low|minimal|none")
     .option("--reasoning-max-tokens <n>", "max reasoning tokens", parseIntOpt("--reasoning-max-tokens"))
@@ -158,6 +160,7 @@ export function registerChat(program: Command) {
           highlightMaxTokens: opts.searchHighlightMaxTokens,
         },
         maxTokens: opts.maxTokens,
+        maxCompletionTokens: opts.maxCompletionTokens,
         temperature: opts.temperature,
         topP: opts.topP,
         topK: opts.topK,
@@ -221,16 +224,39 @@ export function registerChat(program: Command) {
       // (search_done / content / finish / usage) terminated by [DONE].
       const httpRes = await client.stream(ENDPOINTS.chat, req);
       let noted = false;
+      let reasoningNoted = false;
+      const sources: Array<{ title?: string; url?: string }> = [];
       for await (const ev of parseSSE(httpRes)) {
         const e = ev as StreamEvent;
-        if (e.type === "search_done" && !noted) {
-          process.stderr.write("(web search complete)\n");
-          noted = true;
+        if (e.type === "search_done") {
+          if (!noted) {
+            process.stderr.write("(web search complete)\n");
+            noted = true;
+          }
+          // Collect cited sources to list after the answer.
+          for (const grp of ((e as any).search_results ?? []) as Array<{ results?: Array<{ title?: string; url?: string }> }>)
+            for (const r of grp.results ?? []) sources.push({ title: r.title, url: r.url });
           continue;
+        }
+        // Reasoning trace streams to stderr (keeps stdout = answer only).
+        const reasoning: string | undefined = e.choices?.[0]?.delta?.reasoning;
+        if (reasoning) {
+          if (!reasoningNoted) {
+            process.stderr.write(pc.dim("reasoning: "));
+            reasoningNoted = true;
+          }
+          process.stderr.write(pc.dim(reasoning));
         }
         const piece: string | undefined = e.choices?.[0]?.delta?.content;
         if (piece) process.stdout.write(piece);
       }
+      if (reasoningNoted) process.stderr.write("\n");
       process.stdout.write("\n");
+      if (sources.length) {
+        process.stderr.write(pc.dim("Sources:\n"));
+        sources.forEach((s, i) =>
+          process.stderr.write(pc.dim(`  [${i + 1}] ${s.title ?? ""} ${s.url ?? ""}\n`)),
+        );
+      }
     });
 }

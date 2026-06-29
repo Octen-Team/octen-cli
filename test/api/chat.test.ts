@@ -143,13 +143,18 @@ describe("buildChatRequest", () => {
             include_domains: ["example.com"],
             exclude_domains: ["spam.com"],
             time_basis: "published",
-            start_time: "2024-01-01",
-            end_time: "2024-12-31",
+            start_time: "2024-01-01T00:00:00Z",
+            end_time: "2024-12-31T23:59:59Z",
             format: "markdown",
             safesearch: "strict",
           },
         },
       ]);
+    });
+
+    it("rejects --search-count out of range", () => {
+      expect(() => buildChatRequest(msgs, "m", { search: { enabled: true, count: 101 } })).toThrow();
+      expect(() => buildChatRequest(msgs, "m", { search: { enabled: true, count: 0 } })).toThrow();
     });
 
     it("builds full_content and highlight blocks", () => {
