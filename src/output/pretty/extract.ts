@@ -49,6 +49,10 @@ export function renderExtract(data: any, full = false): string {
         // Title
         if (item.title) lines.push(`  ${item.title}`);
 
+        // Media identity: favicon (default) + cover image (with --images)
+        if (item.favicon) lines.push(pc.dim(`  favicon: ${item.favicon}`));
+        if (item.cover_image?.url) lines.push(pc.dim(`  cover: ${item.cover_image.url}`));
+
         // Snippet: prefer joined highlights, else truncated full_content
         if (item.highlights && item.highlights.length > 0) {
           lines.push(`  ${item.highlights.join(" ")}`);

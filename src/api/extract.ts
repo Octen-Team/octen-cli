@@ -11,6 +11,8 @@ export interface ExtractItem {
   time_published?: string;
   full_content?: string;
   highlights?: string[];
+  favicon?: string;
+  cover_image?: { url?: string };
   error_message?: string;
 }
 
@@ -28,7 +30,6 @@ export interface ExtractOpts {
   images?: boolean;
   videos?: boolean;
   audio?: boolean;
-  favicon?: boolean;
 }
 
 /**
@@ -84,7 +85,6 @@ export function buildExtractRequest(urls: string[], o: ExtractOpts): Record<stri
   put("include_images", o.images);
   put("include_videos", o.videos);
   put("include_audio", o.audio);
-  put("include_favicon", o.favicon);
 
   return req;
 }

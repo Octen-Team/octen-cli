@@ -86,11 +86,9 @@ describe("buildExtractRequest", () => {
       images: true,
       videos: true,
       audio: true,
-      favicon: true,
     });
     expect(req.include_images).toBe(true);
     expect(req.include_videos).toBe(true);
     expect(req.include_audio).toBe(true);
-    expect(req.include_favicon).toBe(true);
   });
 });

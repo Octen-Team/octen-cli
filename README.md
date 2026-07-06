@@ -97,7 +97,7 @@ Extract content from one or more URLs (1–20).
 octen extract https://example.com --query "pricing" --max-age 3600 --images
 ```
 
-Options: `--query` (relevance hint), `--max-age <sec>` (cache age, 300–31536000), `--images`, `--videos`, `--audio`, `--favicon`, `--format` (markdown|text), `--fetch-timeout <sec>` (1–60), `--full` (print full page content).
+Options: `--query` (relevance hint), `--max-age <sec>` (cache age, 300–31536000), `--images` (also returns `cover_image` when present), `--videos`, `--audio`, `--format` (markdown|text), `--fetch-timeout <sec>` (1–60), `--full` (print full page content). The page favicon is returned by default when available.
 
 Pretty output truncates page content to ~500 chars for readability; pass `--full` to print the whole thing (or `--json` for the raw response).
 
