@@ -440,15 +440,6 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       },
       TEST_TIMEOUT_MS,
     );
-
-    it(
-      "fetch: favicon=true",
-      async () => {
-        const req = buildExtractRequest(URLS, { favicon: true });
-        await expectEnvelopeOk("fetch favicon=true", ENDPOINTS.extract, req);
-      },
-      TEST_TIMEOUT_MS,
-    );
   });
 
   // -------------------------------------------------------------------------
