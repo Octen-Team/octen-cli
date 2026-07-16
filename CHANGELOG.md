@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.2] — 2026-07-16
+
+### Added
+- **`--country <code>`** flag on `search`, `news`, and `broad-search` for
+  region-specific results. Takes an ISO 3166-1 alpha-2 country code (e.g. `US`,
+  `JP`) or `auto` (the server default when the flag is omitted). Sent as a
+  top-level field on `/search` and inside `search_options` on `/broad-search`.
+  See https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+
 ## [0.5.1] — 2026-07-06
 
 Aligns the `extract` command with the current Extract API reference

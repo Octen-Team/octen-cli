@@ -309,6 +309,21 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       );
     }
 
+    for (const country of ["US", "auto"] as const) {
+      it(
+        `search: country=${country}`,
+        async () => {
+          const req = buildSearchRequest(BASE, { count: 3, country });
+          await expectEnvelopeOk(
+            `search country=${country}`,
+            ENDPOINTS.search,
+            req,
+          );
+        },
+        TEST_TIMEOUT_MS,
+      );
+    }
+
     it(
       "search: highlight=true (+max_tokens=300)",
       async () => {

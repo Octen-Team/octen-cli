@@ -61,7 +61,7 @@ Search the live web.
 octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, min 100), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
+Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, min 100), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`, `--country` (country code for region-specific results — [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) like US or JP, or auto, the default).
 
 ---
 
@@ -85,7 +85,7 @@ Use it for comparisons across many sources (pricing, products, vendors), surveys
 octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
 ```
 
-Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--images`, `--videos`, `--format`, `--safesearch`).
+Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--images`, `--videos`, `--format`, `--safesearch`, `--country`).
 
 ---
 
