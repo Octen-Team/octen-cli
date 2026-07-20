@@ -38,4 +38,15 @@ describe("buildBroadSearchRequest", () => {
       search_options: { highlight: { enable: true, max_tokens: 300 } },
     });
   });
+  it("nests country inside search_options, not at the top level", () => {
+    expect(buildBroadSearchRequest("hi", { country: "US" })).toEqual({
+      query: "hi",
+      search_options: { country: "US" },
+    });
+  });
+  it("omits country when not provided (server default applies)", () => {
+    const req = buildBroadSearchRequest("hi", { count: 5 });
+    expect(req).not.toHaveProperty("country");
+    expect(req.search_options).not.toHaveProperty("country");
+  });
 });

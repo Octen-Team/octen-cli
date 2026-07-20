@@ -9,6 +9,7 @@ import {
   type StreamEvent,
   type ReasoningEffort,
   type Verbosity,
+  type SearchTopic,
   type SearchTimeBasis,
   type SearchSafesearch,
   type SearchFormat,
@@ -104,20 +105,29 @@ export function registerChat(program: Command) {
     .option("-m, --model <id>", "model ID, e.g. anthropic/claude-haiku-4.5 (required unless OCTEN_CHAT_MODEL is set)")
     .option("--system <s>", "system message")
     .option("--cache-system", "send the system message as a cache_control ephemeral block")
-    // ── Web search (octen_search tool) ──────────────────────────────────────
+    // ── Web search (octen_search / octen_broad_search tools) ────────────────
+    // The remaining --search-* options apply to whichever tool(s) are enabled.
     .option("--search", "enable web search via the built-in octen_search tool")
+    .option("--broad-search", "enable broad (multi-query) web search via the built-in octen_broad_search tool")
     .option("--search-max-searches <n>", "octen_search: max searches (default 5)", parseIntOpt("--search-max-searches"))
-    .option("--search-count <n>", "octen_search: results per search (1-100)", parseIntOpt("--search-count"))
-    .option("--search-include-domains <list>", "octen_search: comma-separated domains to include", splitList)
-    .option("--search-exclude-domains <list>", "octen_search: comma-separated domains to exclude", splitList)
-    .option("--search-time-basis <b>", "octen_search: auto|published|crawled")
-    .option("--search-start-time <when>", "octen_search: start time filter")
-    .option("--search-end-time <when>", "octen_search: end time filter")
-    .option("--search-format <f>", "octen_search: markdown|text")
-    .option("--search-safesearch <s>", "octen_search: off|strict")
-    .option("--search-full-content", "octen_search: include full page content")
-    .option("--search-full-content-max-tokens <n>", "octen_search: max tokens for full content", parseIntOpt("--search-full-content-max-tokens"))
-    .option("--search-highlight-max-tokens <n>", "octen_search: max tokens for highlights", parseIntOpt("--search-highlight-max-tokens"))
+    .option("--search-max-queries <n>", "octen_broad_search: max sub-queries (1-30, default 5)", parseIntOpt("--search-max-queries"))
+    .option("--search-topic <t>", "search tools: general|news")
+    .option("--search-count <n>", "search tools: results per search (1-100)", parseIntOpt("--search-count"))
+    .option("--search-include-domains <list>", "search tools: comma-separated domains to include", splitList)
+    .option("--search-exclude-domains <list>", "search tools: comma-separated domains to exclude", splitList)
+    .option("--search-include-text <list>", "search tools: comma-separated phrases to require (max 5)", splitList)
+    .option("--search-exclude-text <list>", "search tools: comma-separated phrases to exclude (max 5)", splitList)
+    .option("--search-time-basis <b>", "search tools: auto|published|crawled")
+    .option("--search-time-range <r>", "search tools: day|week|month|year (or d|w|m|y)")
+    .option("--search-start-time <when>", "search tools: start time filter")
+    .option("--search-end-time <when>", "search tools: end time filter")
+    .option("--search-format <f>", "search tools: markdown|text")
+    .option("--search-safesearch <s>", "search tools: off|strict")
+    .option("--search-country <code>", "search tools: ISO 3166-1 alpha-2 country code (e.g. US, JP) or auto")
+    .option("--search-include-images", "search tools: include image results")
+    .option("--search-full-content", "search tools: include full page content")
+    .option("--search-full-content-max-tokens <n>", "search tools: max tokens for full content", parseIntOpt("--search-full-content-max-tokens"))
+    .option("--search-highlight-max-tokens <n>", "search tools: max tokens for highlights", parseIntOpt("--search-highlight-max-tokens"))
     // ── Sampling ────────────────────────────────────────────────────────────
     .option("--temperature <n>", "sampling temperature", parseFloatOpt("--temperature"))
     .option("--top-p <n>", "nucleus sampling top-p", parseFloatOpt("--top-p"))
@@ -146,15 +156,23 @@ export function registerChat(program: Command) {
       const chatOpts: ChatOpts = {
         search: {
           enabled: Boolean(opts.search),
+          broadEnabled: Boolean(opts.broadSearch),
           maxSearches: opts.searchMaxSearches,
+          maxQueries: opts.searchMaxQueries,
+          topic: opts.searchTopic as SearchTopic | undefined,
           count: opts.searchCount,
           includeDomains: opts.searchIncludeDomains,
           excludeDomains: opts.searchExcludeDomains,
+          includeText: opts.searchIncludeText,
+          excludeText: opts.searchExcludeText,
           timeBasis: opts.searchTimeBasis as SearchTimeBasis | undefined,
+          timeRange: opts.searchTimeRange,
           startTime: opts.searchStartTime,
           endTime: opts.searchEndTime,
           format: opts.searchFormat as SearchFormat | undefined,
           safesearch: opts.searchSafesearch as SearchSafesearch | undefined,
+          country: opts.searchCountry,
+          includeImages: opts.searchIncludeImages,
           fullContent: Boolean(opts.searchFullContent),
           fullContentMaxTokens: opts.searchFullContentMaxTokens,
           highlightMaxTokens: opts.searchHighlightMaxTokens,
