@@ -61,7 +61,7 @@ Search the live web.
 octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, min 100), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`, `--country` (country code for region-specific results — [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) like US or JP, or auto, the default).
+Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, min 100), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`, `--country` (follow [ISO 3166](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2), the International Standard for country codes and codes for their subdivisions — like US or JP, or auto, the default).
 
 ---
 
@@ -128,7 +128,7 @@ Sampling: `--temperature`, `--top-p`, `--top-k`, `--min-p`, `--top-a`, `--repeti
 
 Reasoning: `--reasoning-effort` (xhigh|high|medium|low|minimal|none), `--reasoning-max-tokens`. When a model emits reasoning it is shown under a dim `reasoning:` prefix in pretty mode.
 
-Web search (only meaningful with `--search` and/or `--broad-search`): `--search-max-searches <n>` (octen_search only; default 5), `--search-max-queries <n>` (octen_broad_search only; 1-30, default 5), `--search-topic` (general|news), `--search-count <n>` (1-100), `--search-include-domains <list>`, `--search-exclude-domains <list>`, `--search-include-text <list>`/`--search-exclude-text <list>` (max 5 each), `--search-time-basis` (auto|published|crawled), `--search-time-range` (day|week|month|year or d|w|m|y), `--search-start-time <when>`, `--search-end-time <when>`, `--search-format` (markdown|text), `--search-safesearch` (off|strict), `--search-country` (ISO 3166-1 alpha-2 like US or JP, or auto), `--search-include-images`, `--search-full-content` (+`--search-full-content-max-tokens <n>`), `--search-highlight-max-tokens <n>`. The shared options apply to whichever tool(s) are enabled.
+Web search (only meaningful with `--search` and/or `--broad-search`): `--search-max-searches <n>` (octen_search only; default 5), `--search-max-queries <n>` (octen_broad_search only; 1-30, default 5), `--search-topic` (general|news), `--search-count <n>` (1-100), `--search-include-domains <list>`, `--search-exclude-domains <list>`, `--search-include-text <list>`/`--search-exclude-text <list>` (max 5 each), `--search-time-basis` (auto|published|crawled), `--search-time-range` (day|week|month|year or d|w|m|y), `--search-start-time <when>`, `--search-end-time <when>`, `--search-format` (markdown|text), `--search-safesearch` (off|strict), `--search-country` (ISO 3166 country code like US or JP, or auto), `--search-include-images`, `--search-full-content` (+`--search-full-content-max-tokens <n>`), `--search-highlight-max-tokens <n>`. The shared options apply to whichever tool(s) are enabled.
 
 ---
 
