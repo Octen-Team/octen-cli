@@ -152,6 +152,59 @@ describe("buildChatRequest", () => {
       ]);
     });
 
+    it("maps topic/time_range/country/include_images/include_text/exclude_text into the tool parameters", () => {
+      const req = buildChatRequest(msgs, "m", {
+        search: {
+          enabled: true,
+          topic: "news",
+          timeRange: "week",
+          country: "US",
+          includeImages: true,
+          includeText: ["AI"],
+          excludeText: ["spam"],
+        },
+      });
+      expect(req.tools).toEqual([
+        {
+          type: "octen_search",
+          parameters: {
+            topic: "news",
+            time_range: "week",
+            country: "US",
+            include_images: true,
+            include_text: ["AI"],
+            exclude_text: ["spam"],
+          },
+        },
+      ]);
+    });
+
+    it("validates --search-topic and --search-time-range enums", () => {
+      expect(() =>
+        buildChatRequest(msgs, "m", { search: { enabled: true, topic: "sports" as any } }),
+      ).toThrow(/--search-topic/);
+      expect(() =>
+        buildChatRequest(msgs, "m", { search: { enabled: true, timeRange: "decade" } }),
+      ).toThrow(/--search-time-range/);
+    });
+
+    it("accepts all time_range values", () => {
+      for (const timeRange of ["day", "week", "month", "year", "d", "w", "m", "y"]) {
+        const req = buildChatRequest(msgs, "m", { search: { enabled: true, timeRange } });
+        expect((req.tools as any)[0].parameters.time_range).toBe(timeRange);
+      }
+    });
+
+    it("rejects more than 5 include_text / exclude_text entries", () => {
+      const six = ["a", "b", "c", "d", "e", "f"];
+      expect(() =>
+        buildChatRequest(msgs, "m", { search: { enabled: true, includeText: six } }),
+      ).toThrow(/--search-include-text/);
+      expect(() =>
+        buildChatRequest(msgs, "m", { search: { enabled: true, excludeText: six } }),
+      ).toThrow(/--search-exclude-text/);
+    });
+
     it("rejects --search-count out of range", () => {
       expect(() => buildChatRequest(msgs, "m", { search: { enabled: true, count: 101 } })).toThrow();
       expect(() => buildChatRequest(msgs, "m", { search: { enabled: true, count: 0 } })).toThrow();
@@ -181,6 +234,75 @@ describe("buildChatRequest", () => {
       expect(() =>
         buildChatRequest(msgs, "m", { search: { enabled: true, format: "html" as any } }),
       ).toThrow(/--search-format/);
+    });
+  });
+
+  describe("broad web search (octen_broad_search tool)", () => {
+    it("does not add tools unless broad search is enabled", () => {
+      expect(
+        buildChatRequest(msgs, "m", { search: { broadEnabled: false } }),
+      ).not.toHaveProperty("tools");
+    });
+
+    it("builds an octen_broad_search tool when broad search is enabled (fields omitted when unset)", () => {
+      const req = buildChatRequest(msgs, "m", { search: { broadEnabled: true } });
+      expect(req.tools).toEqual([{ type: "octen_broad_search", parameters: {} }]);
+    });
+
+    it("maps max_queries and shared WebSearchOptions into the tool parameters", () => {
+      const req = buildChatRequest(msgs, "m", {
+        search: {
+          broadEnabled: true,
+          maxQueries: 3,
+          topic: "news",
+          count: 10,
+          timeRange: "week",
+          country: "JP",
+          includeDomains: ["example.com"],
+        },
+      });
+      expect(req.tools).toEqual([
+        {
+          type: "octen_broad_search",
+          parameters: {
+            max_queries: 3,
+            topic: "news",
+            count: 10,
+            time_range: "week",
+            country: "JP",
+            include_domains: ["example.com"],
+          },
+        },
+      ]);
+    });
+
+    it("rejects --search-max-queries out of range", () => {
+      expect(() =>
+        buildChatRequest(msgs, "m", { search: { broadEnabled: true, maxQueries: 0 } }),
+      ).toThrow(/--search-max-queries/);
+      expect(() =>
+        buildChatRequest(msgs, "m", { search: { broadEnabled: true, maxQueries: 31 } }),
+      ).toThrow(/--search-max-queries/);
+    });
+
+    it("does not leak max_searches into the broad tool or max_queries into the search tool", () => {
+      const req = buildChatRequest(msgs, "m", {
+        search: { enabled: true, broadEnabled: true, maxSearches: 4, maxQueries: 6 },
+      });
+      expect(req.tools).toEqual([
+        { type: "octen_search", parameters: { max_searches: 4 } },
+        { type: "octen_broad_search", parameters: { max_queries: 6 } },
+      ]);
+    });
+
+    it("builds both tools with shared options when --search and --broad-search are combined", () => {
+      const req = buildChatRequest(msgs, "m", {
+        search: { enabled: true, broadEnabled: true, topic: "general", country: "US" },
+      });
+      expect(req.tools).toEqual([
+        { type: "octen_search", parameters: { topic: "general", country: "US" } },
+        { type: "octen_broad_search", parameters: { topic: "general", country: "US" } },
+      ]);
     });
   });
 

@@ -113,10 +113,11 @@ octen chat "Summarize the Octen docs" -m anthropic/claude-haiku-4.5
 
 Streaming is on by default when output is a TTY; use `--no-stream` to get a single JSON response. Pass `-i` for interactive REPL mode. Set `OCTEN_CHAT_MODEL` to avoid specifying `-m` every time.
 
-**Web search** is now powered by the built-in `octen_search` tool. Pass `--search` to let the model search the web (the old `--web-search on` flag has been removed):
+**Web search** is powered by built-in server tools. Pass `--search` to let the model search the web via the `octen_search` tool (the old `--web-search on` flag has been removed), and/or `--broad-search` to enable the `octen_broad_search` tool, which fans a question out into several sub-queries for comprehensive coverage — both may be enabled together:
 
 ```sh
 octen chat "What launched at the latest Octen event?" -m anthropic/claude-haiku-4.5 --search --search-count 10
+octen chat "Compare cloud GPU pricing across providers" -m anthropic/claude-haiku-4.5 --broad-search --search-max-queries 5
 ```
 
 When search runs, cited sources are listed after the answer (pretty mode) and the raw response includes `search_results` and per-message `annotations`.
@@ -127,7 +128,7 @@ Sampling: `--temperature`, `--top-p`, `--top-k`, `--min-p`, `--top-a`, `--repeti
 
 Reasoning: `--reasoning-effort` (xhigh|high|medium|low|minimal|none), `--reasoning-max-tokens`. When a model emits reasoning it is shown under a dim `reasoning:` prefix in pretty mode.
 
-Web search (only meaningful with `--search`): `--search-max-searches <n>` (default 5), `--search-count <n>` (1-100), `--search-include-domains <list>`, `--search-exclude-domains <list>`, `--search-time-basis` (auto|published|crawled), `--search-start-time <when>`, `--search-end-time <when>`, `--search-format` (markdown|text), `--search-safesearch` (off|strict), `--search-full-content` (+`--search-full-content-max-tokens <n>`), `--search-highlight-max-tokens <n>`.
+Web search (only meaningful with `--search` and/or `--broad-search`): `--search-max-searches <n>` (octen_search only; default 5), `--search-max-queries <n>` (octen_broad_search only; 1-30, default 5), `--search-topic` (general|news), `--search-count <n>` (1-100), `--search-include-domains <list>`, `--search-exclude-domains <list>`, `--search-include-text <list>`/`--search-exclude-text <list>` (max 5 each), `--search-time-basis` (auto|published|crawled), `--search-time-range` (day|week|month|year or d|w|m|y), `--search-start-time <when>`, `--search-end-time <when>`, `--search-format` (markdown|text), `--search-safesearch` (off|strict), `--search-country` (ISO 3166-1 alpha-2 like US or JP, or auto), `--search-include-images`, `--search-full-content` (+`--search-full-content-max-tokens <n>`), `--search-highlight-max-tokens <n>`. The shared options apply to whichever tool(s) are enabled.
 
 ---
 

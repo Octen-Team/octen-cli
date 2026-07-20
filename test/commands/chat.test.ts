@@ -196,6 +196,107 @@ describe("chat command", () => {
     ]);
   });
 
+  it("--search flags land in the octen_search tool parameters", async () => {
+    const mockResp = { choices: [{ message: { content: "hi" } }] };
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(mockResp));
+
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "chat", "hello",
+      "-m", "test-model",
+      "--search",
+      "--search-topic", "news",
+      "--search-time-range", "week",
+      "--search-country", "US",
+      "--search-include-images",
+      "--search-include-text", "AI,LLM",
+      "--search-exclude-text", "spam",
+      "--no-stream",
+      "--json",
+      "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.tools).toEqual([
+      {
+        type: "octen_search",
+        parameters: {
+          topic: "news",
+          time_range: "week",
+          country: "US",
+          include_images: true,
+          include_text: ["AI", "LLM"],
+          exclude_text: ["spam"],
+        },
+      },
+    ]);
+  });
+
+  it("--broad-search builds an octen_broad_search tool with max_queries", async () => {
+    const mockResp = { choices: [{ message: { content: "hi" } }] };
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(mockResp));
+
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "chat", "hello",
+      "-m", "test-model",
+      "--broad-search",
+      "--search-max-queries", "2",
+      "--no-stream",
+      "--json",
+      "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.tools).toEqual([
+      { type: "octen_broad_search", parameters: { max_queries: 2 } },
+    ]);
+  });
+
+  it("--search --broad-search enables both tools sharing the --search-* options", async () => {
+    const mockResp = { choices: [{ message: { content: "hi" } }] };
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(mockResp));
+
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "chat", "hello",
+      "-m", "test-model",
+      "--search",
+      "--broad-search",
+      "--search-country", "JP",
+      "--no-stream",
+      "--json",
+      "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.tools).toEqual([
+      { type: "octen_search", parameters: { country: "JP" } },
+      { type: "octen_broad_search", parameters: { country: "JP" } },
+    ]);
+  });
+
+  it("omits tools entirely when neither --search nor --broad-search is set", async () => {
+    const mockResp = { choices: [{ message: { content: "hi" } }] };
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(mockResp));
+
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "chat", "hello",
+      "-m", "test-model",
+      "--no-stream",
+      "--json",
+      "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).not.toHaveProperty("tools");
+  });
+
   it("--no-stream pretty path prints message content without JSON wrapper", async () => {
     const mockResp = { choices: [{ message: { content: "plain answer" } }] };
     fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse(mockResp));

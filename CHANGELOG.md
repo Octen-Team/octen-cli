@@ -15,6 +15,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `JP`) or `auto` (the server default when the flag is omitted). Sent as a
   top-level field on `/search` and inside `search_options` on `/broad-search`.
   See https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2
+- **`--broad-search`** flag on `chat`, enabling the new built-in
+  `octen_broad_search` server tool (a peer of `octen_search` that fans the
+  model's search out into several sub-queries), plus
+  **`--search-max-queries <n>`** for its `max_queries` (1–30, default 5).
+  `--search` and `--broad-search` may be combined; the shared `--search-*`
+  options apply to whichever tool(s) are enabled.
+- New `chat` web-search options aligning the search tools with the full
+  WebSearchOptions contract: **`--search-topic`** (general|news),
+  **`--search-time-range`** (day|week|month|year or d|w|m|y),
+  **`--search-country`** (ISO 3166-1 alpha-2 or `auto`),
+  **`--search-include-images`**, and the previously-unexposed
+  **`--search-include-text`**/**`--search-exclude-text`** (max 5 each).
 
 ## [0.5.1] — 2026-07-06
 

@@ -487,19 +487,29 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       TEST_TIMEOUT_MS,
     );
 
-    for (const webSearch of ["on", "off"] as const) {
-      it(
-        `chat: web_search=${webSearch}`,
-        async () => {
-          const req = buildChatRequest(MSG, CHAT_MODEL, {
-            maxTokens: 50,
-            webSearch,
-          });
-          await expectChatOk(`chat web_search=${webSearch}`, req);
-        },
-        TEST_TIMEOUT_MS,
-      );
-    }
+    it(
+      "chat: tools=[octen_search] (topic/time_range/country)",
+      async () => {
+        const req = buildChatRequest(MSG, CHAT_MODEL, {
+          maxTokens: 200,
+          search: { enabled: true, topic: "news", timeRange: "week", country: "US" },
+        });
+        await expectChatOk("chat tools=[octen_search]", req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "chat: tools=[octen_broad_search] (max_queries=2)",
+      async () => {
+        const req = buildChatRequest(MSG, CHAT_MODEL, {
+          maxTokens: 200,
+          search: { broadEnabled: true, maxQueries: 2 },
+        });
+        await expectChatOk("chat tools=[octen_broad_search]", req);
+      },
+      TEST_TIMEOUT_MS,
+    );
 
     it(
       "chat: temperature=0.5",
