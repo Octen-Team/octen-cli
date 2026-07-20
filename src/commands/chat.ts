@@ -123,7 +123,7 @@ export function registerChat(program: Command) {
     .option("--search-end-time <when>", "search tools: end time filter")
     .option("--search-format <f>", "search tools: markdown|text")
     .option("--search-safesearch <s>", "search tools: off|strict")
-    .option("--search-country <code>", "search tools: ISO 3166-1 alpha-2 country code (e.g. US, JP) or auto")
+    .option("--search-country <code>", "search tools: ISO 3166 country code (e.g. US, JP) or auto")
     .option("--search-include-images", "search tools: include image results")
     .option("--search-full-content", "search tools: include full page content")
     .option("--search-full-content-max-tokens <n>", "search tools: max tokens for full content", parseIntOpt("--search-full-content-max-tokens"))
