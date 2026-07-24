@@ -94,33 +94,6 @@ describe("search command", () => {
     expect(body).toMatchObject({ query: "hi", count: 10 });
   });
 
-  it("passes --country to request body", async () => {
-    const prog = makeProgram();
-    await prog.parseAsync(["node", "octen", "search", "hi", "--json", "--api-key", "k", "--country", "US"]);
-
-    const [, init] = fetchSpy.mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ query: "hi", country: "US" });
-  });
-
-  it("omits country from request body when --country is not passed", async () => {
-    const prog = makeProgram();
-    await prog.parseAsync(["node", "octen", "search", "hi", "--json", "--api-key", "k"]);
-
-    const [, init] = fetchSpy.mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).not.toHaveProperty("country");
-  });
-
-  it("news command passes --country to request body alongside topic=news", async () => {
-    const prog = makeProgram();
-    await prog.parseAsync(["node", "octen", "news", "breaking", "--json", "--api-key", "k", "--country", "JP"]);
-
-    const [, init] = fetchSpy.mock.calls[0];
-    const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ query: "breaking", topic: "news", country: "JP" });
-  });
-
   it("rejects non-integer --count", async () => {
     const prog = makeProgram();
     await expect(

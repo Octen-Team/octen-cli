@@ -309,21 +309,6 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       );
     }
 
-    for (const country of ["US", "auto"] as const) {
-      it(
-        `search: country=${country}`,
-        async () => {
-          const req = buildSearchRequest(BASE, { count: 3, country });
-          await expectEnvelopeOk(
-            `search country=${country}`,
-            ENDPOINTS.search,
-            req,
-          );
-        },
-        TEST_TIMEOUT_MS,
-      );
-    }
-
     it(
       "search: highlight=true (+max_tokens=300)",
       async () => {
@@ -488,11 +473,11 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
     );
 
     it(
-      "chat: tools=[octen_search] (topic/time_range/country)",
+      "chat: tools=[octen_search] (topic/time_range)",
       async () => {
         const req = buildChatRequest(MSG, CHAT_MODEL, {
           maxTokens: 200,
-          search: { enabled: true, topic: "news", timeRange: "week", country: "US" },
+          search: { enabled: true, topic: "news", timeRange: "week" },
         });
         await expectChatOk("chat tools=[octen_search]", req);
       },

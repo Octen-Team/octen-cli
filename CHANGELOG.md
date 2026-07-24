@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.4] — 2026-07-24
+
+### Removed
+- `--country` and `--search-country` flags removed from search, news, broad-search, and chat.
+
 ## [0.5.3] — 2026-07-20
 
 ### Changed

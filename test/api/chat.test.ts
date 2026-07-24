@@ -152,13 +152,12 @@ describe("buildChatRequest", () => {
       ]);
     });
 
-    it("maps topic/time_range/country/include_images/include_text/exclude_text into the tool parameters", () => {
+    it("maps topic/time_range/include_images/include_text/exclude_text into the tool parameters", () => {
       const req = buildChatRequest(msgs, "m", {
         search: {
           enabled: true,
           topic: "news",
           timeRange: "week",
-          country: "US",
           includeImages: true,
           includeText: ["AI"],
           excludeText: ["spam"],
@@ -170,7 +169,6 @@ describe("buildChatRequest", () => {
           parameters: {
             topic: "news",
             time_range: "week",
-            country: "US",
             include_images: true,
             include_text: ["AI"],
             exclude_text: ["spam"],
@@ -257,7 +255,6 @@ describe("buildChatRequest", () => {
           topic: "news",
           count: 10,
           timeRange: "week",
-          country: "JP",
           includeDomains: ["example.com"],
         },
       });
@@ -269,7 +266,6 @@ describe("buildChatRequest", () => {
             topic: "news",
             count: 10,
             time_range: "week",
-            country: "JP",
             include_domains: ["example.com"],
           },
         },
@@ -297,11 +293,11 @@ describe("buildChatRequest", () => {
 
     it("builds both tools with shared options when --search and --broad-search are combined", () => {
       const req = buildChatRequest(msgs, "m", {
-        search: { enabled: true, broadEnabled: true, topic: "general", country: "US" },
+        search: { enabled: true, broadEnabled: true, topic: "general" },
       });
       expect(req.tools).toEqual([
-        { type: "octen_search", parameters: { topic: "general", country: "US" } },
-        { type: "octen_broad_search", parameters: { topic: "general", country: "US" } },
+        { type: "octen_search", parameters: { topic: "general" } },
+        { type: "octen_broad_search", parameters: { topic: "general" } },
       ]);
     });
   });

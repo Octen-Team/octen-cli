@@ -18,7 +18,6 @@ export function registerSearch(program: Command, fixedTopic?: "news") {
     .option("--start-time <when>", "YYYY-MM-DD or ISO datetime (e.g. 2024-01-01T00:00:00Z)")
     .option("--end-time <when>", "YYYY-MM-DD or ISO datetime (e.g. 2024-12-31T23:59:59Z)")
     .option("--format <f>", "text|markdown").option("--safesearch <s>", "off|strict")
-    .option("--country <code>", "country of the search — follow ISO 3166 country codes (e.g. US, JP) or auto (default)")
     .option("--highlight").option("--highlight-max-tokens <n>", "max tokens per highlight", parseIntOpt("--highlight-max-tokens"))
     .option("--full-content").option("--full-content-max-tokens <n>", "max tokens per result", parseIntOpt("--full-content-max-tokens"))
     .option("--images").option("--videos");

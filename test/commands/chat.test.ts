@@ -207,7 +207,6 @@ describe("chat command", () => {
       "--search",
       "--search-topic", "news",
       "--search-time-range", "week",
-      "--search-country", "US",
       "--search-include-images",
       "--search-include-text", "AI,LLM",
       "--search-exclude-text", "spam",
@@ -224,7 +223,6 @@ describe("chat command", () => {
         parameters: {
           topic: "news",
           time_range: "week",
-          country: "US",
           include_images: true,
           include_text: ["AI", "LLM"],
           exclude_text: ["spam"],
@@ -265,7 +263,7 @@ describe("chat command", () => {
       "-m", "test-model",
       "--search",
       "--broad-search",
-      "--search-country", "JP",
+      "--search-topic", "news",
       "--no-stream",
       "--json",
       "--api-key", "k",
@@ -274,8 +272,8 @@ describe("chat command", () => {
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body.tools).toEqual([
-      { type: "octen_search", parameters: { country: "JP" } },
-      { type: "octen_broad_search", parameters: { country: "JP" } },
+      { type: "octen_search", parameters: { topic: "news" } },
+      { type: "octen_broad_search", parameters: { topic: "news" } },
     ]);
   });
 
