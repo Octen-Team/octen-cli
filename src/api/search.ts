@@ -77,7 +77,6 @@ export interface SearchOpts {
   endTime?: string;
   format?: "text" | "markdown";
   safesearch?: "off" | "strict";
-  country?: string;
   highlight?: boolean;
   highlightMaxTokens?: number;
   fullContent?: boolean;
@@ -118,7 +117,6 @@ export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
   put("start_time", normalizeTimeBound("--start-time", o.startTime, false));
   put("end_time", normalizeTimeBound("--end-time", o.endTime, true));
   put("format", o.format); put("safesearch", o.safesearch);
-  put("country", o.country);
   put("include_images", o.images); put("include_videos", o.videos);
   if (o.highlight) opts.highlight = { enable: true, ...(o.highlightMaxTokens ? { max_tokens: o.highlightMaxTokens } : {}) };
   if (o.fullContent) opts.full_content = { enable: true, ...(o.fullContentMaxTokens ? { max_tokens: o.fullContentMaxTokens } : {}) };

@@ -55,11 +55,4 @@ describe("buildSearchRequest", () => {
   it("rejects an unparseable time bound", () => {
     expect(() => buildSearchRequest("hi", { startTime: "last tuesday" })).toThrow(OctenValidationError);
   });
-  it("includes country as a top-level field when provided", () => {
-    expect(buildSearchRequest("hi", { country: "US" }))
-      .toEqual({ query: "hi", country: "US" });
-  });
-  it("omits country when not provided (server default applies)", () => {
-    expect(buildSearchRequest("hi", { count: 5 })).not.toHaveProperty("country");
-  });
 });
