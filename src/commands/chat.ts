@@ -123,6 +123,7 @@ export function registerChat(program: Command) {
     .option("--search-end-time <when>", "search tools: end time filter")
     .option("--search-format <f>", "search tools: markdown|text")
     .option("--search-safesearch <s>", "search tools: off|strict")
+    .option("--search-language <list>", "search tools: ISO 639-1 codes, comma-separated, e.g. en,ja", splitList)
     .option("--search-include-images", "search tools: include image results")
     .option("--search-full-content", "search tools: include full page content")
     .option("--search-full-content-max-tokens <n>", "search tools: max tokens for full content", parseIntOpt("--search-full-content-max-tokens"))
@@ -170,6 +171,7 @@ export function registerChat(program: Command) {
           endTime: opts.searchEndTime,
           format: opts.searchFormat as SearchFormat | undefined,
           safesearch: opts.searchSafesearch as SearchSafesearch | undefined,
+          language: opts.searchLanguage,
           includeImages: opts.searchIncludeImages,
           fullContent: Boolean(opts.searchFullContent),
           fullContentMaxTokens: opts.searchFullContentMaxTokens,

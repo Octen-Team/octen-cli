@@ -152,12 +152,13 @@ describe("buildChatRequest", () => {
       ]);
     });
 
-    it("maps topic/time_range/include_images/include_text/exclude_text into the tool parameters", () => {
+    it("maps topic/time_range/language/include_images/include_text/exclude_text into the tool parameters", () => {
       const req = buildChatRequest(msgs, "m", {
         search: {
           enabled: true,
           topic: "news",
           timeRange: "week",
+          language: ["en", "ja"],
           includeImages: true,
           includeText: ["AI"],
           excludeText: ["spam"],
@@ -169,6 +170,7 @@ describe("buildChatRequest", () => {
           parameters: {
             topic: "news",
             time_range: "week",
+            language: ["en", "ja"],
             include_images: true,
             include_text: ["AI"],
             exclude_text: ["spam"],
@@ -293,11 +295,11 @@ describe("buildChatRequest", () => {
 
     it("builds both tools with shared options when --search and --broad-search are combined", () => {
       const req = buildChatRequest(msgs, "m", {
-        search: { enabled: true, broadEnabled: true, topic: "general" },
+        search: { enabled: true, broadEnabled: true, topic: "general", language: ["ja"] },
       });
       expect(req.tools).toEqual([
-        { type: "octen_search", parameters: { topic: "general" } },
-        { type: "octen_broad_search", parameters: { topic: "general" } },
+        { type: "octen_search", parameters: { topic: "general", language: ["ja"] } },
+        { type: "octen_broad_search", parameters: { topic: "general", language: ["ja"] } },
       ]);
     });
   });
