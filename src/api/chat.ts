@@ -107,6 +107,7 @@ export interface SearchOpts {
   endTime?: string;
   format?: SearchFormat;
   safesearch?: SearchSafesearch;
+  language?: string[];
   includeImages?: boolean;
   fullContent?: boolean;
   fullContentMaxTokens?: number;
@@ -175,6 +176,7 @@ function buildWebSearchParameters(s: SearchOpts): Record<string, unknown> {
   put("end_time", normalizeTimeBound("--search-end-time", s.endTime, true));
   put("format", s.format);
   put("safesearch", s.safesearch);
+  put("language", s.language);
   put("include_images", s.includeImages);
 
   if (s.fullContent) {

@@ -55,4 +55,11 @@ describe("buildSearchRequest", () => {
   it("rejects an unparseable time bound", () => {
     expect(() => buildSearchRequest("hi", { startTime: "last tuesday" })).toThrow(OctenValidationError);
   });
+  it("includes language as a top-level array field when provided", () => {
+    expect(buildSearchRequest("hi", { language: ["en", "zh"] }))
+      .toEqual({ query: "hi", language: ["en", "zh"] });
+  });
+  it("omits language when not provided (server default = no filter)", () => {
+    expect(buildSearchRequest("hi", { count: 5 })).not.toHaveProperty("language");
+  });
 });

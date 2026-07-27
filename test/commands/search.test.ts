@@ -94,6 +94,33 @@ describe("search command", () => {
     expect(body).toMatchObject({ query: "hi", count: 10 });
   });
 
+  it("passes --language as a top-level array to request body", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync(["node", "octen", "search", "hi", "--json", "--api-key", "k", "--language", "en,zh"]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).toMatchObject({ query: "hi", language: ["en", "zh"] });
+  });
+
+  it("omits language from request body when --language is not passed", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync(["node", "octen", "search", "hi", "--json", "--api-key", "k"]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).not.toHaveProperty("language");
+  });
+
+  it("news command passes --language to request body alongside topic=news", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync(["node", "octen", "news", "breaking", "--json", "--api-key", "k", "--language", "ja"]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body).toMatchObject({ query: "breaking", topic: "news", language: ["ja"] });
+  });
+
   it("rejects non-integer --count", async () => {
     const prog = makeProgram();
     await expect(

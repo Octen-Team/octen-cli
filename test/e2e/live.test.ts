@@ -309,6 +309,21 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       );
     }
 
+    for (const language of [["ja"], ["en", "zh"]] as const) {
+      it(
+        `search: language=[${language.join(",")}]`,
+        async () => {
+          const req = buildSearchRequest(BASE, { count: 3, language: [...language] });
+          await expectEnvelopeOk(
+            `search language=[${language.join(",")}]`,
+            ENDPOINTS.search,
+            req,
+          );
+        },
+        TEST_TIMEOUT_MS,
+      );
+    }
+
     it(
       "search: highlight=true (+max_tokens=300)",
       async () => {
@@ -473,11 +488,11 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
     );
 
     it(
-      "chat: tools=[octen_search] (topic/time_range)",
+      "chat: tools=[octen_search] (topic/time_range/language)",
       async () => {
         const req = buildChatRequest(MSG, CHAT_MODEL, {
           maxTokens: 200,
-          search: { enabled: true, topic: "news", timeRange: "week" },
+          search: { enabled: true, topic: "news", timeRange: "week", language: ["en"] },
         });
         await expectChatOk("chat tools=[octen_search]", req);
       },
