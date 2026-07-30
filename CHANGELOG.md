@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.6.0] — 2026-07-30
+
+### Fixed
+- `completion <shell> --install` now survives a later `compinit`. The previous
+  zsh/bash install appended `eval "$(octen completion <shell>)"` to the rc file,
+  registering a bash-style completion that a subsequent `compinit` — e.g. one
+  added below it by another tool's installer — would silently drop. Tab
+  completion then broke depending on install order.
+
+### Changed
+- `completion zsh --install` now writes a native `#compdef` `_octen` function to
+  `~/.octen/completions/` and adds that directory to `fpath` (plus a `compinit`
+  call) via an idempotent, marked block in `~/.zshrc`. fpath completions are
+  re-discovered on every `compinit`, so ordering no longer matters. A legacy
+  `eval` line from an earlier install is migrated automatically.
+- `completion bash --install` now writes a native completion file to the
+  bash-completion user dir (`~/.local/share/bash-completion/completions/octen`),
+  lazy-loaded on demand regardless of rc ordering.
+- Printed scripts (`octen completion zsh|bash` without `--install`) are unchanged
+  and remain available as an `eval` fallback.
+
 ## [0.5.5] — 2026-07-27
 
 ### Added

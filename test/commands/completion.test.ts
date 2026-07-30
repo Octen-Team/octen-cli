@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Command } from "commander";
@@ -14,7 +14,7 @@ import { registerConfigureSkills } from "../../src/commands/configureSkills.js";
 import { registerReset } from "../../src/commands/reset.js";
 import { registerCompletion } from "../../src/commands/completion.js";
 
-function makeProgram() {
+function makeProgram(internal: { home?: string } = {}) {
   const prog = new Command();
   prog
     .name("octen")
@@ -35,7 +35,7 @@ function makeProgram() {
   registerEmbed(prog);
   registerVlEmbed(prog);
   // Register LAST, mirroring cli.ts.
-  registerCompletion(prog);
+  registerCompletion(prog, internal);
   return prog;
 }
 
@@ -97,23 +97,66 @@ describe("completion command", () => {
     ).rejects.toThrow(OctenValidationError);
   });
 
-  it("--install appends an idempotent eval line to ~/.zshrc under injected home", async () => {
+  it("--install (zsh) writes a native _octen file on fpath and a compinit block in ~/.zshrc", async () => {
     const home = mkdtempSync(join(tmpdir(), "octen-comp-"));
     try {
-      const make = () => {
-        const prog = new Command();
-        prog.name("octen").exitOverride();
-        registerCompletion(prog, { home });
-        return prog;
-      };
+      const make = () => makeProgram({ home });
       await make().parseAsync(["node", "octen", "completion", "zsh", "--install"]);
+
+      // Native completion function file lives in an fpath dir.
+      const fn = join(home, ".octen/completions/_octen");
+      expect(existsSync(fn)).toBe(true);
+      const fnBody = readFileSync(fn, "utf8");
+      expect(fnBody).toContain("#compdef octen");
+      expect(fnBody).toContain("compadd --");
+      expect(fnBody).toContain("search"); // subcommand
+      expect(fnBody).toContain("--count"); // per-subcommand flag
+
+      // ~/.zshrc gets the fpath + compinit block.
       const rc = join(home, ".zshrc");
-      const evalLine = 'eval "$(octen completion zsh)"';
-      expect(readFileSync(rc, "utf8")).toContain(evalLine);
-      // Idempotent: a second install does not duplicate the line.
+      const rcBody = readFileSync(rc, "utf8");
+      expect(rcBody).toContain("# >>> octen completion >>>");
+      expect(rcBody).toContain('fpath=("$HOME/.octen/completions" $fpath)');
+      expect(rcBody).toContain("autoload -Uz compinit && compinit");
+
+      // Idempotent: a second install does not duplicate the block.
       await make().parseAsync(["node", "octen", "completion", "zsh", "--install"]);
-      const occurrences = readFileSync(rc, "utf8").split(evalLine).length - 1;
-      expect(occurrences).toBe(1);
+      const blocks = readFileSync(rc, "utf8").split("# >>> octen completion >>>").length - 1;
+      expect(blocks).toBe(1);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("--install (zsh) migrates a legacy eval line to the fpath block", async () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-comp-"));
+    try {
+      const rc = join(home, ".zshrc");
+      writeFileSync(
+        rc,
+        '# user config\n\n# octen CLI completion\neval "$(octen completion zsh)"\n',
+      );
+      await makeProgram({ home }).parseAsync(["node", "octen", "completion", "zsh", "--install"]);
+
+      const rcBody = readFileSync(rc, "utf8");
+      expect(rcBody).not.toContain('eval "$(octen completion zsh)"');
+      expect(rcBody).toContain("# >>> octen completion >>>");
+      expect(rcBody).toContain("# user config"); // preserved unrelated lines
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+
+  it("--install (bash) writes a native completion file into the bash-completion dir", async () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-comp-"));
+    try {
+      await makeProgram({ home }).parseAsync(["node", "octen", "completion", "bash", "--install"]);
+
+      const file = join(home, ".local/share/bash-completion/completions/octen");
+      expect(existsSync(file)).toBe(true);
+      const body = readFileSync(file, "utf8");
+      expect(body).toContain("complete -F _octen octen");
+      expect(body).toContain("_octen()");
     } finally {
       rmSync(home, { recursive: true, force: true });
     }
