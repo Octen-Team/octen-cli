@@ -11,16 +11,12 @@ describe("buildImageSearchRequest", () => {
       inputs: [{ type: "text", data: "red car" }],
     });
   });
-  it("adds an image input for an https url", () => {
-    const req = buildImageSearchRequest("red car", {
-      image: "https://example.com/car.jpg",
-    });
-    expect(req).toMatchObject({
-      inputs: [
-        { type: "text", data: "red car" },
-        { type: "image", url: "https://example.com/car.jpg" },
-      ],
-    });
+  it("rejects a query and --image together", () => {
+    // The endpoint takes exactly one input; sending both used to build a
+    // two-entry array that always came back 400 "Inputs exceeds 1 entries".
+    expect(() =>
+      buildImageSearchRequest("red car", { image: "https://example.com/car.jpg" }),
+    ).toThrow(OctenValidationError);
   });
   it("allows --image alone with no query", () => {
     expect(buildImageSearchRequest("", { image: "https://example.com/car.jpg" })).toEqual({
@@ -46,8 +42,13 @@ describe("buildImageSearchRequest", () => {
       OctenValidationError,
     );
   });
-  it("rejects an invalid time-range", () => {
-    expect(() => buildImageSearchRequest("hi", { timeRange: "1d" })).toThrow(OctenValidationError);
+  it("rejects html-snippet-max-tokens out of range", () => {
+    expect(() =>
+      buildImageSearchRequest("hi", { htmlSnippet: true, htmlSnippetMaxTokens: 99 }),
+    ).toThrow(OctenValidationError);
+    expect(() =>
+      buildImageSearchRequest("hi", { htmlSnippet: true, htmlSnippetMaxTokens: 100_001 }),
+    ).toThrow(OctenValidationError);
   });
   it("rejects a bad safesearch", () => {
     expect(() => buildImageSearchRequest("hi", { safesearch: "x" as never })).toThrow(
@@ -59,13 +60,15 @@ describe("buildImageSearchRequest", () => {
       buildImageSearchRequest("hi", { htmlSnippet: true, htmlSnippetMaxTokens: 2000 }),
     ).toMatchObject({ html_snippet: { enable: true, max_tokens: 2000 } });
   });
-  it("expands a bare start/end date to start/end of day", () => {
-    expect(
-      buildImageSearchRequest("hi", { startTime: "2024-01-01", endTime: "2024-12-31" }),
-    ).toMatchObject({
-      start_time: "2024-01-01T00:00:00Z",
-      end_time: "2024-12-31T23:59:59Z",
-    });
+  it("sends no time filters — the endpoint has none", () => {
+    // /image-search silently drops time_range/start_time/end_time: it answers
+    // time_range="zzz" with 200 and unfiltered results, where /video-search
+    // and /search both return 400. Offering the flags implied filtering that
+    // never happened.
+    const req = buildImageSearchRequest("hi", {});
+    expect(req).not.toHaveProperty("time_range");
+    expect(req).not.toHaveProperty("start_time");
+    expect(req).not.toHaveProperty("end_time");
   });
   it("throws when a local --image file does not exist", () => {
     expect(() =>

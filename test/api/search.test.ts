@@ -36,10 +36,28 @@ describe("buildSearchRequest", () => {
   it("rejects an invalid format", () => {
     expect(() => buildSearchRequest("hi", { format: "x" as never })).toThrow(OctenValidationError);
   });
-  it("rejects highlight-max-tokens below the 100 minimum", () => {
+  it("rejects highlight-max-tokens outside 100-20000", () => {
+    // API: "must be at least 100" / "must be at most 20000"
     expect(() => buildSearchRequest("hi", { highlight: true, highlightMaxTokens: 50 })).toThrow(
       OctenValidationError,
     );
+    expect(() => buildSearchRequest("hi", { highlight: true, highlightMaxTokens: 20_001 })).toThrow(
+      OctenValidationError,
+    );
+    expect(
+      buildSearchRequest("hi", { highlight: true, highlightMaxTokens: 20_000 }),
+    ).toMatchObject({ highlight: { enable: true, max_tokens: 20_000 } });
+  });
+  it("rejects full-content-max-tokens outside 100-100000", () => {
+    expect(() =>
+      buildSearchRequest("hi", { fullContent: true, fullContentMaxTokens: 99 }),
+    ).toThrow(OctenValidationError);
+    expect(() =>
+      buildSearchRequest("hi", { fullContent: true, fullContentMaxTokens: 100_001 }),
+    ).toThrow(OctenValidationError);
+    expect(
+      buildSearchRequest("hi", { fullContent: true, fullContentMaxTokens: 100_000 }),
+    ).toMatchObject({ full_content: { enable: true, max_tokens: 100_000 } });
   });
   it("expands a bare start/end date to start/end of day", () => {
     expect(buildSearchRequest("hi", { startTime: "2024-01-01", endTime: "2024-12-31" })).toMatchObject({

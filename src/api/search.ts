@@ -19,6 +19,20 @@ export function validateEnum(flag: string, value: unknown, allowed: readonly str
  * (23:59:59Z) of that day; a full datetime passes through. Anything else is
  * rejected client-side with a clear message instead of a server 400.
  */
+/**
+ * Reject a numeric option the API would reject anyway, so the failure names
+ * the flag instead of arriving as a 400 several hundred milliseconds later.
+ */
+export function assertRange(
+  flag: string,
+  value: number | undefined,
+  bounds: { min: number; max: number },
+): void {
+  if (value == null) return;
+  if (value < bounds.min || value > bounds.max)
+    throw new OctenValidationError(`${flag} must be ${bounds.min}-${bounds.max}`);
+}
+
 export function normalizeTimeBound(
   flag: string,
   value: string | undefined,
@@ -99,10 +113,8 @@ export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
     throw new OctenValidationError(`include-text max ${LIMITS.includeText}`);
   if (o.excludeText && o.excludeText.length > LIMITS.excludeText)
     throw new OctenValidationError(`exclude-text max ${LIMITS.excludeText}`);
-  if (o.highlightMaxTokens != null && o.highlightMaxTokens < LIMITS.highlightMaxTokens.min)
-    throw new OctenValidationError(
-      `highlight-max-tokens must be at least ${LIMITS.highlightMaxTokens.min}`,
-    );
+  assertRange("highlight-max-tokens", o.highlightMaxTokens, LIMITS.highlightMaxTokens);
+  assertRange("full-content-max-tokens", o.fullContentMaxTokens, LIMITS.fullContentMaxTokens);
   validateEnum("--topic", o.topic, TOPIC_OPTIONS);
   validateEnum("--time-basis", o.timeBasis, TIME_BASIS_OPTIONS);
   validateEnum("--time-range", o.timeRange, TIME_RANGE_OPTIONS);
