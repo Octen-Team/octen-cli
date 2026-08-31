@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.7.0] — 2026-08-31
+
 Aligns parameter validation with the API reference. Every bound below was read
 off a live `400`, not the docs — in several cases the two disagreed.
 
