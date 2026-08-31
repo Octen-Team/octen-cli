@@ -7,6 +7,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+Aligns parameter validation with the API reference. Every bound below was read
+off a live `400`, not the docs — in several cases the two disagreed.
+
+### Removed
+
+- **`--videos` from `search` and `broad-search`.** `include_videos` is not in
+  the search API reference. It stays on `octen extract --videos`, which
+  documents it.
+
+- **`--time-range` / `--start-time` / `--end-time` from `image-search`.** The
+  endpoint has no time filters, and it does not reject the fields:
+  `time_range="zzz_garbage"` comes back `200` with unfiltered results, where
+  `search` and `video-search` both return `400`. Narrowing an image search to
+  the past week returned everything and reported success — and the local
+  enum/date validation made it look real. These flags are unchanged on
+  `search`, `news`, `broad-search` and `video-search`.
+
+### Changed
+
+- **`image-search` takes exactly one input.** A query plus `--image` built a
+  two-entry `inputs` array that the API always answered with
+  `400 Inputs exceeds 1 entries`, so the combination could never succeed — it
+  was in the README as an example. It now fails locally with a message that
+  says why.
+
+- **Token bounds enforced.** `--highlight-max-tokens` checked only its lower
+  bound; `--full-content-max-tokens` and `--html-snippet-max-tokens` were not
+  checked at all, though the API rejects out-of-range values on all three.
+  Now 100–20000, 100–100000 and 100–100000 respectively.
+
+- **`octen-search` skill: domain filter limits corrected** to 1200 entries of
+  up to 60 characters for `include_domains` / `exclude_domains` (documented as
+  1000 / 150 entries of 30 characters). Agents reading the skill were told to
+  split lists the API would have served as-is. `include_text` /
+  `exclude_text` (5 × 30) were already right.
+
 ## [0.6.0] — 2026-07-30
 
 ### Fixed
