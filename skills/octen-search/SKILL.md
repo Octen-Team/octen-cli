@@ -94,8 +94,8 @@ POST https://api.octen.ai/search
 |--|--|--|--|--|
 | `query` | string | **Yes** | - | Search query (max 500 chars) |
 | `count` | integer | No | `5` | Number of results (1–100) |
-| `include_domains` | string[] | No | - | Only include results from these domains (max 1000 domains, each max 30 chars) |
-| `exclude_domains` | string[] | No | - | Exclude results from these domains (max 150 domains, each max 30 chars) |
+| `include_domains` | string[] | No | - | Only include results from these domains (max 1200 domains, each max 60 chars) |
+| `exclude_domains` | string[] | No | - | Exclude results from these domains (max 1200 domains, each max 60 chars) |
 | `include_text` | string[] | No | - | Strings that must appear in result page text (max 5 items, each max 30 chars) |
 | `exclude_text` | string[] | No | - | Strings that must not appear in result page text (max 5 items, each max 30 chars) |
 | `time_basis` | string | No | `auto` | Time field used for filtering: `auto`, `published`, `crawled` |

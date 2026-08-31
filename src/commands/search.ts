@@ -21,7 +21,7 @@ export function registerSearch(program: Command, fixedTopic?: "news") {
     .option("--language <list>", "ISO 639-1 codes, comma-separated, e.g. en,ja", (v) => v.split(","))
     .option("--highlight").option("--highlight-max-tokens <n>", "max tokens per highlight", parseIntOpt("--highlight-max-tokens"))
     .option("--full-content").option("--full-content-max-tokens <n>", "max tokens per result", parseIntOpt("--full-content-max-tokens"))
-    .option("--images").option("--videos");
+    .option("--images");
   if (!fixedTopic) cmd.option("--topic <t>", "general|news");
 
   cmd.action(async (queryArg: string[] | string, opts: SearchOpts, command: Command) => {

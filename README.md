@@ -61,7 +61,7 @@ Search the live web.
 octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, min 100), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content`, `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
+Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, 100–20000), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content` (+`--full-content-max-tokens`, 100–100000), `--images`, `--format` (text|markdown), `--safesearch`.
 
 ---
 
@@ -85,7 +85,7 @@ Use it for comparisons across many sources (pricing, products, vendors), surveys
 octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
 ```
 
-Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--language`, `--images`, `--videos`, `--format`, `--safesearch`).
+Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--language`, `--images`, `--format`, `--safesearch`).
 
 ---
 
@@ -164,17 +164,19 @@ Options: `-m/--model` (base|large or full ID), `--fusion`/`--no-fusion`, `--dime
 
 **In Beta** — contact us to request beta access.
 
-Search the web for images by text query and/or an example image.
+Search the web for images, either by text query or by example image.
 
 ```sh
-octen image-search "red sports car" -n 10 --topic design --time-range week
+octen image-search "red sports car" -n 10 --topic design
 octen image-search --image https://example.com/car.jpg
-octen image-search "similar to this" --image ./car.png
+octen image-search --image ./car.png
 ```
 
-`--image` accepts a public URL or a local file path (read inline as base64, max 5MB). At least one of a query or `--image` is required.
+The endpoint takes exactly one input, so pass a query **or** `--image`, not both. `--image` accepts a public URL or a local file path (read inline as base64, max 5MB).
 
-Options: `--image <url|path>`, `--topic` (general|design), `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--safesearch` (off|strict), `--html-snippet` (+`--html-snippet-max-tokens`).
+Options: `--image <url|path>`, `--topic` (general|design), `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--safesearch` (off|strict), `--html-snippet` (+`--html-snippet-max-tokens`, 100–100000).
+
+Unlike `octen search` and `octen video-search`, this endpoint has no time filters.
 
 ---
 

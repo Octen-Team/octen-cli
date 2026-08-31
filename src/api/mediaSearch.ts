@@ -6,7 +6,7 @@ import {
   SAFESEARCH_OPTIONS,
 } from "./constants.js";
 import { OctenValidationError } from "./errors.js";
-import { validateEnum, normalizeTimeBound } from "./search.js";
+import { validateEnum, normalizeTimeBound, assertRange } from "./search.js";
 
 /** Max size of a local image read inline as base64. */
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024; // 5 MB
@@ -40,9 +40,6 @@ export interface ImageSearchOpts {
   count?: number;
   includeDomains?: string[];
   excludeDomains?: string[];
-  timeRange?: string;
-  startTime?: string;
-  endTime?: string;
   safesearch?: "off" | "strict";
   htmlSnippet?: boolean;
   htmlSnippetMaxTokens?: number;
@@ -82,25 +79,31 @@ export function buildImageSearchRequest(
   query: string,
   o: ImageSearchOpts,
 ): Record<string, unknown> {
-  const inputs: ImageInput[] = [];
-  if (query) inputs.push({ type: "text", data: query });
-  if (o.image) inputs.push(resolveImageInput(o.image));
+  // The endpoint takes exactly one input, so a query and --image are
+  // alternatives. Sending both produced a two-entry array the API answered
+  // with 400 "Inputs exceeds 1 entries".
+  if (query && o.image)
+    throw new OctenValidationError(
+      "pass a query or --image, not both: image search accepts exactly one input",
+    );
+  const inputs: ImageInput[] = query
+    ? [{ type: "text", data: query }]
+    : o.image
+      ? [resolveImageInput(o.image)]
+      : [];
   if (inputs.length === 0)
     throw new OctenValidationError("provide a query or --image");
 
   if (o.count != null && (o.count < LIMITS.imageCount.min || o.count > LIMITS.imageCount.max))
     throw new OctenValidationError(`count must be ${LIMITS.imageCount.min}-${LIMITS.imageCount.max}`);
+  assertRange("--html-snippet-max-tokens", o.htmlSnippetMaxTokens, LIMITS.htmlSnippetMaxTokens);
   validateEnum("--topic", o.topic, IMAGE_TOPIC_OPTIONS);
-  validateEnum("--time-range", o.timeRange, TIME_RANGE_OPTIONS);
   validateEnum("--safesearch", o.safesearch, SAFESEARCH_OPTIONS);
 
   const req: Record<string, unknown> = { inputs };
   const put = (k: string, v: unknown) => { if (v != null) req[k] = v; };
   put("topic", o.topic); put("count", o.count);
   put("include_domains", o.includeDomains); put("exclude_domains", o.excludeDomains);
-  put("time_range", o.timeRange);
-  put("start_time", normalizeTimeBound("--start-time", o.startTime, false));
-  put("end_time", normalizeTimeBound("--end-time", o.endTime, true));
   put("safesearch", o.safesearch);
   if (o.htmlSnippet)
     req.html_snippet = {
