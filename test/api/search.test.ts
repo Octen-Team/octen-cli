@@ -48,6 +48,13 @@ describe("buildSearchRequest", () => {
       buildSearchRequest("hi", { highlight: true, highlightMaxTokens: 20_000 }),
     ).toMatchObject({ highlight: { enable: true, max_tokens: 20_000 } });
   });
+  it("never sends include_videos — documented on /extract only", () => {
+    // The API accepts and honours it, but the search reference does not list
+    // it; extract does, and keeps its --videos flag.
+    const req = buildSearchRequest("hi", { images: true } as never);
+    expect(req).not.toHaveProperty("include_videos");
+    expect(req).toHaveProperty("include_images", true);
+  });
   it("rejects full-content-max-tokens outside 100-100000", () => {
     expect(() =>
       buildSearchRequest("hi", { fullContent: true, fullContentMaxTokens: 99 }),

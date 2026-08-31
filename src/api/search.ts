@@ -97,7 +97,6 @@ export interface SearchOpts {
   fullContent?: boolean;
   fullContentMaxTokens?: number;
   images?: boolean;
-  videos?: boolean;
 }
 
 /**
@@ -131,7 +130,8 @@ export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
   put("end_time", normalizeTimeBound("--end-time", o.endTime, true));
   put("format", o.format); put("safesearch", o.safesearch);
   put("language", o.language);
-  put("include_images", o.images); put("include_videos", o.videos);
+  // No include_videos: the API reference documents it on /extract only.
+  put("include_images", o.images);
   if (o.highlight) opts.highlight = { enable: true, ...(o.highlightMaxTokens ? { max_tokens: o.highlightMaxTokens } : {}) };
   if (o.fullContent) opts.full_content = { enable: true, ...(o.fullContentMaxTokens ? { max_tokens: o.fullContentMaxTokens } : {}) };
   return opts;

@@ -61,7 +61,7 @@ Search the live web.
 octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, 100–20000), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content` (+`--full-content-max-tokens`, 100–100000), `--images`, `--videos`, `--format` (text|markdown), `--safesearch`.
+Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, 100–20000), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content` (+`--full-content-max-tokens`, 100–100000), `--images`, `--format` (text|markdown), `--safesearch`.
 
 ---
 
@@ -85,7 +85,7 @@ Use it for comparisons across many sources (pricing, products, vendors), surveys
 octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
 ```
 
-Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--language`, `--images`, `--videos`, `--format`, `--safesearch`).
+Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--language`, `--images`, `--format`, `--safesearch`).
 
 ---
 
