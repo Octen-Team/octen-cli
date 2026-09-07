@@ -2,3 +2,12 @@ node_modules/
 dist/
 *.log
 .DS_Store
+.idea/
+
+# Local AI-assistant / editor config
+.claude/
+.codex/
+CLAUDE.md
+AGENTS.md
+.cursor/
+.vscode/
