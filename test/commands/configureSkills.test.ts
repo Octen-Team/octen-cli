@@ -437,3 +437,47 @@ describe("configure-skills default remote path", () => {
     expect(existsSync(join(home, ".claude/skills", "octen-design", "SKILL.md"))).toBe(true);
   });
 });
+
+describe("configure-skills --only validation", () => {
+  it("rejects an --only list with no non-empty names before creating anything", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "configure-skills", "--cursor", "--offline", "--only", " , ",
+      ]),
+    ).rejects.toThrow("--only must contain at least one non-empty value");
+
+    expect(existsSync(join(home, ".cursor/skills"))).toBe(false);
+  });
+
+  it("parses a padded --only list into exact skill names", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+
+    await prog.parseAsync([
+      "node", "octen", "configure-skills", "--cursor", "--offline",
+      "--only", " octen-search, ,octen-design ",
+    ]);
+
+    const skillsDir = join(home, ".cursor/skills");
+    expect(existsSync(join(skillsDir, "octen-search", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(skillsDir, "octen-design", "SKILL.md"))).toBe(true);
+  });
+});
+
+describe("configure-skills --scope validation", () => {
+  it("rejects an unknown scope instead of silently using user scope", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "configure-skills", "--cursor", "--offline", "--scope", "global",
+      ]),
+    ).rejects.toThrow(/--scope must be one of: user, project/);
+
+    expect(existsSync(join(home, ".cursor/skills"))).toBe(false);
+  });
+});

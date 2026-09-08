@@ -61,9 +61,13 @@ export const MCP_CLIENTS: McpClient[] = [
     id: "codex",
     label: "Codex",
     format: "toml",
-    supportsProject: false,
-    pathFor(_scope, home, _cwd) {
-      return join(home, ".codex/config.toml");
+    // Codex reads a project-level .codex/config.toml (MCP servers included) in a
+    // repository it has been told to trust, so project scope has a real target.
+    supportsProject: true,
+    pathFor(scope, home, cwd) {
+      return scope === "project"
+        ? join(cwd, ".codex/config.toml")
+        : join(home, ".codex/config.toml");
     },
   },
 ];

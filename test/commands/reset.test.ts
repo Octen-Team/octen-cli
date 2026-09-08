@@ -252,3 +252,62 @@ describe("reset --mcp --cursor (octen not present)", () => {
     expect(process.exitCode).toBeUndefined();
   });
 });
+
+describe("reset --codex --scope project", () => {
+  it("removes the octen entry from the project file and leaves the user file untouched", async () => {
+    const home = makeTmp();
+    const cwd = makeTmp();
+
+    // Seed both scopes so we can prove only the project entry is removed.
+    for (const dir of [home, cwd]) {
+      mkdirSync(join(dir, ".codex"), { recursive: true });
+      writeFileSync(
+        join(dir, ".codex/config.toml"),
+        '[mcp_servers.octen]\ncommand = "npx"\nargs = ["-y", "octen-mcp"]\n\n' +
+          '[mcp_servers.other]\ncommand = "other-server"\n',
+        "utf8",
+      );
+    }
+
+    const prog = makeProgram(home, cwd);
+    await prog.parseAsync(["node", "octen", "reset", "--codex", "--mcp", "--scope", "project"]);
+
+    const { parse: tomlParse } = await import("smol-toml");
+    const project = tomlParse(
+      readFileSync(join(cwd, ".codex/config.toml"), "utf8"),
+    ) as Record<string, any>;
+    expect(project.mcp_servers.octen).toBeUndefined();
+    expect(project.mcp_servers.other).toBeDefined();
+
+    const user = tomlParse(
+      readFileSync(join(home, ".codex/config.toml"), "utf8"),
+    ) as Record<string, any>;
+    expect(user.mcp_servers.octen).toBeDefined();
+  });
+});
+
+describe("reset --scope validation", () => {
+  it("rejects an unknown scope instead of silently using user scope", async () => {
+    const home = makeTmp();
+    const cwd = makeTmp();
+
+    mkdirSync(join(home, ".codex"), { recursive: true });
+    writeFileSync(
+      join(home, ".codex/config.toml"),
+      '[mcp_servers.octen]\ncommand = "npx"\n',
+      "utf8",
+    );
+
+    const prog = makeProgram(home, cwd);
+    await expect(
+      prog.parseAsync(["node", "octen", "reset", "--codex", "--mcp", "--scope", "global"]),
+    ).rejects.toThrow(/--scope must be one of: user, project/);
+
+    // Nothing may have been removed.
+    const { parse: tomlParse } = await import("smol-toml");
+    const user = tomlParse(
+      readFileSync(join(home, ".codex/config.toml"), "utf8"),
+    ) as Record<string, any>;
+    expect(user.mcp_servers.octen).toBeDefined();
+  });
+});

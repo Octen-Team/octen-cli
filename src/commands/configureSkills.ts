@@ -10,6 +10,7 @@ import { setClientEnvKey } from "../skills/setkey.js";
 import { OctenValidationError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { quotePath } from "../util/quotePath.js";
+import { parseCsvOpt, parseScopeOpt, type ConfigScope } from "./utils.js";
 
 interface ConfigureSkillsInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -44,11 +45,13 @@ export function registerConfigureSkills(
     .option(
       "--scope <s>",
       "config scope: user | project (default: user)",
+      parseScopeOpt("--scope"),
       "user",
     )
     .option(
       "--only <names>",
       "comma-separated list of skill names to install (e.g. octen-search,octen-design)",
+      parseCsvOpt("--only"),
     )
     .option("--ref <ref>", "upstream git ref to fetch skills from", "main")
     .option("--bundled", "force use of bundled (vendored) skills — no network")
@@ -68,8 +71,8 @@ export function registerConfigureSkills(
         openclaw?: boolean;
         hermes?: boolean;
         skillsDir?: string;
-        scope: string;
-        only?: string;
+        scope: ConfigScope;
+        only?: string[];
         ref: string;
         bundled?: boolean;
         offline?: boolean;
@@ -77,14 +80,12 @@ export function registerConfigureSkills(
         force?: boolean;
       };
 
-      const scope = (opts.scope === "project" ? "project" : "user") as
-        | "user"
-        | "project";
+      // Parsed and validated by parseScopeOpt at option-parse time.
+      const scope = opts.scope as ConfigScope;
       const ref = opts.ref;
       const offline = !!(opts.bundled || opts.offline);
-      const only = opts.only
-        ? opts.only.split(",").map((s) => s.trim()).filter(Boolean)
-        : undefined;
+      // parseCsvOpt already trimmed the names and rejected an all-empty list.
+      const only = opts.only;
 
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();

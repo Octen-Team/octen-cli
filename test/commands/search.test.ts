@@ -130,3 +130,59 @@ describe("search command", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 });
+
+describe("search command list and query validation", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ data: { results: [] }, code: 0, msg: "success" }),
+    );
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects an empty --include-domains before any request", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "search", "hi", "--include-domains", "", "--api-key", "k",
+      ]),
+    ).rejects.toThrow("--include-domains must contain at least one non-empty value");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("trims --include-domains items and drops interior empties", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "search", "hi", "--json", "--api-key", "k",
+      "--include-domains", " a.com, ,b.com ",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.include_domains).toEqual(["a.com", "b.com"]);
+  });
+
+  it("rejects a whitespace-only query before any request", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync(["node", "octen", "search", "   ", "--api-key", "k"]),
+    ).rejects.toThrow("query is required");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("sends a valid query verbatim without trimming it", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "search", " hello world ", "--json", "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.query).toBe(" hello world ");
+  });
+});

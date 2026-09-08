@@ -55,11 +55,14 @@ describe("MCP_CLIENTS registry", () => {
     expect(client.pathFor("user", HOME, CWD)).toBe("/tmp/c/.vscode/mcp.json");
   });
 
-  it("codex: user → ~/.codex/config.toml", () => {
+  it("codex: user → ~/.codex/config.toml, project → cwd/.codex/config.toml", () => {
     const client = MCP_CLIENTS.find((c) => c.id === "codex")!;
     expect(client).toBeDefined();
     expect(client.format).toBe("toml");
-    expect(client.supportsProject).toBe(false);
+    // Codex reads a project-level .codex/config.toml in a trusted repository,
+    // so project scope must not fall back to the user file.
+    expect(client.supportsProject).toBe(true);
     expect(client.pathFor("user", HOME, CWD)).toBe("/tmp/h/.codex/config.toml");
+    expect(client.pathFor("project", HOME, CWD)).toBe("/tmp/c/.codex/config.toml");
   });
 });

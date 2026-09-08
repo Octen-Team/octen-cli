@@ -492,3 +492,41 @@ describe("chat piped stdin prompt", () => {
     ).rejects.toThrow(/no prompt/);
   });
 });
+
+describe("chat command search list validation", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ choices: [{ message: { content: "hi" } }] }),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects an empty --search-include-domains before any request", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "chat", "hello", "-m", "test-model", "--no-stream", "--json",
+        "--search", "--search-include-domains", "", "--api-key", "k",
+      ]),
+    ).rejects.toThrow("--search-include-domains must contain at least one non-empty value");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("trims --search-include-domains items and drops interior empties", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "chat", "hello", "-m", "test-model", "--no-stream", "--json",
+      "--search", "--search-include-domains", " a.com, ,b.com ", "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.tools[0].parameters.include_domains).toEqual(["a.com", "b.com"]);
+  });
+});

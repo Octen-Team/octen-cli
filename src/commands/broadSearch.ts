@@ -7,7 +7,7 @@ import {
 } from "../api/search.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderBroadSearch } from "../output/pretty/broadSearch.js";
-import { makeClient, parseIntOpt } from "./utils.js";
+import { makeClient, parseCsvOpt, parseIntOpt } from "./utils.js";
 
 export function registerBroadSearch(program: Command) {
   program.command("broad-search")
@@ -17,15 +17,15 @@ export function registerBroadSearch(program: Command) {
     .option("--max-queries <n>", "decompose into up to N sub-queries (1-30; default 5, raise toward 30 for surveys/research)", parseIntOpt("--max-queries"))
     .option("--topic <t>", "general|news")
     .option("-n, --count <n>", "results per sub-query 1-100", parseIntOpt("--count"))
-    .option("--include-domains <list>", "comma list", (v) => v.split(","))
-    .option("--exclude-domains <list>", "comma list", (v) => v.split(","))
-    .option("--include-text <list>", "comma list", (v) => v.split(","))
-    .option("--exclude-text <list>", "comma list", (v) => v.split(","))
+    .option("--include-domains <list>", "comma list", parseCsvOpt("--include-domains"))
+    .option("--exclude-domains <list>", "comma list", parseCsvOpt("--exclude-domains"))
+    .option("--include-text <list>", "comma list", parseCsvOpt("--include-text"))
+    .option("--exclude-text <list>", "comma list", parseCsvOpt("--exclude-text"))
     .option("--time-basis <b>", "auto|published|crawled").option("--time-range <r>", "day|week|month|year (or d|w|m|y)")
     .option("--start-time <when>", "YYYY-MM-DD or ISO datetime (e.g. 2024-01-01T00:00:00Z)")
     .option("--end-time <when>", "YYYY-MM-DD or ISO datetime (e.g. 2024-12-31T23:59:59Z)")
     .option("--format <f>", "text|markdown").option("--safesearch <s>", "off|strict")
-    .option("--language <list>", "ISO 639-1 codes, comma-separated, e.g. en,ja", (v) => v.split(","))
+    .option("--language <list>", "ISO 639-1 codes, comma-separated, e.g. en,ja", parseCsvOpt("--language"))
     .option("--highlight").option("--highlight-max-tokens <n>", "max tokens per highlight", parseIntOpt("--highlight-max-tokens"))
     .option("--full-content").option("--full-content-max-tokens <n>", "max tokens per result", parseIntOpt("--full-content-max-tokens"))
     .option("--images")
