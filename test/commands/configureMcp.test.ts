@@ -267,3 +267,90 @@ describe("configure-mcp missing API key", () => {
     expect(stderrOutput).toMatch(/OCTEN_API_KEY/);
   });
 });
+
+describe("configure-mcp --codex --scope project", () => {
+  it("writes the project .codex/config.toml and leaves the global file absent", async () => {
+    const home = makeTmp();
+    const cwd = mkdtempSync(join(tmpdir(), "octen-proj-"));
+
+    try {
+      const prog = makeProgram(home, cwd);
+      await prog.parseAsync([
+        "node", "octen", "configure-mcp", "--codex", "--scope", "project",
+        "--api-key", "test-key",
+      ]);
+
+      expect(existsSync(join(cwd, ".codex/config.toml"))).toBe(true);
+      expect(existsSync(join(home, ".codex/config.toml"))).toBe(false);
+
+      const { parse: tomlParse } = await import("smol-toml");
+      const parsed = tomlParse(
+        readFileSync(join(cwd, ".codex/config.toml"), "utf8"),
+      ) as Record<string, any>;
+      expect(parsed.mcp_servers.octen.command).toBe("npx");
+      expect(parsed.mcp_servers.octen.env.OCTEN_API_KEY).toBe("test-key");
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("reports project status from the project file, not the global one", async () => {
+    const home = makeTmp();
+    const cwd = mkdtempSync(join(tmpdir(), "octen-proj-"));
+
+    try {
+      // Configure the project file only.
+      await makeProgram(home, cwd).parseAsync([
+        "node", "octen", "configure-mcp", "--codex", "--scope", "project",
+        "--api-key", "test-key",
+      ]);
+
+      const projectOut: string[] = [];
+      vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+        projectOut.push(String(chunk));
+        return true;
+      });
+      await makeProgram(home, cwd).parseAsync([
+        "node", "octen", "configure-mcp", "--scope", "project",
+      ]);
+      expect(projectOut.join("")).toMatch(/Codex: configured/);
+
+      vi.restoreAllMocks();
+
+      const userOut: string[] = [];
+      vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+        userOut.push(String(chunk));
+        return true;
+      });
+      await makeProgram(home, cwd).parseAsync([
+        "node", "octen", "configure-mcp", "--scope", "user",
+      ]);
+      expect(userOut.join("")).toMatch(/Codex: absent/);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});
+
+describe("configure-mcp --scope validation", () => {
+  it("rejects an unknown scope instead of silently using user scope", async () => {
+    const home = makeTmp();
+    const cwd = mkdtempSync(join(tmpdir(), "octen-proj-"));
+
+    try {
+      const prog = makeProgram(home, cwd);
+      await expect(
+        prog.parseAsync([
+          "node", "octen", "configure-mcp", "--codex", "--scope", "global",
+          "--api-key", "test-key",
+        ]),
+      ).rejects.toThrow(/--scope must be one of: user, project/);
+
+      // Neither scope's file may be created.
+      expect(existsSync(join(cwd, ".codex/config.toml"))).toBe(false);
+      expect(existsSync(join(home, ".codex/config.toml"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+});

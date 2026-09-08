@@ -6,6 +6,7 @@ import { SKILL_CLIENTS } from "../skills/clients.js";
 import { removeMcp, type InstallOpts } from "../mcp/install.js";
 import { removeSkills } from "../skills/install.js";
 import { quotePath } from "../util/quotePath.js";
+import { parseScopeOpt, type ConfigScope } from "./utils.js";
 
 interface ResetInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -46,6 +47,7 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
     .option(
       "--scope <s>",
       "config scope: user | project (default: user)",
+      parseScopeOpt("--scope"),
       "user",
     )
     .action((_opts: Record<string, any>, command: Command) => {
@@ -61,12 +63,13 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
         codex?: boolean;
         openclaw?: boolean;
         hermes?: boolean;
-        scope: string;
+        scope: ConfigScope;
       };
 
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();
-      const scope = (opts.scope === "project" ? "project" : "user") as "user" | "project";
+      // Parsed and validated by parseScopeOpt at option-parse time.
+      const scope = opts.scope as ConfigScope;
       const installOpts: InstallOpts = { hasClaudeCli: internal.hasClaudeCli };
 
       // Surface selection

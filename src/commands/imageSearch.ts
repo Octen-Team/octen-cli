@@ -7,7 +7,7 @@ import {
 } from "../api/mediaSearch.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderImageSearch } from "../output/pretty/imageSearch.js";
-import { makeClient, parseIntOpt } from "./utils.js";
+import { makeClient, parseCsvOpt, parseIntOpt } from "./utils.js";
 
 export function registerImageSearch(program: Command) {
   program
@@ -19,8 +19,8 @@ export function registerImageSearch(program: Command) {
     .option("--image <url|path>", "image input: public URL or local file path")
     .option("--topic <t>", "general|design")
     .option("-n, --count <n>", "results 1-10", parseIntOpt("--count"))
-    .option("--include-domains <list>", "comma list", (v) => v.split(","))
-    .option("--exclude-domains <list>", "comma list", (v) => v.split(","))
+    .option("--include-domains <list>", "comma list", parseCsvOpt("--include-domains"))
+    .option("--exclude-domains <list>", "comma list", parseCsvOpt("--exclude-domains"))
     .option("--safesearch <s>", "off|strict")
     .option("--html-snippet", "include HTML snippet for each result")
     .option("--html-snippet-max-tokens <n>", "max tokens per HTML snippet", parseIntOpt("--html-snippet-max-tokens"))

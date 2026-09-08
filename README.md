@@ -217,6 +217,60 @@ Options: `--all`, `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`,
 
 Run without flags to print current status for each client.
 
+#### Config scopes
+
+`--scope` selects which file is written, and an unknown scope is an error rather
+than a silent fall back to `user`:
+
+| Client | `--scope user` | `--scope project` |
+|---|---|---|
+| Codex | `$HOME/.codex/config.toml` | `<project>/.codex/config.toml` |
+| Cursor | `$HOME/.cursor/mcp.json` | `<project>/.cursor/mcp.json` |
+| VS Code | `<project>/.vscode/mcp.json` | `<project>/.vscode/mcp.json` |
+| Claude Code, Claude Desktop, Windsurf | user config only | same as user |
+
+Codex reads a project-level `.codex/config.toml` only in a repository it has
+been told to trust, so a project-scoped entry stays inert until you trust the
+directory in Codex. `--scope status` and `reset --scope project` read and remove
+from the same project file.
+
+#### Codex cold start
+
+On a machine that has never run `octen-mcp`, `npx -y octen-mcp` has to fetch
+the package and its dependency tree before the server can answer `initialize`.
+Measured on macOS 15 / Node 24.18 / octen-mcp 0.5.1, from an empty npm cache
+(`npm_config_cache` pointed at a fresh directory) over three trials: **9.45s,
+9.59s and 9.75s** to `initialize`, 53 MB and ~4,200 files downloaded, all six
+tools listed. The same run against a warm cache: **0.24s**.
+
+Codex's default MCP startup window is in the same ballpark as that cold
+figure, so a fresh-cache first run is a race — which is how the Octen tools
+can be missing from a session that reports no error. Two optional keys make
+Codex wait for the server instead:
+
+```toml
+[mcp_servers.octen]
+command = "npx"
+args = ["-y", "octen-mcp"]
+required = true
+startup_timeout_sec = 60
+
+[mcp_servers.octen.env]
+OCTEN_API_KEY = "${OCTEN_API_KEY}"
+```
+
+`required` and `startup_timeout_sec` are fields of Codex's MCP server config
+(verified against codex-cli 0.153.4); Codex silently ignores config keys it does
+not know, so check your own version before relying on them. Warming the cache
+once with `npm i -g octen-mcp` (or a single `npx -y octen-mcp` run) is the
+other way to close the same gap. `required = true`
+means a server that fails to start blocks the Codex session, which is why
+`octen configure-mcp --codex` does not write these two keys by default — add
+them yourself where Octen has to be available. The `env` table is the same shape
+`configure-mcp` writes. `${OCTEN_API_KEY}` above is a documentation placeholder,
+not a value Codex expands: inject the real key through `configure-mcp` or your
+own secret handling, and never commit one.
+
 ---
 
 ### `octen configure-skills`
@@ -295,6 +349,27 @@ eval "$(octen completion zsh)"     # add this line to ~/.zshrc to persist
 ## Output
 
 All commands print human-readable output when stdout is a TTY. When stdout is piped or `--json` is passed, commands emit raw JSON. Use `--pretty` to force human-readable output even when piped. `--no-color` disables ANSI colors.
+
+## Errors and exit codes
+
+Scripts must check the exit status, not just the output.
+
+| Status | When |
+|---|---|
+| `0` | The command completed and the response was complete. |
+| `2` | Bad input, caught before any request: a malformed number (`--count 1.5`, `--count 2junk`), an empty comma list (`--include-domains ""`), a blank query, an unknown `--scope`, or a missing API key. |
+| `1` | Everything else: HTTP errors, an API envelope with a non-zero `code`, a timeout, and stream failures. |
+
+Two consequences worth knowing:
+
+- **Malformed numbers and empty lists fail instead of being guessed.** `--count 1.5`
+  used to be sent as `1` and `--include-domains ""` as `[""]`. Both now name the
+  flag and exit 2, so no request is made.
+- **A streaming answer can fail after printing part of itself.** If the stream
+  carries an error event, ends without its terminator, or stalls past the
+  timeout, `octen chat` exits non-zero with the partial answer already on stdout.
+  It is not rolled back — a caller that ignores the exit status will treat a
+  truncated answer as a complete one.
 
 ## Keeping things up to date
 

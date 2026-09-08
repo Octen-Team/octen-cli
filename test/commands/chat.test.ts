@@ -492,3 +492,113 @@ describe("chat piped stdin prompt", () => {
     ).rejects.toThrow(/no prompt/);
   });
 });
+
+describe("chat command search list validation", () => {
+  let fetchSpy: ReturnType<typeof vi.spyOn>;
+
+  beforeEach(() => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ choices: [{ message: { content: "hi" } }] }),
+    );
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("rejects an empty --search-include-domains before any request", async () => {
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "chat", "hello", "-m", "test-model", "--no-stream", "--json",
+        "--search", "--search-include-domains", "", "--api-key", "k",
+      ]),
+    ).rejects.toThrow("--search-include-domains must contain at least one non-empty value");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("trims --search-include-domains items and drops interior empties", async () => {
+    const prog = makeProgram();
+    await prog.parseAsync([
+      "node", "octen", "chat", "hello", "-m", "test-model", "--no-stream", "--json",
+      "--search", "--search-include-domains", " a.com, ,b.com ", "--api-key", "k",
+    ]);
+
+    const [, init] = fetchSpy.mock.calls[0];
+    const body = JSON.parse((init as RequestInit).body as string);
+    expect(body.tools[0].parameters.include_domains).toEqual(["a.com", "b.com"]);
+  });
+});
+
+describe("chat command typed stream errors", () => {
+  beforeEach(() => {
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("fails after a typed error event, keeping the partial content already written", async () => {
+    const stdout: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      stdout.push(String(chunk));
+      return true;
+    });
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      makeSSEResponse([
+        { type: "content", choices: [{ delta: { content: "partial" } }] },
+        { type: "error", error: { message: "quota exceeded", code: "rate_limit" } },
+      ]),
+    );
+
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "chat", "hello", "-m", "test-model", "--pretty", "--api-key", "k",
+      ]),
+    ).rejects.toThrow("quota exceeded");
+
+    // Content already streamed to stdout is not rolled back.
+    expect(stdout.join("")).toContain("partial");
+  });
+
+  it("fails on a bare error event with no typed marker", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      makeSSEResponse([{ error: { msg: "upstream refused" } }]),
+    );
+
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "chat", "hello", "-m", "test-model", "--pretty", "--api-key", "k",
+      ]),
+    ).rejects.toThrow("upstream refused");
+  });
+
+  it("fails when the stream ends without a terminator", async () => {
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const encoder = new TextEncoder();
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.enqueue(
+              encoder.encode('data: {"type":"content","choices":[{"delta":{"content":"half"}}]}\n\n'),
+            );
+            controller.close();
+          },
+        }),
+      ),
+    );
+
+    const prog = makeProgram();
+    await expect(
+      prog.parseAsync([
+        "node", "octen", "chat", "hello", "-m", "test-model", "--pretty", "--api-key", "k",
+      ]),
+    ).rejects.toThrow(/stream ended before the response was complete/);
+  });
+});

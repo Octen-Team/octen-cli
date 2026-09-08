@@ -16,12 +16,11 @@ import {
 } from "../api/chat.js";
 import pc from "picocolors";
 import { parseSSE } from "../api/sse.js";
-import { OctenValidationError } from "../api/errors.js";
+import { errorMessage, OctenStreamError, OctenValidationError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderChat } from "../output/pretty/chat.js";
-import { makeClient, parseIntOpt, parseFloatOpt } from "./utils.js";
+import { makeClient, parseCsvOpt, parseIntOpt, parseFloatOpt } from "./utils.js";
 
-const splitList = (v: string): string[] => v.split(",").map((s) => s.trim()).filter(Boolean);
 
 export interface ReplStreams {
   input: NodeJS.ReadableStream;
@@ -113,17 +112,17 @@ export function registerChat(program: Command) {
     .option("--search-max-queries <n>", "octen_broad_search: max sub-queries (1-30, default 5)", parseIntOpt("--search-max-queries"))
     .option("--search-topic <t>", "search tools: general|news")
     .option("--search-count <n>", "search tools: results per search (1-100)", parseIntOpt("--search-count"))
-    .option("--search-include-domains <list>", "search tools: comma-separated domains to include", splitList)
-    .option("--search-exclude-domains <list>", "search tools: comma-separated domains to exclude", splitList)
-    .option("--search-include-text <list>", "search tools: comma-separated phrases to require (max 5)", splitList)
-    .option("--search-exclude-text <list>", "search tools: comma-separated phrases to exclude (max 5)", splitList)
+    .option("--search-include-domains <list>", "search tools: comma-separated domains to include", parseCsvOpt("--search-include-domains"))
+    .option("--search-exclude-domains <list>", "search tools: comma-separated domains to exclude", parseCsvOpt("--search-exclude-domains"))
+    .option("--search-include-text <list>", "search tools: comma-separated phrases to require (max 5)", parseCsvOpt("--search-include-text"))
+    .option("--search-exclude-text <list>", "search tools: comma-separated phrases to exclude (max 5)", parseCsvOpt("--search-exclude-text"))
     .option("--search-time-basis <b>", "search tools: auto|published|crawled")
     .option("--search-time-range <r>", "search tools: day|week|month|year (or d|w|m|y)")
     .option("--search-start-time <when>", "search tools: start time filter")
     .option("--search-end-time <when>", "search tools: end time filter")
     .option("--search-format <f>", "search tools: markdown|text")
     .option("--search-safesearch <s>", "search tools: off|strict")
-    .option("--search-language <list>", "search tools: ISO 639-1 codes, comma-separated, e.g. en,ja", splitList)
+    .option("--search-language <list>", "search tools: ISO 639-1 codes, comma-separated, e.g. en,ja", parseCsvOpt("--search-language"))
     .option("--search-include-images", "search tools: include image results")
     .option("--search-full-content", "search tools: include full page content")
     .option("--search-full-content-max-tokens <n>", "search tools: max tokens for full content", parseIntOpt("--search-full-content-max-tokens"))
@@ -246,6 +245,11 @@ export function registerChat(program: Command) {
       const sources: Array<{ title?: string; url?: string }> = [];
       for await (const ev of parseSSE(httpRes)) {
         const e = ev as StreamEvent;
+        // A typed error event ends the turn as a failure. Content already
+        // written to stdout stays; the non-zero exit is what callers check.
+        if (e.type === "error" || e.error != null) {
+          throw new OctenStreamError(errorMessage(e.error ?? e, "stream returned an error"));
+        }
         if (e.type === "search_done") {
           if (!noted) {
             process.stderr.write("(web search complete)\n");

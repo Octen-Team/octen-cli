@@ -7,6 +7,82 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Numeric flags are parsed strictly.** `parseInt`/`parseFloat` accepted a
+  numeric prefix and threw the rest away, so `--count 1.5` was sent as `1`,
+  `--count 2junk` as `2` and `--count 1e2` as `1`. A value that is not exactly
+  an integer (or, for float flags, a complete decimal) now names its flag and
+  exits 2 before any request. Hex, trailing garbage, empty strings and
+  non-finite values are all rejected; range checks still live in the request
+  builders.
+
+- **Empty comma lists are rejected.** `--include-domains ""` produced `[""]`,
+  a filter matching nothing that the caller never asked for, and
+  `configure-skills --only " , "` installed zero skills while reporting
+  success. Items are trimmed, empties dropped, and a list with nothing left
+  fails. Applies to every comma list on `search`, `news`, `broad-search`,
+  `image-search`, `chat` and `configure-skills` (`--stop` is unchanged: an
+  empty stop token is a separate question).
+
+- **Blank queries are rejected.** `search "   "` and `broad-search "   "` were
+  sent as-is. They now fail locally; a valid query is still sent verbatim,
+  untrimmed.
+
+- **`configure-mcp --codex --scope project` writes the project file.** The
+  Codex registry entry ignored the scope and always wrote
+  `$HOME/.codex/config.toml`, so a project-scoped request silently edited the
+  global config. It now writes `<project>/.codex/config.toml`, which Codex
+  reads for a trusted repository, and `configure-mcp` status and
+  `reset --scope project` read the same file.
+
+- **An unknown `--scope` is an error.** `--scope global` was coerced to `user`
+  by `configure-mcp`, `configure-skills` and `reset` — writing to, or deleting
+  from, a file the caller did not name.
+
+- **Nested error objects are readable.** A non-2xx body of
+  `{"error":{"message":"..."}}` reached the terminal as `[object Object]`, and
+  `message`/`detail` were never consulted. Extraction is now `msg` →
+  `message` → `detail` → a recursive `error` → the HTTP status, shared by the
+  request and stream paths.
+
+- **A 2xx response must actually carry a payload.** `null`, `[]`, `{}` and a
+  non-object body were all returned as success. They now raise, as does an
+  Octen envelope whose numeric `code` is non-zero — those exited 0 before, so
+  an automated caller could not tell a failure from a result. A string or
+  absent `code` is left to the endpoint's own shape, so OpenAI-compatible chat
+  responses are unaffected.
+
+- **`Retry-After` is honoured.** A 429 or 5xx asking for a specific delay
+  (delta-seconds or HTTP-date) was ignored in favour of the exponential
+  backoff. Invalid or negative values still fall back to the backoff, and any
+  wait is capped at 30s so a server asking for an hour cannot hang a command
+  for an hour.
+
+- **SSE events are framed correctly.** The parser split on `\n\n`, which never
+  matches a CRLF-framed stream, so those events surfaced only at EOF. It also
+  parsed each `data:` line separately — dropping a JSON object split across
+  data lines — and required a space after `data:`.
+
+- **A truncated or malformed stream fails.** A stream that ended without
+  `[DONE]`, a typed `finish` event or an OpenAI-style `finish_reason` was
+  treated as a complete answer, and a malformed event was skipped silently.
+  Both now exit 1. Partial output already written to stdout is kept, so
+  callers must check the exit status.
+
+- **A typed in-stream `error` event fails.** `octen chat` printed the partial
+  answer and exited 0. It now reports the server's message and exits 1.
+
+- **The stream timeout covers the body.** The deadline was cleared as soon as
+  the response headers arrived, so a server that sent headers and then stopped
+  left the CLI waiting forever. The timeout now applies to each chunk: a
+  stalled stream raises `OctenTimeoutError`, while a long answer that keeps
+  streaming is not cut off. This matches the per-read deadline the Python SDK
+  gets from httpx.
+
+- **Streams release their connection.** The SSE reader was never released or
+  cancelled, so stopping early leaked it.
+
 ## [0.7.0] — 2026-08-31
 
 Aligns parameter validation with the API reference. Every bound below was read

@@ -138,7 +138,10 @@ export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
 }
 
 export function buildSearchRequest(query: string, o: SearchOpts): Record<string, unknown> {
-  if (!query) throw new OctenValidationError("query is required");
+  // Validate on the trimmed value but send the caller's text verbatim: a query
+  // of only whitespace is a mistake, whitespace inside a real query is not ours
+  // to rewrite.
+  if (query.trim().length === 0) throw new OctenValidationError("query is required");
   return { query, ...buildSearchOptions(o) };
 }
 
@@ -152,7 +155,7 @@ export interface BroadSearchOpts extends SearchOpts {
  * `max_queries` stay at the top level.
  */
 export function buildBroadSearchRequest(query: string, o: BroadSearchOpts): Record<string, unknown> {
-  if (!query) throw new OctenValidationError("query is required");
+  if (query.trim().length === 0) throw new OctenValidationError("query is required");
   if (o.maxQueries != null && (o.maxQueries < LIMITS.maxQueries.min || o.maxQueries > LIMITS.maxQueries.max))
     throw new OctenValidationError(`max-queries must be ${LIMITS.maxQueries.min}-${LIMITS.maxQueries.max}`);
   const searchOptions = buildSearchOptions(o);

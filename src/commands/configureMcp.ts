@@ -6,6 +6,7 @@ import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
 import { isClientInstalled } from "../util/detectClient.js";
+import { parseScopeOpt, type ConfigScope } from "./utils.js";
 import { quotePath } from "../util/quotePath.js";
 
 interface ConfigureMcpInternalOpts {
@@ -37,6 +38,7 @@ export function registerConfigureMcp(
     .option(
       "--scope <s>",
       "config scope: user | project (default: user)",
+      parseScopeOpt("--scope"),
       "user",
     )
     .option("--pin <ver>", "pin octen-mcp to a specific version, e.g. 0.2.1")
@@ -51,14 +53,13 @@ export function registerConfigureMcp(
         windsurf?: boolean;
         vscode?: boolean;
         codex?: boolean;
-        scope: string;
+        scope: ConfigScope;
         pin?: string;
         force?: boolean;
       };
 
-      const scope = (opts.scope === "project" ? "project" : "user") as
-        | "user"
-        | "project";
+      // Parsed and validated by parseScopeOpt at option-parse time.
+      const scope = opts.scope as ConfigScope;
       const pin: string | undefined = opts.pin;
 
       // Resolve API key — tolerate missing
