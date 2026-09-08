@@ -389,10 +389,14 @@ describe("OctenClient.stream body deadline", () => {
       const res = await c.stream(ENDPOINTS.chat, { model: "m", messages: [] });
 
       const iterator = parseSSE(res);
-      const pending = iterator.next();
+      // The rejection handler must be attached before the timers advance:
+      // advanceTimersByTimeAsync flushes microtasks, so the promise rejects
+      // inside that call. Attaching `.rejects` afterwards is too late — Node
+      // has already reported an unhandled rejection, and that is not retracted
+      // when a handler arrives later.
+      const pending = expect(iterator.next()).rejects.toBeInstanceOf(OctenTimeoutError);
       await vi.advanceTimersByTimeAsync(100);
-
-      await expect(pending).rejects.toBeInstanceOf(OctenTimeoutError);
+      await pending;
     } finally {
       vi.useRealTimers();
     }
