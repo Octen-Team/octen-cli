@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { OctenClient } from "../../src/api/client.js";
+import { parseSSE } from "../../src/api/sse.js";
 import { ENDPOINTS } from "../../src/api/constants.js";
 import { OctenAPIError, OctenAuthError, OctenNetworkError, OctenTimeoutError } from "../../src/api/errors.js";
 
@@ -344,5 +345,130 @@ describe("OctenClient Retry-After handling", () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+describe("OctenClient.stream body deadline", () => {
+  beforeEach(() => vi.restoreAllMocks());
+
+  /**
+   * A response whose body behaves like fetch's: it errors with an AbortError
+   * when the request signal aborts, and only carries what the test pushes.
+   */
+  function abortableBody(init: RequestInit | undefined) {
+    const encoder = new TextEncoder();
+    let controller!: ReadableStreamDefaultController<Uint8Array>;
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        controller = c;
+        init?.signal?.addEventListener("abort", () => {
+          try {
+            controller.error(Object.assign(new Error("aborted"), { name: "AbortError" }));
+          } catch {
+            /* already closed */
+          }
+        });
+      },
+    });
+    return {
+      response: new Response(body, { status: 200 }),
+      push: (text: string) => controller.enqueue(encoder.encode(text)),
+    };
+  }
+
+  it("raises OctenTimeoutError when the body stalls after the headers arrive", async () => {
+    vi.useFakeTimers();
+    try {
+      let feed!: ReturnType<typeof abortableBody>;
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+        feed = abortableBody(init as RequestInit);
+        return feed.response;
+      });
+
+      const c = new OctenClient({ apiKey: "k", timeoutMs: 100 });
+      const res = await c.stream(ENDPOINTS.chat, { model: "m", messages: [] });
+
+      const iterator = parseSSE(res);
+      const pending = iterator.next();
+      await vi.advanceTimersByTimeAsync(100);
+
+      await expect(pending).rejects.toBeInstanceOf(OctenTimeoutError);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("does not time out a long stream that keeps delivering chunks", async () => {
+    vi.useFakeTimers();
+    try {
+      let feed!: ReturnType<typeof abortableBody>;
+      vi.spyOn(globalThis, "fetch").mockImplementation(async (_url, init) => {
+        feed = abortableBody(init as RequestInit);
+        return feed.response;
+      });
+
+      const c = new OctenClient({ apiKey: "k", timeoutMs: 100 });
+      const res = await c.stream(ENDPOINTS.chat, { model: "m", messages: [] });
+      const iterator = parseSSE(res);
+
+      // Three gaps of 99ms each: 297ms total, well past the 100ms deadline, but
+      // no single gap reaches it. The deadline is per-read, like the SDK's.
+      const first = iterator.next();
+      await vi.advanceTimersByTimeAsync(99);
+      feed.push('data: {"type":"content"}\n\n');
+      expect((await first).value).toMatchObject({ type: "content" });
+
+      const second = iterator.next();
+      await vi.advanceTimersByTimeAsync(99);
+      feed.push('data: {"type":"content"}\n\n');
+      expect((await second).value).toMatchObject({ type: "content" });
+
+      const third = iterator.next();
+      await vi.advanceTimersByTimeAsync(99);
+      feed.push("data: [DONE]\n\n");
+      expect((await third).done).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("preserves status, statusText and headers on the wrapped response", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response('data: [DONE]\n\n', {
+        status: 200,
+        statusText: "OK",
+        headers: { "content-type": "text/event-stream", "x-request-id": "abc123" },
+      }),
+    );
+    const c = new OctenClient({ apiKey: "k", timeoutMs: 1000 });
+    const res = await c.stream(ENDPOINTS.chat, { model: "m", messages: [] });
+
+    expect(res.status).toBe(200);
+    expect(res.headers.get("x-request-id")).toBe("abc123");
+    expect(res.headers.get("content-type")).toBe("text/event-stream");
+  });
+
+  it("cancels the upstream body when the consumer stops early", async () => {
+    let cancelled = false;
+    vi.spyOn(globalThis, "fetch").mockImplementation(async () => {
+      const encoder = new TextEncoder();
+      const body = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('data: {"type":"content"}\n\n'));
+        },
+        cancel() {
+          cancelled = true;
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+
+    const c = new OctenClient({ apiKey: "k", timeoutMs: 1000 });
+    const res = await c.stream(ENDPOINTS.chat, { model: "m", messages: [] });
+    const iterator = parseSSE(res);
+    await iterator.next();
+    await iterator.return(undefined);
+
+    expect(cancelled).toBe(true);
   });
 });

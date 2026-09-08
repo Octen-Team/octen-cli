@@ -16,7 +16,7 @@ import {
 } from "../api/chat.js";
 import pc from "picocolors";
 import { parseSSE } from "../api/sse.js";
-import { OctenValidationError } from "../api/errors.js";
+import { errorMessage, OctenStreamError, OctenValidationError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
 import { renderChat } from "../output/pretty/chat.js";
 import { makeClient, parseCsvOpt, parseIntOpt, parseFloatOpt } from "./utils.js";
@@ -245,6 +245,11 @@ export function registerChat(program: Command) {
       const sources: Array<{ title?: string; url?: string }> = [];
       for await (const ev of parseSSE(httpRes)) {
         const e = ev as StreamEvent;
+        // A typed error event ends the turn as a failure. Content already
+        // written to stdout stays; the non-zero exit is what callers check.
+        if (e.type === "error" || e.error != null) {
+          throw new OctenStreamError(errorMessage(e.error ?? e, "stream returned an error"));
+        }
         if (e.type === "search_done") {
           if (!noted) {
             process.stderr.write("(web search complete)\n");

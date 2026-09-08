@@ -1,4 +1,4 @@
-import { OctenStreamError } from "./errors.js";
+import { OctenStreamError, OctenTimeoutError } from "./errors.js";
 
 /** Prefix of an SSE data field. The single space after the colon is optional. */
 const DATA_PREFIX = "data:";
@@ -81,9 +81,22 @@ export async function* parseSSE(res: Response): AsyncGenerator<unknown> {
     }
   };
 
+  /** A body read aborted by the client deadline is a timeout, not a stream defect. */
+  const read = async (): Promise<ReadableStreamReadResult<Uint8Array>> => {
+    try {
+      return await reader.read();
+    } catch (err) {
+      const name = (err as Error)?.name;
+      if (name === "AbortError" || name === "TimeoutError") {
+        throw new OctenTimeoutError("request timed out");
+      }
+      throw err;
+    }
+  };
+
   try {
     while (!sawDone) {
-      const { done, value } = await reader.read();
+      const { done, value } = await read();
       if (done) {
         sourceDrained = true;
         buffer += feed(decoder.decode());

@@ -51,9 +51,11 @@ export interface ChatCompletion {
  * chunks (search_done / content / finish / usage) terminated by a `[DONE]` sentinel.
  */
 export interface StreamEvent {
-  type?: "search_done" | "content" | "finish" | "usage" | string;
-  choices?: Array<{ delta?: { content?: string; reasoning?: string } }>;
+  type?: "search_done" | "content" | "finish" | "usage" | "error" | string;
+  choices?: Array<{ delta?: { content?: string; reasoning?: string }; finish_reason?: string | null }>;
   usage?: Record<string, unknown>;
+  /** Present on an in-stream error event; shape is server-defined. */
+  error?: unknown;
 }
 
 export const VERBOSITY_OPTIONS = ["low", "medium", "high"] as const;

@@ -164,11 +164,30 @@ export class OctenClient {
     throw lastErr;
   }
 
-  /** Returns the raw Response for SSE streaming (chat). */
+  /**
+   * Returns the Response for SSE streaming (chat).
+   *
+   * The timeout covers the whole request, not just the headers: it is armed
+   * while we wait for the next chunk and disarmed once that chunk lands, so a
+   * server that stops sending mid-answer aborts the request while a long answer
+   * that keeps streaming does not. That is the same per-read deadline httpx
+   * gives the Python SDK, so both clients promise the same thing.
+   */
   async stream(endpoint: string, body: Record<string, unknown>, timeoutMs?: number): Promise<Response> {
     const ac = new AbortController();
     const ms = timeoutMs ?? this.timeoutMs;
-    const t = ms ? setTimeout(() => ac.abort(), ms) : undefined;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const arm = () => {
+      if (!ms) return;
+      clearTimeout(timer);
+      timer = setTimeout(() => ac.abort(), ms);
+    };
+    const disarm = () => {
+      clearTimeout(timer);
+      timer = undefined;
+    };
+
+    arm();
     try {
       const res = await fetch(`${this.baseUrl}${endpoint}`, {
         method: "POST",
@@ -176,6 +195,7 @@ export class OctenClient {
         body: JSON.stringify({ ...body, stream: true }),
         signal: ac.signal,
       });
+      disarm();
       if (!res.ok) {
         const rawText = await res.text().catch(() => "");
         let errBody: unknown = undefined;
@@ -186,14 +206,48 @@ export class OctenClient {
           errBody,
         );
       }
-      return res;
+      if (!ms || !res.body) return res;
+
+      // Wrap the body so the deadline keeps applying to each chunk. The source
+      // reader is released on end, error and consumer cancellation alike.
+      const source = res.body.getReader();
+      const wrapped = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          arm();
+          try {
+            const { done, value } = await source.read();
+            disarm();
+            if (done) {
+              controller.close();
+              return;
+            }
+            controller.enqueue(value);
+          } catch (err) {
+            disarm();
+            controller.error(err);
+          }
+        },
+        async cancel(reason) {
+          disarm();
+          try {
+            await source.cancel(reason);
+          } catch {
+            /* the stream is already gone */
+          }
+        },
+      });
+
+      return new Response(wrapped, {
+        status: res.status,
+        statusText: res.statusText,
+        headers: res.headers,
+      });
     } catch (e) {
+      disarm();
       if (e instanceof OctenAPIError || e instanceof OctenAuthError) throw e;
       if ((e as Error).name === "AbortError") throw new OctenTimeoutError("request timed out");
       const cause = (e as any)?.cause?.code ?? (e as any)?.cause?.message ?? (e as Error).message;
       throw new OctenNetworkError(`network error reaching ${this.baseUrl}: ${cause}`);
-    } finally {
-      clearTimeout(t);
     }
   }
 }
