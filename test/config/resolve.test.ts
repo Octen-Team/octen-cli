@@ -93,6 +93,40 @@ describe("resolve", () => {
     expect(readCredentials(h)).toBeDefined();
   });
 
+  it("names OCTEN_AUTH_ISSUER as the cause instead of reusing the no-credential message", () => {
+    // F5: reusing NO_CREDENTIAL_MESSAGE here told the user to run `octen
+    // login` when a perfectly good credential was on disk and logging in
+    // again could not have helped — the real cause was never named.
+    const h = H();
+    writeCredentials(h, loginCreds({ issuer: "https://auth.octen.ai", apiKey: "sk-must-not-leak" }));
+    let thrown: unknown;
+    try {
+      resolveApiKey(undefined, { OCTEN_AUTH_ISSUER: "http://127.0.0.1:8080" }, { home: h });
+    } catch (err) {
+      thrown = err;
+    }
+    const message = (thrown as Error).message;
+    expect(message).toContain("OCTEN_AUTH_ISSUER");
+    expect(message).toContain("http://127.0.0.1:8080");
+    expect(message).not.toContain("No API key.");
+    expect(message).not.toContain("sk-must-not-leak");
+  });
+
+  it("names OCTEN_AUTH_RESOURCE as the cause instead of reusing the no-credential message", () => {
+    const h = H();
+    writeCredentials(h, loginCreds({ resource: "https://cli.octen.ai" }));
+    let thrown: unknown;
+    try {
+      resolveApiKey(undefined, { OCTEN_AUTH_RESOURCE: "https://other.octen.ai" }, { home: h });
+    } catch (err) {
+      thrown = err;
+    }
+    const message = (thrown as Error).message;
+    expect(message).toContain("OCTEN_AUTH_RESOURCE");
+    expect(message).toContain("https://other.octen.ai");
+    expect(message).not.toContain("No API key.");
+  });
+
   it("ignores credentials issued for a different resource than the current environment", () => {
     const h = H();
     writeCredentials(h, loginCreds({ resource: "https://cli.octen.ai" }));
