@@ -199,22 +199,34 @@ describe("exchangeForApiKey", () => {
     ];
     for (const response of scenarios) {
       const fetchImpl = vi.fn().mockResolvedValue(response.clone());
+      // F7: the guard `throw` used to live inside the try, so it landed in
+      // this very catch — and its own message contains no secret, so both
+      // assertions passed even if exchangeForApiKey had stopped rejecting.
+      // `threw` is asserted outside the catch so that can no longer pass.
+      let threw = false;
       try {
         await exchangeForApiKey({
           issuer: "https://auth.octen.ai",
           accessToken: SECRET_TOKEN,
           fetchImpl: fetchImpl as any,
         });
-        throw new Error("expected exchangeForApiKey to reject");
       } catch (err) {
+        threw = true;
         const message = (err as Error).message;
         expect(message).not.toContain(SECRET_TOKEN);
         expect(message).not.toContain(SECRET_API_KEY);
       }
+      expect(threw, `expected exchangeForApiKey to reject for status ${response.status}`).toBe(true);
     }
 
-    // Also check the success path's key never leaks into a subsequent unrelated throw path.
-    const fetchImpl = vi.fn().mockResolvedValue(
+    // F8: this block's comment used to claim it checked that "the success
+    // path's key never leaks into a subsequent throw", while its only
+    // assertion was `result.apiKey === SECRET_API_KEY` — that the key IS
+    // returned, the opposite property. Both halves are now real and named
+    // honestly.
+
+    // (a) the happy path returns the key verbatim.
+    const okFetch = vi.fn().mockResolvedValue(
       new Response(
         JSON.stringify({ active: true, api_key: SECRET_API_KEY, expires_at: null, grant_id: "g-1" }),
         { status: 200 },
@@ -223,8 +235,36 @@ describe("exchangeForApiKey", () => {
     const result = await exchangeForApiKey({
       issuer: "https://auth.octen.ai",
       accessToken: SECRET_TOKEN,
-      fetchImpl: fetchImpl as any,
+      fetchImpl: okFetch as any,
     });
     expect(result.apiKey).toBe(SECRET_API_KEY);
+
+    // (b) the 200-status error branches the scenarios loop above cannot
+    // reach — `active: false`, and a 200 body that still carries the key
+    // but is otherwise unusable — reject with no secret in the message.
+    const badBodies: Response[] = [
+      new Response(JSON.stringify({ active: false }), { status: 200 }),
+      new Response(
+        JSON.stringify({ active: true, api_key: SECRET_API_KEY, expires_at: null }),
+        { status: 200 },
+      ),
+    ];
+    for (const body of badBodies) {
+      const badFetch = vi.fn().mockResolvedValue(body);
+      let threw = false;
+      try {
+        await exchangeForApiKey({
+          issuer: "https://auth.octen.ai",
+          accessToken: SECRET_TOKEN,
+          fetchImpl: badFetch as any,
+        });
+      } catch (err) {
+        threw = true;
+        const message = (err as Error).message;
+        expect(message).not.toContain(SECRET_TOKEN);
+        expect(message).not.toContain(SECRET_API_KEY);
+      }
+      expect(threw, "expected a 200 with an unusable body to reject").toBe(true);
+    }
   });
 });

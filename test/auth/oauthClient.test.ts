@@ -161,19 +161,52 @@ describe("exchangeCode", () => {
     ];
     for (const response of scenarios) {
       const fetchImpl = vi.fn().mockResolvedValue(response.clone());
+      // F7: the guard `throw` used to live inside the try, so it landed in
+      // this very catch — and its own message contains no secret, so both
+      // assertions passed. If exchangeCode had stopped rejecting entirely,
+      // the test would still have been green. `threw` is asserted outside
+      // the catch so a non-rejection now fails.
+      let threw = false;
       try {
         await exchangeCode({ ...args, fetchImpl: fetchImpl as any });
-        throw new Error("expected exchangeCode to reject");
       } catch (err) {
+        threw = true;
         const message = (err as Error).message;
         expect(message).not.toContain(SECRET_CODE);
         expect(message).not.toContain(SECRET_VERIFIER);
       }
+      expect(threw, `expected exchangeCode to reject for status ${response.status}`).toBe(true);
     }
 
-    // Also check the success path's token never leaks into a subsequent unrelated throw path.
-    const fetchImpl = vi.fn().mockResolvedValue(okResponse("super-secret-access-token"));
-    const result = await exchangeCode({ ...args, fetchImpl: fetchImpl as any });
+    // F8: this block's comment used to claim it checked that "the success
+    // path's token never leaks into a later throw", while its only
+    // assertion was `result.accessToken === "super-secret-access-token"` —
+    // that the token IS returned, the opposite property. Both halves are
+    // now real and named honestly.
+
+    // (a) the happy path returns the token verbatim — nothing in the
+    // redaction above mangles it.
+    const okFetch = vi.fn().mockResolvedValue(okResponse("super-secret-access-token"));
+    const result = await exchangeCode({ ...args, fetchImpl: okFetch as any });
     expect(result.accessToken).toBe("super-secret-access-token");
+
+    // (b) the two 200-status error branches the scenarios loop above cannot
+    // reach — a malformed body, and a body with no access_token — also
+    // reject, and their messages carry no secret.
+    const badBodies = [new Response("not json", { status: 200 }), okResponse("")];
+    for (const body of badBodies) {
+      const badFetch = vi.fn().mockResolvedValue(body);
+      let threw = false;
+      try {
+        await exchangeCode({ ...args, fetchImpl: badFetch as any });
+      } catch (err) {
+        threw = true;
+        const message = (err as Error).message;
+        expect(message).not.toContain(SECRET_CODE);
+        expect(message).not.toContain(SECRET_VERIFIER);
+        expect(message).not.toContain("super-secret-access-token");
+      }
+      expect(threw, "expected a 200 with an unusable body to reject").toBe(true);
+    }
   });
 });
