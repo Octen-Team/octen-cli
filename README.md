@@ -151,7 +151,9 @@ without revoking its grant — that branch makes no network request at all, by d
 above). So if you switch a machine from a browser login to a pasted key, the old
 authorization is left behind: it stays listed as active in the dashboard's authorization
 list, and once its `grantId` is gone from this machine's disk, nothing here can revoke it —
-only the dashboard can. Revoke it there directly if you want to clean it up.
+only the dashboard can. The command prints that `grantId` on stderr before overwriting the
+file, so you can still find the entry; revoke it there directly if you want to clean it up,
+or run `octen logout` first to revoke it properly.
 
 ## Commands
 
@@ -485,17 +487,23 @@ octen reset --mcp
 # Remove only skills from a specific client
 octen reset --skills --claude-code
 
-# Clear ~/.octen/credentials.json (equivalent to octen logout --local)
+# Clear ~/.octen/credentials.json (like octen logout --local, but see the note below)
 octen reset --credentials
 ```
 
-Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, plus per-client flags: `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project).
+Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, `--credentials`, plus per-client flags: `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project).
 
 `--credentials` is **not** included in `--all` — `--all`'s existing meaning is "both
 surfaces (MCP + skills) across all clients", and folding in the login credential would mean
 `--all` silently logs you out, which would be an unwelcome surprise. Reach for `octen
 logout` instead of `reset --credentials` when there's a remote authorization to revoke too;
 `reset --credentials` only ever touches the local file, with no network request.
+
+It behaves like `octen logout --local` — same file, same zero network requests — but it is
+not the same command: `reset --credentials` reports removal in `reset`'s own style, and
+`logout` is the command whose whole job is the authorization. Both print the `grantId` of a
+`source: login` credential before destroying it, so the authorization left listed in the
+dashboard can still be identified and revoked there.
 
 ---
 

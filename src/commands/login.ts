@@ -2,7 +2,7 @@ import os from "node:os";
 import { spawn } from "node:child_process";
 import type { Command } from "commander";
 import { login } from "../auth/login.js";
-import { CREDENTIALS_VERSION, credentialsPath, writeCredentials } from "../auth/store.js";
+import { CREDENTIALS_VERSION, credentialsPath, readCredentials, writeCredentials } from "../auth/store.js";
 import { assertRange } from "../api/search.js";
 import { parseIntOpt } from "./utils.js";
 
@@ -96,6 +96,35 @@ function warnIfEnvKeyShadows(env: NodeJS.ProcessEnv): void {
   );
 }
 
+/**
+ * `login --api-key` overwrites whatever is on disk. When that is a
+ * `source: "login"` credential, the file being replaced is the only place
+ * this machine records its `grantId` — the authorization stays listed in the
+ * dashboard and, once the file is gone, nothing here can name it any more
+ * (F6, the same stranding `logout --local` was fixed for).
+ *
+ * Costs zero network requests, so the design's zero-network rule for this
+ * branch is preserved: it is a plain file read, and the grant is deliberately
+ * NOT revoked (documented in the README's "Switching from a browser login to
+ * a pasted key"). An unreadable file is tolerated the way `octen logout`
+ * tolerates it — there is no grantId to extract from it either way.
+ */
+function warnIfOverwritingLoginGrant(home: string): void {
+  let existing;
+  try {
+    existing = readCredentials(home);
+  } catch {
+    return;
+  }
+  if (existing?.source !== "login") return;
+  process.stderr.write(
+    `warning: this replaces a browser login. Grant ${existing.grantId} was not revoked — ` +
+      "`octen login --api-key` makes no network request. It can still mint a new credential " +
+      "without a fresh consent screen; revoke it from the dashboard's authorization list if " +
+      "you want to close it out. (Run `octen logout` first to revoke it properly.)\n",
+  );
+}
+
 export function registerLogin(program: Command, internal: LoginInternalOpts = {}): void {
   program
     .command("login")
@@ -124,6 +153,7 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
       // --api-key is a separate branch: no server, no network request, just
       // write the file and return (design §6.6).
       if (g.apiKey) {
+        warnIfOverwritingLoginGrant(home);
         writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: g.apiKey });
         process.stdout.write("API key saved.\n");
         warnIfEnvKeyShadows(env);

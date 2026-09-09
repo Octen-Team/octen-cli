@@ -347,6 +347,62 @@ describe("reset --credentials", () => {
     expect(readCredentials(home)).toMatchObject({ source: "api-key", apiKey: "k" });
   });
 
+  it("prints the grantId when it destroys a source=login credential", async () => {
+    // F6: without the grantId printed here, the grant stays listed in the
+    // dashboard and nothing on this machine can name it any more — the same
+    // stranding `logout --local` was fixed for.
+    const home = makeTmp();
+    const { writeCredentials, readCredentials, CREDENTIALS_VERSION } = await import(
+      "../../src/auth/store.js"
+    );
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "sk-must-not-leak",
+      apiKeyExpiresAt: null,
+      grantId: "grant-reset-test",
+    });
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    expect(readCredentials(home)).toBeUndefined();
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toContain("grant-reset-test");
+    expect(output).toMatch(/dashboard/i);
+    expect(output).not.toContain("sk-must-not-leak");
+  });
+
+  it("says nothing about a grant for an api-key credential — there is none", async () => {
+    const home = makeTmp();
+    const { writeCredentials, CREDENTIALS_VERSION } = await import("../../src/auth/store.js");
+    writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "k" });
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).not.toMatch(/grant|dashboard/i);
+  });
+
+  it("tolerates an unreadable credentials file and still removes it", async () => {
+    const home = makeTmp();
+    mkdirSync(join(home, ".octen"), { recursive: true });
+    writeFileSync(join(home, ".octen/credentials.json"), "{ not json");
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    expect(existsSync(join(home, ".octen/credentials.json"))).toBe(false);
+    expect(stdoutSpy.mock.calls.map((c) => String(c[0])).join("")).toMatch(/removed local credentials/i);
+  });
+
   it("reports when there is no credential to clear", async () => {
     const home = makeTmp();
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);

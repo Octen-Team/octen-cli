@@ -24,7 +24,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--json`. Exits non-zero when not logged in.
 - **`octen reset --credentials`.** Clears the locally stored login credential.
   Deliberately not folded into `--all`, whose existing meaning is "both surfaces (MCP +
-  skills) across all clients."
+  skills) across all clients." Like `octen logout --local`, it prints the `grantId` of a
+  `source: login` credential before destroying it — otherwise the authorization stays
+  listed in the dashboard with nothing left on the machine able to name it. `octen login
+  --api-key` prints the same warning when it overwrites a browser login.
 - **`OCTEN_AUTH_ISSUER` and `OCTEN_AUTH_RESOURCE`** are now documented (README Auth
   section and `octen login --help`). They override the OAuth authorization server and
   the token audience for local development against a self-hosted AS; both default to

@@ -108,6 +108,62 @@ describe("octen login", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("--api-key warns with the grantId when it overwrites a source=login credential", async () => {
+    // F6: this branch destroys the only record of the grantId on this
+    // machine and previously said nothing but "API key saved.", leaving the
+    // authorization listed in the dashboard with nothing able to name it.
+    const h = tmp();
+    writeCredentials(h, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "sk-must-not-leak",
+      apiKeyExpiresAt: null,
+      grantId: "grant-overwritten",
+    });
+    const fetchImpl = vi.fn();
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, env: {}, fetchImpl: fetchImpl as any, openBrowser: vi.fn() });
+
+    await prog.parseAsync(["node", "octen", "login", "--api-key", "manual-key"]);
+
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(err).toContain("grant-overwritten");
+    expect(err).toMatch(/dashboard/i);
+    expect(err).not.toContain("sk-must-not-leak");
+    expect(err).not.toContain("manual-key");
+    // The design's zero-network rule for this branch is preserved.
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(readCredentials(h)).toMatchObject({ source: "api-key", apiKey: "manual-key" });
+  });
+
+  it("--api-key says nothing about a grant when overwriting an api-key credential", async () => {
+    const h = tmp();
+    writeCredentials(h, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "old" });
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, env: {}, fetchImpl: vi.fn() as any, openBrowser: vi.fn() });
+
+    await prog.parseAsync(["node", "octen", "login", "--api-key", "manual-key"]);
+
+    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join("")).not.toMatch(/grant|dashboard/i);
+  });
+
+  it("--api-key tolerates an unreadable credentials file and still stores the key", async () => {
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(join(h, ".octen/credentials.json"), "{ not json");
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, env: {}, fetchImpl: vi.fn() as any, openBrowser: vi.fn() });
+
+    await prog.parseAsync(["node", "octen", "login", "--api-key", "manual-key"]);
+
+    expect(readCredentials(h)).toMatchObject({ source: "api-key", apiKey: "manual-key" });
+  });
+
   it("--help documents OCTEN_AUTH_ISSUER and OCTEN_AUTH_RESOURCE", () => {
     // F5: both variables can make every command say "No API key" while a
     // good credential sits on disk, and a trailing slash on either throws.
