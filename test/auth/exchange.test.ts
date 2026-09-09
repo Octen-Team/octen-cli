@@ -175,6 +175,21 @@ describe("exchangeForApiKey", () => {
     ).rejects.toBeInstanceOf(OctenNetworkError);
   });
 
+  it("a 200 response with a missing or empty grant_id is a contract violation", async () => {
+    // F11: grantId is what logout/whoami depend on — a 200 body lacking it is
+    // the same class of contract violation as a missing api_key, and must
+    // not be silently absorbed into `grantId: undefined` cast as a string.
+    for (const body of [
+      { active: true, api_key: "k", expires_at: null }, // grant_id missing entirely
+      { active: true, api_key: "k", expires_at: null, grant_id: "" }, // grant_id empty
+    ]) {
+      const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+      await expect(
+        exchangeForApiKey({ issuer: "https://auth.octen.ai", accessToken: "at", fetchImpl: fetchImpl as any }),
+      ).rejects.toBeInstanceOf(OctenNetworkError);
+    }
+  });
+
   it("never puts the access token or the api key into an error message", async () => {
     const scenarios: Response[] = [
       new Response("", { status: 401 }),
