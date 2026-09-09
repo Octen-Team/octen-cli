@@ -11,16 +11,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 >
 > **Do not publish this release until the server side is live in production.** Merging this
 > branch is safe; tagging is not. `octen login` authenticates as the pre-registered public
-> client `octen-cli`, and that client row is seeded by a SQL script a human runs **once per
-> environment** — it is not created by a migration and does not appear as a side effect of a
-> deploy.
+> client `octen-cli`, and the server creates that client row itself the first time a login
+> reaches for it — so no manual database step gates the release, but the **server code that
+> does it** must be running in production first.
 >
-> Until that row exists in production, every `octen login` dies at the authorize step with
+> Until that server code is live, every `octen login` dies at the authorize step with
 > `invalid_client` before the browser ever shows a consent screen. Every user who upgrades
-> hits it; there is no client-side fallback, and no CLI change can work around a missing row.
+> hits it; there is no client-side fallback, and no CLI change can work around it.
 >
-> So the order is: **server released to production → the `octen-cli` client row seeded and
-> verified in production → only then push the `v*` tag here.** Pushing the tag runs
+> So the order is: **server released to production → a real `octen login` verified against
+> production → only then push the `v*` tag here.** Pushing the tag runs
 > `release.yml` (npm publish) and `binaries.yml`, both of which are hard to walk back once
 > users have installed. Verify with a real `octen login` against production before tagging,
 > not after.
