@@ -102,6 +102,20 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
     .description("Log in via your browser and store the resulting API key")
     .option("--port <n>", "pin the loopback callback port (for ssh -L forwarding)", parseIntOpt("--port"))
     .option("--no-browser", "print the authorize URL instead of opening it")
+    .addHelpText(
+      "after",
+      [
+        "",
+        "Environment:",
+        "  OCTEN_AUTH_ISSUER    authorization server (default: https://auth.octen.ai)",
+        "  OCTEN_AUTH_RESOURCE  token audience (default: https://cli.octen.ai)",
+        "",
+        "  Both are for local development only and must have no trailing slash. A stored",
+        "  credential minted for a different issuer/resource pair is ignored (never used,",
+        "  never deleted) — see the README's Auth section.",
+        "",
+      ].join("\n"),
+    )
     .action(async (_opts: Record<string, unknown>, command: Command) => {
       const g = command.optsWithGlobals() as { apiKey?: string; port?: number; browser?: boolean };
       const home = internal.home ?? os.homedir();

@@ -25,6 +25,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`octen reset --credentials`.** Clears the locally stored login credential.
   Deliberately not folded into `--all`, whose existing meaning is "both surfaces (MCP +
   skills) across all clients."
+- **`OCTEN_AUTH_ISSUER` and `OCTEN_AUTH_RESOURCE`** are now documented (README Auth
+  section and `octen login --help`). They override the OAuth authorization server and
+  the token audience for local development against a self-hosted AS; both default to
+  production, must have no trailing slash, and changing either makes an existing stored
+  credential inapplicable — the CLI now says exactly that and names the variable, instead
+  of reusing the generic "No API key. Run `octen login`" message for a case where
+  logging in again would not have helped.
 - `octen configure-skills --set-key` now resolves the key through the same
   `--api-key` > `OCTEN_API_KEY` > `octen login` credential priority as every other
   command, instead of reading `OCTEN_API_KEY` directly — a login credential now feeds

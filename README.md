@@ -70,6 +70,31 @@ AI-client configs once and forget about it.
 You can also pass `--api-key <key>` or `--base-url <url>` on any command; to point at a
 self-hosted or staging endpoint, set `OCTEN_API_URL` or pass `--base-url <url>`.
 
+Run `octen whoami` to see which of the three sources is actually in effect — it names the
+winner explicitly, so a stored credential that is being shadowed or ignored says so rather
+than looking live.
+
+### Auth environment variables
+
+| Variable | Default | What it does |
+| --- | --- | --- |
+| `OCTEN_API_KEY` | — | The API key to use. Takes precedence over `~/.octen/credentials.json`, so a stored login is ignored while it is set. |
+| `OCTEN_API_URL` | `https://api.octen.ai` | The Octen API base URL. |
+| `OCTEN_AUTH_ISSUER` | `https://auth.octen.ai` | The OAuth authorization server `octen login` talks to. Only for local development against a self-hosted AS. |
+| `OCTEN_AUTH_RESOURCE` | `https://cli.octen.ai` | The audience `octen login` requests the access token for. Only for local development. |
+
+`OCTEN_AUTH_ISSUER` and `OCTEN_AUTH_RESOURCE` **must not have a trailing slash** — a
+trailing one is rejected with a named error rather than silently trimmed, because trimming
+is what once turned a JWKS URL into `//api/oauth/jwks` and made a byte-for-byte issuer
+comparison fail.
+
+Changing either of them makes an existing stored credential **inapplicable**: the credential
+records the issuer and resource it was minted for, and one minted for a different pair
+belongs to another environment. The CLI never uses it and never deletes it — it says so and
+names the variable. Unset the variable to go back to the stored credential, or run `octen
+login` again to get one for the new environment. `octen whoami` shows both the stored
+`Issuer`/`Resource` and which credential is in effect.
+
 **Add `.octen/` to your global gitignore.** A credentials file living in a dotfile directory
 is more likely to be committed by accident than an environment variable ever was:
 

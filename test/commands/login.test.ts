@@ -108,6 +108,23 @@ describe("octen login", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("--help documents OCTEN_AUTH_ISSUER and OCTEN_AUTH_RESOURCE", () => {
+    // F5: both variables can make every command say "No API key" while a
+    // good credential sits on disk, and a trailing slash on either throws.
+    // They must be findable from the CLI itself, not just the README.
+    const prog = baseProgram();
+    registerLogin(prog, { home: tmp(), env: {} });
+    const loginCmd = prog.commands.find((c) => c.name() === "login")!;
+    // helpInformation() renders only the built-in sections; the
+    // addHelpText("after") hook is applied by outputHelp().
+    let help = "";
+    loginCmd.configureOutput({ writeOut: (str) => { help += str; } });
+    loginCmd.outputHelp();
+    expect(help).toContain("OCTEN_AUTH_ISSUER");
+    expect(help).toContain("OCTEN_AUTH_RESOURCE");
+    expect(help).toMatch(/trailing slash/);
+  });
+
   it("warns that OCTEN_API_KEY shadows the credential it just wrote", async () => {
     const h = tmp();
     const fetchImpl = tokenAndKeyFetch();
