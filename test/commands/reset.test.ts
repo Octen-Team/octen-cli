@@ -96,7 +96,10 @@ describe("reset with no surface flags", () => {
     await prog.parseAsync(["node", "octen", "reset", "--cursor"]);
 
     const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
-    expect(output).toMatch(/specify --mcp, --skills, or --all/);
+    // F9: --credentials is a valid selector too, and omitting it from this
+    // line was the only place the CLI told the user what to pass.
+    expect(output).toMatch(/specify --mcp, --skills, --credentials, or --all/);
+    expect(output).toContain("--credentials");
 
     // Config was not modified
     const current = readFileSync(join(home, ".cursor/mcp.json"), "utf8");

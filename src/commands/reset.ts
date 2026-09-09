@@ -88,7 +88,8 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
 
       if (!doMcp && !doSkills && !doCredentials) {
         process.stdout.write(
-          "specify --mcp, --skills, or --all to select what to remove\n",
+          "specify --mcp, --skills, --credentials, or --all to select what to remove\n" +
+            "(--all covers --mcp and --skills across all clients; --credentials is separate)\n",
         );
         return;
       }
