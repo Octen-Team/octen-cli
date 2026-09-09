@@ -5,6 +5,7 @@ import { MCP_CLIENTS } from "../mcp/clients.js";
 import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
+import { OctenAuthError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { parseScopeOpt, type ConfigScope } from "./utils.js";
 import { quotePath } from "../util/quotePath.js";
@@ -62,12 +63,26 @@ export function registerConfigureMcp(
       const scope = opts.scope as ConfigScope;
       const pin: string | undefined = opts.pin;
 
-      // Resolve API key — tolerate missing
+      // Determine the effective home/cwd. `home` is computed before the key
+      // resolution below so it can be threaded into resolveApiKey: without
+      // it that call fell back to os.homedir() and read the real machine's
+      // credentials file, which is not this command's to read under test.
+      const home = internal.home ?? os.homedir();
+      const cwd = internal.cwd ?? process.cwd();
+
+      // Resolve API key — tolerate a missing one, but only a missing one.
       let key: string;
       let keyMissing = false;
       try {
-        key = resolveApiKey(g.apiKey, process.env);
-      } catch {
+        key = resolveApiKey(g.apiKey, process.env, { home });
+      } catch (err) {
+        // Only "no usable credential" (OctenAuthError) becomes the
+        // ${OCTEN_API_KEY} placeholder. Anything else — a corrupt or
+        // unknown-version credentials file, a malformed
+        // OCTEN_AUTH_ISSUER/OCTEN_AUTH_RESOURCE — is a distinct, fixable
+        // problem, and silently writing a degraded config for it hides the
+        // cause. Symmetric with configureSkills.ts's --set-key branch.
+        if (!(err instanceof OctenAuthError)) throw err;
         key = "${OCTEN_API_KEY}";
         keyMissing = true;
       }
@@ -79,9 +94,6 @@ export function registerConfigureMcp(
         env: { OCTEN_API_KEY: key },
       };
 
-      // Determine the effective home/cwd
-      const home = internal.home ?? os.homedir();
-      const cwd = internal.cwd ?? process.cwd();
       const isInstalled =
         internal.isInstalled ?? ((id: string) => isClientInstalled(id, { home }));
 
