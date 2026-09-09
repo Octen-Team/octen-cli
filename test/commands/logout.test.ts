@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
@@ -71,10 +71,14 @@ describe("octen logout", () => {
       return new Response("{}", { status: 200 });
     });
 
-    await runLogout(h, fetchImpl);
+    const { out } = await runLogout(h, fetchImpl);
 
     expect(fetchImpl).toHaveBeenCalledTimes(1);
     expect(readCredentials(h)).toBeUndefined();
+    // Positive assertion, not just "doesn't say the bad thing": the honest
+    // caveat must still be present. Deleting this sentence entirely used to
+    // pass every other test in this file.
+    expect(out).toMatch(/does not deactivate the api key/i);
   });
 
   it("still works long after a refresh token would have expired", async () => {
@@ -92,15 +96,21 @@ describe("octen logout", () => {
     expect(readCredentials(h)).toBeUndefined();
   });
 
-  it("--local skips the network call", async () => {
+  it("--local skips the network call, prints the grantId, and never suggests the now-unreachable plain logout", async () => {
     const h = tmp();
-    seedLoginCreds(h);
+    seedLoginCreds(h, { grantId: "grant-local-test" });
     const fetchImpl = vi.fn();
 
-    await runLogout(h, fetchImpl, ["--local"]);
+    const { out } = await runLogout(h, fetchImpl, ["--local"]);
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(readCredentials(h)).toBeUndefined();
+    // The file is already gone by the time this prints, so "run `octen
+    // logout` without --local" would land on the no-credential branch and
+    // never work — and without the grantId printed here, the user has no
+    // way left to identify which authorization to revoke in the dashboard.
+    expect(out).toContain("grant-local-test");
+    expect(out).not.toMatch(/run `octen logout` without --local/);
   });
 
   it("on an api-key credential deletes the file without claiming a revocation, with zero network requests", async () => {
@@ -112,7 +122,9 @@ describe("octen logout", () => {
 
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(readCredentials(h)).toBeUndefined();
-    expect(out).not.toMatch(/revoked|已撤销/i);
+    // Broad enough to catch "revoke", "revoking", "revocation" — not just
+    // the exact word "revoked" that a narrower regex would miss.
+    expect(out).not.toMatch(/revok|撤销/i);
   });
 
   it("keeps the file when revocation fails for a network reason and suggests --local", async () => {
@@ -129,6 +141,75 @@ describe("octen logout", () => {
     expect(existsSync(credentialsPath(h))).toBe(true);
     expect(err).toMatch(/--local/);
     expect(process.exitCode).toBe(1);
+  });
+
+  it("deletes the file when the server says the grant id was not recognized (400) — the goal is already met", async () => {
+    const h = tmp();
+    seedLoginCreds(h, { grantId: "grant-400" });
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 400 }));
+
+    const { out, err } = await runLogout(h, fetchImpl);
+
+    // Deterministic failure: retrying plain `octen logout` would fail
+    // identically forever, and the grant is already gone server-side — so
+    // this must NOT be treated like the network-failure "keep the file" case.
+    expect(readCredentials(h)).toBeUndefined();
+    expect(process.exitCode).toBeUndefined();
+    expect(out).toMatch(/already gone/i);
+    expect(out).toContain("grant-400");
+    expect(err).toBe("");
+  });
+
+  it("deletes the file when the stored key is no longer valid (401) and prints the grantId", async () => {
+    const h = tmp();
+    seedLoginCreds(h, { grantId: "grant-401" });
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 401 }));
+
+    const { out } = await runLogout(h, fetchImpl);
+
+    expect(readCredentials(h)).toBeUndefined();
+    expect(process.exitCode).toBeUndefined();
+    expect(out).toContain("grant-401");
+    expect(out).not.toMatch(/already gone/i);
+  });
+
+  it("deletes the file when the grant isn't bound to this key (403) and prints the grantId", async () => {
+    const h = tmp();
+    seedLoginCreds(h, { grantId: "grant-403" });
+    const fetchImpl = vi.fn(async () => new Response("{}", { status: 403 }));
+
+    const { out } = await runLogout(h, fetchImpl);
+
+    expect(readCredentials(h)).toBeUndefined();
+    expect(process.exitCode).toBeUndefined();
+    expect(out).toContain("grant-403");
+    expect(out).not.toMatch(/already gone/i);
+  });
+
+  it("removes an unreadable (corrupt) credentials file instead of failing, with zero network requests", async () => {
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(credentialsPath(h), "{ not valid json", "utf8");
+    const fetchImpl = vi.fn();
+
+    const { out } = await runLogout(h, fetchImpl);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(existsSync(credentialsPath(h))).toBe(false);
+    expect(out).toMatch(/cleared local credentials/i);
+  });
+
+  it("--local also removes an unreadable (corrupt) credentials file", async () => {
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(credentialsPath(h), JSON.stringify({ version: 99, source: "login" }), "utf8");
+    const fetchImpl = vi.fn();
+
+    const { out } = await runLogout(h, fetchImpl, ["--local"]);
+
+    expect(fetchImpl).not.toHaveBeenCalled();
+    expect(existsSync(credentialsPath(h))).toBe(false);
+    expect(out).toMatch(/cleared local credentials/i);
   });
 
   it("output never claims to have revoked access on other machines", async () => {

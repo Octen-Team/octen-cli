@@ -114,9 +114,10 @@ without attempting to revoke the authorization.
 The dashboard's per-authorization "revoke" button has **no effect on a device that already
 holds a credential**: it only stops that device from obtaining a *new* one without going
 through the consent screen again — the API key it already has keeps working exactly as
-before. The dashboard states this next to CLI authorizations. To actually stop a key from
-working anywhere, deactivate or rotate it from the key management page, not the
-authorization list.
+before. The authorization still shows up in the dashboard's list either way; run `octen
+whoami` on the device in question to get its `grantId` so you can identify which entry in
+that list corresponds to it. To actually stop a key from working anywhere, deactivate or
+rotate it from the key management page, not the authorization list.
 
 ### Switching from a browser login to a pasted key
 
