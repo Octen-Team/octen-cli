@@ -12,7 +12,7 @@ const H = () => mkdtempSync(join(tmpdir(), "octen-resolve-"));
  * `resolveApiKey` falls back to `os.homedir()` when a test doesn't pass an
  * explicit `opts.home`. Left unmocked, that reaches for the *real* machine's
  * `~/.octen/credentials.json` — hermetic today only because no such file
- * exists here, but `octen login` (Task 6) writes exactly that file, so a
+ * exists here, but `octen login` writes exactly that file, so a
  * developer who has logged in locally would get a result that depends on
  * whether their stored issuer/resource happen to match the defaults. Every
  * test in this suite either passes `{ home }` explicitly, or — for the one
@@ -94,9 +94,10 @@ describe("resolve", () => {
   });
 
   it("names OCTEN_AUTH_ISSUER as the cause instead of reusing the no-credential message", () => {
-    // F5: reusing NO_CREDENTIAL_MESSAGE here told the user to run `octen
-    // login` when a perfectly good credential was on disk and logging in
-    // again could not have helped — the real cause was never named.
+    // Reusing the generic no-credential message here told the user to run
+    // `octen login` when a perfectly good credential was already on disk and
+    // logging in again could not have helped — the real cause, an
+    // OCTEN_AUTH_* override, was never named.
     const h = H();
     writeCredentials(h, loginCreds({ issuer: "https://auth.octen.ai", apiKey: "sk-must-not-leak" }));
     let thrown: unknown;
@@ -137,7 +138,7 @@ describe("resolve", () => {
   });
 
   it("honours a non-null apiKeyExpiresAt by asking the user to log in again", () => {
-    // F8's forward-compatibility behaviour. The server always returns
+    // Forward-compatibility behaviour. The server always returns
     // expires_at: null today, so this never fires yet — but it must be ready
     // for the day it does.
     const h = H();

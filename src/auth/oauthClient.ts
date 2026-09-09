@@ -2,9 +2,17 @@ import { OctenAuthError, OctenNetworkError } from "../api/errors.js";
 import { CLI_CLIENT_ID, REQUEST_TIMEOUT_MS } from "./constants.js";
 
 /**
- * The result of a code->token exchange. Deliberately just the access token:
- * F6 means there is no refresh path, and F11 means the refresh token (even if
- * the server issued one) is never stored. Used once, then discarded.
+ * The result of a code->token exchange. Deliberately just the access token,
+ * which is used once (to exchange for the account's API key) and then
+ * discarded.
+ *
+ * There is no refresh token here, and no field to put one in, because there
+ * is nothing for a refresh to accomplish: the credential this flow ultimately
+ * stores is the user's own long-lived API key, which does not expire. Keeping
+ * a refresh token would add a second secret to protect, on disk, whose only
+ * use would be to re-mint something that never needs re-minting — and which
+ * would itself expire after 30 days, leaving behind a credential that looks
+ * usable and silently is not.
  */
 export interface TokenSet {
   accessToken: string;
@@ -13,9 +21,11 @@ export interface TokenSet {
 /**
  * Build the `GET {issuer}/oauth/authorize` URL for the loopback flow.
  *
- * `client_id` is fixed to `CLI_CLIENT_ID` and is NOT a parameter (F3: the CLI
- * is pre-registered with the server, there is no dynamic client
- * registration) — every other value is per-flow.
+ * `client_id` is fixed to `CLI_CLIENT_ID` and is deliberately NOT a
+ * parameter: this CLI is a single pre-registered public client whose row is
+ * seeded server-side, and there is no dynamic client registration anywhere in
+ * this flow. Making it a parameter would imply a per-install client identity
+ * that does not exist. Every other value here is genuinely per-flow.
  */
 export function authorizeUrl(a: {
   issuer: string;
@@ -51,7 +61,12 @@ function oauthErrorCode(payload: unknown): string | undefined {
  * Exchange an authorization code for an access token at
  * `POST {issuer}/api/oauth/token`.
  *
- * Error classification (design §6.5) — by transport layer FIRST, then body:
+ * Error classification — by transport layer FIRST, then body. The ordering is
+ * the point: an `OctenAuthError` tells the caller "this credential is no good",
+ * which is grounds for deleting it, while an `OctenNetworkError` means "try
+ * again later". Letting a response body decide that would let a struggling
+ * server delete a perfectly valid credential.
+ *
  *   - a fetch-level failure (DNS, connection reset, our own timeout) is
  *     always `OctenNetworkError`.
  *   - any 3xx (or an opaque redirect from `redirect: "manual"`) is treated as
@@ -129,7 +144,10 @@ export async function exchangeCode(a: {
   }
 
   // Transport-layer classification wins over the body, even when the body
-  // claims invalid_grant (design §6.5).
+  // claims invalid_grant. A 5xx (or 408/429) is a server or infrastructure
+  // fault: whatever its body says, the credential is not known to be bad, and
+  // classifying it as an auth failure here would propagate upward into
+  // deleting a credential that was fine all along.
   if (res.status === 408 || res.status === 429 || res.status >= 500) {
     throw new OctenNetworkError("The authorization server is unavailable; please try again later.");
   }

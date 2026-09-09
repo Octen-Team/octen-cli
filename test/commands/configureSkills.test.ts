@@ -326,7 +326,7 @@ describe("configure-skills --set-key", () => {
   it("configure-skills --set-key now honours the login store", async () => {
     // configureSkills.ts used to read process.env.OCTEN_API_KEY directly,
     // bypassing resolveApiKey, so a logged-in user's credential never applied
-    // here. Under F1 the key login stores is the user's own long-lived key,
+    // here. The key login stores is the user's own long-lived key,
     // so writing it into shell config is safe.
     const home = makeTmp();
     writeCredentials(home, {

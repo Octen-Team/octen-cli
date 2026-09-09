@@ -1,6 +1,12 @@
 import { OctenValidationError } from "../api/errors.js";
 
-/** Pre-registered public client id — must match the server-side seed (F3). */
+/**
+ * The pre-registered public client id. This is not a value the CLI chooses:
+ * it must byte-match the client row seeded on the authorization server, and a
+ * mismatch fails at the authorize step with `invalid_client`, before the user
+ * ever sees a consent screen. There is no dynamic client registration, so
+ * nothing negotiates this at runtime — it is a cross-repository constant.
+ */
 export const CLI_CLIENT_ID = "octen-cli";
 export const CLI_SCOPE = "octen:api_key";
 
@@ -23,8 +29,15 @@ function rejectTrailingSlash(name: string, value: string): string {
   return value;
 }
 
-/** OCTEN_AUTH_ISSUER, default https://auth.octen.ai. pre and prod share this
- * host (configs/pre.config.yaml:1365) — there is no auth.pre.octen.ai. */
+/**
+ * OCTEN_AUTH_ISSUER, default https://auth.octen.ai.
+ *
+ * Note that the pre-production and production environments share this one
+ * auth host — there is no `auth.pre.octen.ai`, and inventing one by analogy
+ * with the other per-environment hostnames will produce a DNS failure rather
+ * than a pre-prod login. Point this at a locally running authorization server
+ * for development instead.
+ */
 export function authIssuer(env: NodeJS.ProcessEnv): string {
   const value = env.OCTEN_AUTH_ISSUER ?? DEFAULT_ISSUER;
   return rejectTrailingSlash("OCTEN_AUTH_ISSUER", value);

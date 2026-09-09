@@ -18,7 +18,9 @@ export interface LoginDeps {
    * missing browser binary) surface asynchronously, so this reports a
    * failure either by throwing synchronously OR by calling the `onFailure`
    * callback it's given — neither one fails the login, both fall back to
-   * printing the URL (design §6.4).
+   * printing the URL. A machine with no browser (CI, a container, a headless
+   * box over ssh) is a supported way to log in, not an error: the user can
+   * always copy the printed URL to a browser elsewhere.
    */
   openBrowser: (url: string, onFailure: (err: unknown) => void) => void;
   /** `--no-browser`: print the URL instead of calling `openBrowser` at all. */
@@ -30,10 +32,14 @@ export interface LoginDeps {
 }
 
 /**
- * Orchestrates the eight-step loopback login flow (design §6.4/§6.6):
+ * Orchestrates the eight-step loopback login flow:
  *
- *   1. best-effort revoke of an existing `source: "login"` grant (R4) —
- *      never blocks a new login, a failure is only logged
+ *   1. best-effort revoke of an existing `source: "login"` grant — never
+ *      blocks a new login, a failure is only logged. It exists so repeated
+ *      logins on one machine don't pile up orphaned authorizations in the
+ *      dashboard, which is a tidiness goal, never a correctness one: if the
+ *      old grant cannot be revoked, the right outcome is still a working new
+ *      login.
  *   2. start the loopback server
  *   3. build the authorize URL (fixed client_id, PKCE challenge, state,
  *      resource, scope)
@@ -43,9 +49,13 @@ export interface LoginDeps {
  *   6. exchange the code for an access token
  *   7. exchange the access token for the account's API key
  *   8. write credentials — THE ONLY DISK WRITE. A failure at any earlier
- *      step propagates and nothing is written; there is no two-phase
- *      partial state to reconcile (F1: no minted short-lived credential to
- *      roll back).
+ *      step propagates and nothing is written, so there is no two-phase
+ *      partial state to reconcile and no cleanup path to get wrong. This is
+ *      what the whole design rests on: because the flow either writes one
+ *      complete credential or writes nothing, and because what it writes is
+ *      a long-lived key that is afterwards only ever read, credential
+ *      resolution stays synchronous, lock-free, and free of any refresh
+ *      logic. Nothing here may acquire a second write path.
  */
 export async function login(deps: LoginDeps): Promise<Credentials> {
   const log = deps.log ?? ((line: string) => { process.stderr.write(`${line}\n`); });
@@ -54,7 +64,9 @@ export async function login(deps: LoginDeps): Promise<Credentials> {
 
   // Step 1: best-effort revoke of a prior login grant so repeated logins
   // don't accumulate orphaned authorizations. Every failure mode here is
-  // non-blocking (R4) — network error, 401/403/400/503 all just log.
+  // non-blocking — network error, 401, 403, 400, 503 all just log and carry
+  // on. Blocking a new login because an old grant could not be tidied up
+  // would turn a cosmetic problem into a lockout.
   //
   // Reading the existing file is itself guarded: `octen login` is precisely
   // the command that must not depend on an old file being readable, since

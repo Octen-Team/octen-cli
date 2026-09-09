@@ -161,7 +161,7 @@ describe("exchangeCode", () => {
     ];
     for (const response of scenarios) {
       const fetchImpl = vi.fn().mockResolvedValue(response.clone());
-      // F7: the guard `throw` used to live inside the try, so it landed in
+      // The guard `throw` used to live inside the try, so it landed in
       // this very catch — and its own message contains no secret, so both
       // assertions passed. If exchangeCode had stopped rejecting entirely,
       // the test would still have been green. `threw` is asserted outside
@@ -178,7 +178,7 @@ describe("exchangeCode", () => {
       expect(threw, `expected exchangeCode to reject for status ${response.status}`).toBe(true);
     }
 
-    // F8: this block's comment used to claim it checked that "the success
+    // This block's comment used to claim it checked that "the success
     // path's token never leaks into a later throw", while its only
     // assertion was `result.accessToken === "super-secret-access-token"` —
     // that the token IS returned, the opposite property. Both halves are

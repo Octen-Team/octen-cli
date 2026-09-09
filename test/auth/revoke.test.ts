@@ -58,7 +58,7 @@ describe("revokeCliGrant", () => {
       thrown = err;
     });
     expect(thrown).toBeInstanceOf(OctenAuthError);
-    // F10: `octen logout` selects its "already gone" copy on this exact
+    // `octen logout` selects its "already gone" copy on this exact
     // message. It now imports this constant instead of re-typing the
     // sentence, so the two can no longer drift silently — this assertion
     // pins the 400 branch to the constant from revoke.ts's own side.

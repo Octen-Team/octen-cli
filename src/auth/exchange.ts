@@ -7,18 +7,32 @@ import { REQUEST_TIMEOUT_MS } from "./constants.js";
  */
 export interface ExchangeResult {
   apiKey: string;
-  expiresAt: number | null; // F8: the server always returns null at this stage
-  grantId: string; // F11: used by logout and whoami
+  /**
+   * Epoch seconds, or `null` for "does not expire". The server returns null
+   * for every credential it mints today — this is a forward-compatibility
+   * slot, kept so that if short-lived API keys ever ship, the client already
+   * records the deadline instead of needing a storage-format change.
+   */
+  expiresAt: number | null;
+  /**
+   * The id of the OAuth grant behind this credential. Stored on disk and
+   * surfaced by `octen whoami`, and it is the only thing `octen logout` can
+   * use to name the authorization it wants revoked — no refresh token is ever
+   * kept, so this id plus the API key is the whole revocation credential.
+   */
+  grantId: string;
   accountId?: string;
   accountType?: string;
 }
 
 /**
  * Convert the server's ISO-8601 `expires_at` to epoch seconds. `null` stays
- * `null` (F8: this is a forward-compatibility slot the server does not yet
- * populate). Anything else that fails to parse returns `undefined` so the
- * caller can treat it as a contract violation rather than silently falling
- * back to local time.
+ * `null` and means "does not expire" — the only value the server sends today.
+ *
+ * Anything else that fails to parse returns `undefined`, deliberately
+ * distinct from `null`, so the caller can treat it as a contract violation.
+ * The alternative — falling back to a locally computed deadline — would
+ * invent an expiry the server never stated and expire a working credential.
  */
 function parseExpiresAt(value: unknown): number | null | undefined {
   if (value === null) return null;
@@ -32,15 +46,19 @@ function parseExpiresAt(value: unknown): number | null | undefined {
  * Exchange an access token for the account's own long-lived API key at
  * `POST {issuer}/api/oauth/cli/key`.
  *
- * This is the public counterpart of the existing internal
- * `/internal/oauth/resolve-key` service call (design §4.2): same
- * authorization facts, different authentication — a Bearer access token
- * instead of a shared service secret. The server reads the grant id out of
+ * This is the public counterpart of the server's existing internal
+ * `/internal/oauth/resolve-key` service call: same authorization facts,
+ * different authentication — a Bearer access token instead of a shared
+ * service secret. The server reads the grant id out of
  * the token's own session, never from the caller, so this request carries no
  * body at all.
  *
- * Error classification (design §6.5) — by transport layer FIRST, then body,
- * mirroring `exchangeCode` in `./oauthClient.ts`:
+ * Error classification — by transport layer FIRST, then body, mirroring
+ * `exchangeCode` in `./oauthClient.ts`. The ordering matters because an
+ * `OctenAuthError` is grounds for discarding a credential while an
+ * `OctenNetworkError` means "retry later": if a response body were allowed to
+ * decide, a struggling server could talk the CLI into throwing away a
+ * credential that was never invalid.
  *   - a fetch-level failure (DNS, connection reset, our own timeout) is
  *     always `OctenNetworkError`.
  *   - any 3xx (or an opaque redirect from `redirect: "manual"`) is treated as
@@ -85,7 +103,8 @@ export async function exchangeForApiKey(a: {
   }
 
   // Transport-layer classification wins over the body, even when the body
-  // claims a credential problem (design §6.5).
+  // claims a credential problem: a 5xx/408/429 is a server or infrastructure
+  // fault, and nothing about it establishes that the token or key is bad.
   if (res.status === 408 || res.status === 429 || res.status >= 500) {
     throw new OctenNetworkError("The authorization server is unavailable; please retry later.");
   }

@@ -15,7 +15,8 @@ describe("auth constants", () => {
     expect(authIssuer({})).toBe("https://auth.octen.ai");
     expect(authResource({})).toBe("https://cli.octen.ai");
     // Local dev points at a local AS. pre and prod share auth.octen.ai
-    // (configs/pre.config.yaml:1365) — there is no auth.pre.octen.ai, don't invent one.
+    // — there is no auth.pre.octen.ai, so don't invent one by analogy with
+    // the other per-environment hostnames; it just fails to resolve.
     expect(authIssuer({ OCTEN_AUTH_ISSUER: "http://127.0.0.1:8080" })).toBe("http://127.0.0.1:8080");
   });
 

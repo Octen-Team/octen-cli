@@ -101,7 +101,7 @@ describe("octen whoami", () => {
     const prog = baseProgram();
     registerWhoami(prog, { home: h, env: {} });
 
-    // F8: the old version of this test asserted only that the promise
+    // The old version of this test asserted only that the promise
     // rejects, while its name promised an exit code. The code itself comes
     // from cli.ts's exitCodeFor(err), which a bare test program never runs,
     // so assert that mapping directly rather than leaving the name a claim

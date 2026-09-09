@@ -39,9 +39,10 @@ export function credentialIgnoredReason(
   if (creds.issuer !== authIssuer(env)) return "issuer-mismatch";
   if (creds.resource !== authResource(env)) return "resource-mismatch";
 
-  // F8 forward-compatibility: the server returns apiKeyExpiresAt: null today,
-  // so this never fires yet, but it's the first user-visible behaviour if
-  // that ever changes to short-lived credentials.
+  // Forward-compatibility only: the server returns apiKeyExpiresAt: null for
+  // every credential it mints today, so this branch never fires yet. It is
+  // here so that if short-lived keys ever ship, an expired credential names
+  // itself instead of surfacing as an opaque 401 from the first API call.
   if (creds.apiKeyExpiresAt !== null && creds.apiKeyExpiresAt <= nowSeconds) return "expired";
 
   return undefined;
@@ -77,8 +78,12 @@ export interface ResolveApiKeyOpts {
  * ~/.octen/credentials.json (written by `octen login`) > throw.
  *
  * Stays synchronous and does no network work: the stored key never expires
- * on its own (F8's short-lived-key path is the one exception, handled below),
- * so a plain, lock-free file read is enough. Steps 1 and 2 return before
+ * on its own (the not-yet-reachable short-lived-key path below is the only
+ * exception), so a plain, lock-free file read is enough. This is the property
+ * everything else depends on: the credential is written once, by `octen
+ * login`, and afterwards only read — so there is no refresh to serialize, no
+ * lock to hold, and no reason for this function to become async. Making it
+ * async would ripple into every command's client construction. Steps 1 and 2 return before
  * touching the disk at all, so an explicit flag or env var never pays for a
  * file read and always wins over a stale or foreign login.
  */

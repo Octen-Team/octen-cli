@@ -5,7 +5,7 @@ import { readCredentials, deleteCredentials } from "../auth/store.js";
 // is already met) is identified by importing revoke.ts's own constant rather
 // than re-typing its sentence: editing that copy now breaks the build here
 // instead of silently downgrading this branch to the generic 401/403 message
-// with no test failure (F10).
+// with no test failure.
 import { revokeCliGrant, GRANT_ALREADY_GONE_MESSAGE } from "../auth/revoke.js";
 import { OctenNetworkError } from "../api/errors.js";
 
@@ -15,15 +15,16 @@ export interface LogoutInternalOpts {
   /**
    * Injected fetch (for testing); defaults to global fetch. Never invoked
    * for a `source: "api-key"` credential (no grant exists to revoke), when
-   * `--local` is passed, or when the stored file is unreadable (design
-   * §6.6) — all three branches make zero network requests.
+   * `--local` is passed, or when the stored file is unreadable — all three
+   * branches make zero network requests, because in each of them there is
+   * either no grant to revoke or no way left to name it.
    */
   fetchImpl?: typeof fetch;
 }
 
 /**
  * `octen logout` — revoke this device's authorization, then remove the
- * local credential (design §5.2/§6.6).
+ * local credential.
  *
  * The copy here is a hard requirement, not polish: this command clears a
  * local file and revokes a *grant* (which only blocks the CLI from silently
@@ -32,12 +33,16 @@ export interface LogoutInternalOpts {
  * account-wide, long-lived key, and is very likely also sitting in other
  * machines, production code, and the AI-client configs `octen
  * configure-mcp` wrote. So the output must never claim to have revoked
- * *access*, only "this authorization" — see design §5.2.
+ * *access*, only "this authorization". Telling a user their access was
+ * revoked when the key is still live everywhere else would be the most
+ * damaging kind of wrong: they would stop looking for the exposure.
  *
  * Whether a failed revocation should keep or delete the file depends on
  * whether the failure is retriable: `OctenNetworkError` is a transport
- * fault the design says must never be treated as "the credential is
- * invalid" (§6.5), so the file is kept and `--local` is suggested. Every
+ * fault, and a transport fault must never be read as "the credential is
+ * invalid" — deleting a working credential because the network was down
+ * would leave the user with nothing and no way back without re-consenting.
+ * So the file is kept and `--local` is suggested. Every
  * other failure `revokeCliGrant` can throw is `OctenAuthError` from one of
  * three deterministic causes (401/403/400 in revoke.ts) — the stored
  * key is no longer valid, the grant isn't bound to it, or the grant id
@@ -81,8 +86,9 @@ export function registerLogout(program: Command, internal: LogoutInternalOpts = 
 
       if (creds.source === "api-key") {
         // A pasted key has no grant behind it — nothing to revoke, and the
-        // copy must never claim otherwise (design §6.6). Zero network
-        // requests on this branch.
+        // copy must never claim otherwise, or the user is told an
+        // authorization was closed that never existed. Zero network requests
+        // on this branch.
         deleteCredentials(home);
         process.stdout.write("Cleared local credentials.\n");
         return;

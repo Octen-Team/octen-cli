@@ -289,7 +289,7 @@ describe("configure-mcp credential resolution", () => {
     writeFileSync(join(home, ".octen/credentials.json"), "{ not json");
     const prog = makeProgram(home, home);
 
-    // Before F3 this was swallowed by a bare catch and silently produced a
+    // This used to be swallowed by a bare catch, which silently produced a
     // ${OCTEN_API_KEY} placeholder config for a distinct, fixable problem.
     await withCleanAuthEnv(async () => {
       await expect(
@@ -347,7 +347,7 @@ describe("configure-mcp missing API key", () => {
     delete process.env.OCTEN_API_KEY;
     // No os.homedir spy is needed: configureMcp.ts now threads its injected
     // `home` into resolveApiKey, so this assertion is hermetic by
-    // construction rather than by one remembered mock (F3).
+    // construction rather than by one remembered mock.
 
     try {
       await prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]);

@@ -134,7 +134,7 @@ action, unlike `logout`, affects every place holding the key.
 `octen logout --local` skips the network call entirely and only removes the local file,
 without attempting to revoke the authorization.
 
-### Dashboard "revoke" and an already-logged-in CLI (F12)
+### Dashboard "revoke" and an already-logged-in CLI
 
 The dashboard's per-authorization "revoke" button has **no effect on a device that already
 holds a credential**: it only stops that device from obtaining a *new* one without going
@@ -147,8 +147,9 @@ rotate it from the key management page, not the authorization list.
 ### Switching from a browser login to a pasted key
 
 `octen login --api-key <KEY>` overwrites any existing `source: login` credential on disk
-without revoking its grant — that branch makes no network request at all, by design (see
-above). So if you switch a machine from a browser login to a pasted key, the old
+without revoking its grant — that branch makes no network request at all, deliberately, so
+that it still works on a machine with no browser and no reachable auth server (see above).
+So if you switch a machine from a browser login to a pasted key, the old
 authorization is left behind: it stays listed as active in the dashboard's authorization
 list, and once its `grantId` is gone from this machine's disk, nothing here can revoke it —
 only the dashboard can. The command prints that `grantId` on stderr before overwriting the

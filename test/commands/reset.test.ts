@@ -96,7 +96,7 @@ describe("reset with no surface flags", () => {
     await prog.parseAsync(["node", "octen", "reset", "--cursor"]);
 
     const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
-    // F9: --credentials is a valid selector too, and omitting it from this
+    // --credentials is a valid selector too, and omitting it from this
     // line was the only place the CLI told the user what to pass.
     expect(output).toMatch(/specify --mcp, --skills, --credentials, or --all/);
     expect(output).toContain("--credentials");
@@ -346,12 +346,12 @@ describe("reset --credentials", () => {
     await prog.parseAsync(["node", "octen", "reset", "--all"]);
 
     // The credential is a login concern, not an MCP/skills concern — --all
-    // logging the user out would be an unwelcome surprise (design/brief).
+    // logging the user out would be an unwelcome surprise.
     expect(readCredentials(home)).toMatchObject({ source: "api-key", apiKey: "k" });
   });
 
   it("prints the grantId when it destroys a source=login credential", async () => {
-    // F6: without the grantId printed here, the grant stays listed in the
+    // Without the grantId printed here, the grant stays listed in the
     // dashboard and nothing on this machine can name it any more — the same
     // stranding `logout --local` was fixed for.
     const home = makeTmp();

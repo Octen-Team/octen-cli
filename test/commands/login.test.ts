@@ -109,7 +109,7 @@ describe("octen login", () => {
   });
 
   it("--api-key warns with the grantId when it overwrites a source=login credential", async () => {
-    // F6: this branch destroys the only record of the grantId on this
+    // This branch destroys the only record of the grantId on this
     // machine and previously said nothing but "API key saved.", leaving the
     // authorization listed in the dashboard with nothing able to name it.
     const h = tmp();
@@ -134,7 +134,7 @@ describe("octen login", () => {
     expect(err).toMatch(/dashboard/i);
     expect(err).not.toContain("sk-must-not-leak");
     expect(err).not.toContain("manual-key");
-    // The design's zero-network rule for this branch is preserved.
+    // The zero-network rule for this branch is preserved.
     expect(fetchImpl).not.toHaveBeenCalled();
     expect(readCredentials(h)).toMatchObject({ source: "api-key", apiKey: "manual-key" });
   });
@@ -165,7 +165,7 @@ describe("octen login", () => {
   });
 
   it("--help documents OCTEN_AUTH_ISSUER and OCTEN_AUTH_RESOURCE", () => {
-    // F5: both variables can make every command say "No API key" while a
+    // Both variables can make every command say "No API key" while a
     // good credential sits on disk, and a trailing slash on either throws.
     // They must be findable from the CLI itself, not just the README.
     const prog = baseProgram();
@@ -255,7 +255,7 @@ describe("octen login", () => {
     const authorizeUrl = new URL(openBrowser.mock.calls[0][0] as string);
     expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe("S256");
     expect(authorizeUrl.searchParams.get("client_id")).toBe("octen-cli");
-    // Pinned on a production path (F4): the scope reaches the real AS
+    // Pinned on a production path: the scope reaches the real AS
     // verbatim, and a typo here is invisible until the first live link-up.
     expect(authorizeUrl.searchParams.get("scope")).toBe("octen:api_key");
     expect(authorizeUrl.searchParams.get("resource")).toBe("https://cli.octen.ai");

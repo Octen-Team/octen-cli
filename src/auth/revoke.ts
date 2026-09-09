@@ -6,20 +6,23 @@ import { REQUEST_TIMEOUT_MS } from "./constants.js";
  * grant is already gone server-side (already revoked, or never existed).
  *
  * Exported because `octen logout` branches on exactly this case to say
- * "already gone" instead of the generic 401/403 copy. It used to match the
- * literal string, so editing the sentence here would silently downgrade that
- * branch with no test failure (F10). Importing the constant makes the
- * coupling break at compile time instead.
+ * "already gone" instead of the generic 401/403 copy. That branch used to
+ * match the literal string, so editing this sentence would have silently
+ * downgraded it to the wrong message with no test failure anywhere.
+ * Importing the constant makes the coupling break at compile time instead.
  */
 export const GRANT_ALREADY_GONE_MESSAGE = "The grant id was not recognized.";
 
 /**
  * Revoke a CLI OAuth grant at `POST {issuer}/api/oauth/cli/revoke`.
  *
- * Not RFC 7009 (design §4.3) — logout has no usable bearer (access tokens
- * are used once and discarded, F6/F11) and the refresh token, even if the
- * server issued one, is never stored and would silently expire after 30
- * days regardless. So this authenticates with the long-lived `apiKey`
+ * Deliberately not RFC 7009 token revocation. RFC 7009 wants a token to
+ * revoke, and by this point `octen logout` has none: the access token was
+ * used once at login and discarded, and no refresh token is ever stored — an
+ * ostensible refresh token would expire after 30 days anyway, so keeping one
+ * for logout would give a revocation path that looks available and silently
+ * stops working on idle machines, which are exactly the ones a user logs out
+ * from. So this authenticates with the long-lived `apiKey`
  * (header `x-api-key`) and self-certifies via `{ grant_id }` in the body —
  * the server checks that the grant's `api_key_id` matches the key's own id.
  *
@@ -33,9 +36,9 @@ export const GRANT_ALREADY_GONE_MESSAGE = "The grant id was not recognized.";
  *     or not a CLI grant), and 400 (unknown/malformed grant_id) are all
  *     `OctenAuthError`.
  *
- * Callers that use this for a best-effort revoke (e.g. `octen login`'s step
- * 1, F3/R4) must catch every rejection themselves — nothing here is ever
- * meant to block a caller that only wants "try, and don't wait".
+ * Callers that use this for a best-effort revoke (`octen login`'s step 1)
+ * must catch every rejection themselves — nothing here is ever meant to
+ * block a caller that only wants "try, and don't wait".
  *
  * No error message here ever includes `a.apiKey` or `a.grantId`.
  */

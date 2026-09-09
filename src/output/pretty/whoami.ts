@@ -94,8 +94,9 @@ function effectLine(data: WhoamiEffect, stored: { issuer?: string; resource?: st
 
 /**
  * Pretty-print `octen whoami` output. Reflects only the local credentials
- * file (design §6.6) — every line here is derived from disk, never from a
- * request, and the trailing note says so explicitly.
+ * file — every line here is derived from disk, never from a request, and the
+ * trailing note says so explicitly so a reader never mistakes this for
+ * confirmation that the key still works server-side.
  */
 export function renderWhoami(data: WhoamiData): string {
   const lines: string[] = [];

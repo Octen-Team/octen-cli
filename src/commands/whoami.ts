@@ -18,9 +18,11 @@ export interface WhoamiInternalOpts {
   /** Injected env (for testing); defaults to process.env. */
   env?: NodeJS.ProcessEnv;
   /**
-   * Deliberately no `fetchImpl`: `whoami` makes zero network requests
-   * (design §6.6), and the absence of the seam is what keeps that true
-   * structurally rather than by convention.
+   * Deliberately no `fetchImpl`: `whoami` makes zero network requests, and
+   * the absence of the seam is what keeps that true structurally rather than
+   * by convention. Adding one would make it possible — and then easy — for a
+   * later change to slip a request into a command whose entire contract is
+   * "this only reads a local file".
    */
 }
 
@@ -28,11 +30,16 @@ const NOT_LOGGED_IN_MESSAGE =
   "Not logged in (no local credential file). Run `octen login`, or `octen login --api-key <key>`.";
 
 /**
- * `octen whoami` — show the locally stored credential. Design §6.6: this
- * reads only the local file and makes zero network requests. There is
- * deliberately no `--verify`: under F3 there is no short-lived state to
- * verify, and a request would only prove the key works right now, which
- * `octen search` already shows.
+ * `octen whoami` — show the locally stored credential. This reads only the
+ * local file and makes zero network requests.
+ *
+ * There is deliberately no `--verify`. The stored credential is a long-lived
+ * API key with no short-lived state attached, so there is nothing local that
+ * could have gone stale and needs checking against the server; a request
+ * would only prove the key worked at that instant, which running any actual
+ * command already demonstrates. A `--verify` flag would also turn the one
+ * command a user reaches for while debugging broken connectivity into
+ * another command that needs working connectivity.
  *
  * It also reports which of the three sources is *actually* in effect. The
  * two filters `resolveApiKey` applies — the flag/env short-circuit and the

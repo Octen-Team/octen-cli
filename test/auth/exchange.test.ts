@@ -31,7 +31,7 @@ describe("exchangeForApiKey", () => {
     });
     expect(r.apiKey).toBe("user-real-key");
     expect(r.expiresAt).toBeNull();
-    expect(r.grantId).toBe("g-1"); // F11
+    expect(r.grantId).toBe("g-1"); // logout and whoami both depend on this
     expect(r.accountId).toBe("u-1");
     expect(r.accountType).toBe("user");
 
@@ -77,7 +77,7 @@ describe("exchangeForApiKey", () => {
   });
 
   it("parses a non-null expires_at when the server starts sending one", async () => {
-    // F8's forward compatibility: once the server starts minting short-lived
+    // Forward compatibility: once the server starts minting short-lived
     // keys, the CLI can already store an expiry.
     const iso = "2026-09-07T12:00:00Z";
     const fetchImpl = vi.fn().mockResolvedValue(
@@ -93,7 +93,7 @@ describe("exchangeForApiKey", () => {
     expect(r.expiresAt).toBe(Math.floor(Date.parse(iso) / 1000));
   });
 
-  // These two are the core invariant of the whole design. Deleting in the
+  // These two are the core invariant of the whole flow. Deleting in the
   // wrong direction is asymmetric: treating a retryable fault as a credential
   // problem sends users round a re-login loop that cannot fix anything.
   it("401 and active:false are credential problems", async () => {
@@ -176,7 +176,7 @@ describe("exchangeForApiKey", () => {
   });
 
   it("a 200 response with a missing or empty grant_id is a contract violation", async () => {
-    // F11: grantId is what logout/whoami depend on — a 200 body lacking it is
+    // grantId is what logout/whoami depend on — a 200 body lacking it is
     // the same class of contract violation as a missing api_key, and must
     // not be silently absorbed into `grantId: undefined` cast as a string.
     for (const body of [
@@ -199,7 +199,7 @@ describe("exchangeForApiKey", () => {
     ];
     for (const response of scenarios) {
       const fetchImpl = vi.fn().mockResolvedValue(response.clone());
-      // F7: the guard `throw` used to live inside the try, so it landed in
+      // The guard `throw` used to live inside the try, so it landed in
       // this very catch — and its own message contains no secret, so both
       // assertions passed even if exchangeForApiKey had stopped rejecting.
       // `threw` is asserted outside the catch so that can no longer pass.
@@ -219,7 +219,7 @@ describe("exchangeForApiKey", () => {
       expect(threw, `expected exchangeForApiKey to reject for status ${response.status}`).toBe(true);
     }
 
-    // F8: this block's comment used to claim it checked that "the success
+    // This block's comment used to claim it checked that "the success
     // path's key never leaks into a subsequent throw", while its only
     // assertion was `result.apiKey === SECRET_API_KEY` — that the key IS
     // returned, the opposite property. Both halves are now real and named

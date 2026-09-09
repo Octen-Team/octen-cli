@@ -84,8 +84,8 @@ export function openBrowser(
  * by any command: `resolveApiKey` returns the env var before it touches the
  * file (src/config/resolve.ts:31-32). Reporting an unqualified "Logged in"
  * for that would tell the user a browser consent flow accomplished something
- * it did not (F2). Warns on stderr only — stdout keeps carrying just the
- * result — and never echoes either key.
+ * it did not. Warns on stderr only — stdout keeps carrying just the result,
+ * so a script parsing stdout is unaffected — and never echoes either key.
  */
 function warnIfEnvKeyShadows(env: NodeJS.ProcessEnv): void {
   if (!env.OCTEN_API_KEY) return;
@@ -101,13 +101,16 @@ function warnIfEnvKeyShadows(env: NodeJS.ProcessEnv): void {
  * `source: "login"` credential, the file being replaced is the only place
  * this machine records its `grantId` — the authorization stays listed in the
  * dashboard and, once the file is gone, nothing here can name it any more
- * (F6, the same stranding `logout --local` was fixed for).
+ * — the same stranding `octen logout --local` prints the id to avoid.
  *
- * Costs zero network requests, so the design's zero-network rule for this
- * branch is preserved: it is a plain file read, and the grant is deliberately
- * NOT revoked (documented in the README's "Switching from a browser login to
- * a pasted key"). An unreadable file is tolerated the way `octen logout`
- * tolerates it — there is no grantId to extract from it either way.
+ * Costs zero network requests, which is what keeps this branch's contract
+ * intact: `--api-key` exists so a machine with no browser and no outbound
+ * access to the auth server can still be configured, so it must stay a pure
+ * local file operation. Reading the old file before overwriting it is still
+ * just a file read; the grant is deliberately NOT revoked here, which the
+ * README's "Switching from a browser login to a pasted key" section
+ * documents. An unreadable file is tolerated the way `octen logout` tolerates
+ * it — there is no grantId to extract from it either way.
  */
 function warnIfOverwritingLoginGrant(home: string): void {
   let existing;
@@ -150,8 +153,9 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
       const home = internal.home ?? os.homedir();
       const env = internal.env ?? process.env;
 
-      // --api-key is a separate branch: no server, no network request, just
-      // write the file and return (design §6.6).
+      // --api-key is a separate branch: no loopback server, no network
+      // request, just write the file and return. This is the path for CI, a
+      // container, or any machine where a browser flow is not possible.
       if (g.apiKey) {
         warnIfOverwritingLoginGrant(home);
         writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: g.apiKey });

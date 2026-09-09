@@ -13,8 +13,22 @@ export type Credentials =
       issuer: string;
       resource: string;
       apiKey: string;
-      apiKeyExpiresAt: number | null; // F8: always null at this stage
-      grantId: string; // F11: used by logout and whoami
+      /**
+       * Epoch seconds, or `null` for "does not expire" — which is what the
+       * server sends for every credential today. Kept as a real field so
+       * that if short-lived keys ever ship, the stored format already
+       * carries the deadline and no migration is needed.
+       */
+      apiKeyExpiresAt: number | null;
+      /**
+       * The OAuth grant behind this credential. This is the only record on
+       * the machine of which dashboard authorization corresponds to this
+       * install, so `octen whoami` prints it and `octen logout` revokes by
+       * it. Any command that destroys this file must print it first:
+       * afterwards the grant is still listed server-side with nothing local
+       * able to name it.
+       */
+      grantId: string;
       accountId?: string;
       accountType?: string;
     };
@@ -87,7 +101,10 @@ function validate(obj: unknown): Credentials {
 /**
  * Whitelist exactly the fields that belong to each source, so an accidental
  * extra property on the passed-in object (e.g. a smuggled `refreshToken`)
- * never reaches disk (F11).
+ * never reaches disk. The one that matters is a refresh token: this design
+ * never stores one, and an accidental property on a passed-in object must
+ * not be able to quietly introduce a second long-lived secret into the
+ * credentials file.
  */
 function serialize(c: Credentials): string {
   const obj: Record<string, unknown> =

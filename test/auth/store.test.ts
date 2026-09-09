@@ -53,7 +53,7 @@ describe("credential store", () => {
   });
 
   it("a login credential never contains a refresh token", () => {
-    // F11: deliberately not stored. logout self-authenticates with apiKey + grantId
+    // Deliberately not stored. logout self-authenticates with apiKey + grantId
     // instead, because a refresh token would silently expire after 30 days and give
     // a revocation path that silently fails.
     const h = H();

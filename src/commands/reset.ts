@@ -99,10 +99,10 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
         // Read before deleting: a `source: "login"` credential is the only
         // place this machine records its grantId, and destroying it without
         // printing that id strands the user — the grant stays listed in the
-        // dashboard and nothing here can name it any more (F6, the same
-        // stranding `logout --local` was fixed for). A corrupt/unreadable
-        // file is tolerated, exactly as `octen logout` tolerates it: reset's
-        // job is to remove the file, not to diagnose it.
+        // dashboard and nothing here can name it any more — the same
+        // stranding `octen logout --local` prints the id to avoid. A
+        // corrupt/unreadable file is tolerated, exactly as `octen logout`
+        // tolerates it: reset's job is to remove the file, not diagnose it.
         let grantId: string | undefined;
         try {
           const existing = readCredentials(home);

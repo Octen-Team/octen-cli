@@ -82,8 +82,9 @@ describe("octen logout", () => {
   });
 
   it("still works long after a refresh token would have expired", async () => {
-    // The design's reason for existing: there is no refreshToken on disk
-    // (F11) — revocation uses only apiKey + grantId, so elapsed time since
+    // The reason this revocation scheme exists at all: there is no
+    // refreshToken on disk — revocation uses only apiKey + grantId, and the
+    // API key does not expire, so elapsed time since
     // login (even far past a hypothetical 30-day refresh-token lifetime)
     // never affects it.
     const h = tmp();
