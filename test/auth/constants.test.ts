@@ -1,7 +1,16 @@
 import { describe, it, expect } from "vitest";
-import { authIssuer, authResource } from "../../src/auth/constants.js";
+import { CLI_CLIENT_ID, CLI_SCOPE, authIssuer, authResource } from "../../src/auth/constants.js";
 
 describe("auth constants", () => {
+  it("pins the client id and scope to the server's seeded client row", () => {
+    // These two strings must byte-match the pre-registered `octen-cli`
+    // client on the authorization server. Nothing else in the suite fails
+    // if they drift: a typo surfaces only as an invalid_scope /
+    // invalid_client from the real AS, at the first live link-up.
+    expect(CLI_CLIENT_ID).toBe("octen-cli");
+    expect(CLI_SCOPE).toBe("octen:api_key");
+  });
+
   it("issuer and resource default to production and honour env overrides", () => {
     expect(authIssuer({})).toBe("https://auth.octen.ai");
     expect(authResource({})).toBe("https://cli.octen.ai");

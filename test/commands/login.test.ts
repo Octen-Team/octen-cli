@@ -182,6 +182,10 @@ describe("octen login", () => {
     const authorizeUrl = new URL(openBrowser.mock.calls[0][0] as string);
     expect(authorizeUrl.searchParams.get("code_challenge_method")).toBe("S256");
     expect(authorizeUrl.searchParams.get("client_id")).toBe("octen-cli");
+    // Pinned on a production path (F4): the scope reaches the real AS
+    // verbatim, and a typo here is invisible until the first live link-up.
+    expect(authorizeUrl.searchParams.get("scope")).toBe("octen:api_key");
+    expect(authorizeUrl.searchParams.get("resource")).toBe("https://cli.octen.ai");
 
     const creds = readCredentials(h);
     expect(creds).toMatchObject({
