@@ -7,6 +7,7 @@ import { SKILL_CLIENTS } from "../skills/clients.js";
 import { resolveSkillsDir } from "../skills/source.js";
 import { installSkills, skillStatus } from "../skills/install.js";
 import { setClientEnvKey } from "../skills/setkey.js";
+import { resolveApiKey } from "../config/resolve.js";
 import { OctenValidationError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { quotePath } from "../util/quotePath.js";
@@ -216,10 +217,12 @@ export function registerConfigureSkills(
 
       if (opts.setKey) {
         const g = command.optsWithGlobals() as { apiKey?: string };
-        const key = g.apiKey || process.env.OCTEN_API_KEY;
-        if (!key) {
+        let key: string;
+        try {
+          key = resolveApiKey(g.apiKey, process.env, { home });
+        } catch {
           throw new OctenValidationError(
-            "--set-key needs a key: pass --api-key or set OCTEN_API_KEY",
+            "--set-key needs a key: pass --api-key, set OCTEN_API_KEY, or run `octen login`",
           );
         }
         for (const client of selected) {

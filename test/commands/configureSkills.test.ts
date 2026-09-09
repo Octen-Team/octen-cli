@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import * as tar from "tar";
 import { Command } from "commander";
 import { registerConfigureSkills } from "../../src/commands/configureSkills.js";
+import { writeCredentials, CREDENTIALS_VERSION } from "../../src/auth/store.js";
 
 let tmpDirs: string[] = [];
 
@@ -320,6 +321,42 @@ describe("configure-skills --set-key", () => {
       if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
       else process.env.OCTEN_API_KEY = prevKey;
     }
+  });
+
+  it("configure-skills --set-key now honours the login store", async () => {
+    // configureSkills.ts used to read process.env.OCTEN_API_KEY directly,
+    // bypassing resolveApiKey, so a logged-in user's credential never applied
+    // here. Under F1 the key login stores is the user's own long-lived key,
+    // so writing it into shell config is safe.
+    const home = makeTmp();
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "from-login-store",
+      apiKeyExpiresAt: null,
+      grantId: "grant-1",
+    });
+    const prog = makeProgram(home, home);
+
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prevKey = process.env.OCTEN_API_KEY;
+    delete process.env.OCTEN_API_KEY;
+    try {
+      await prog.parseAsync([
+        "node", "octen", "configure-skills",
+        "--claude-code", "--offline", "--set-key",
+      ]);
+    } finally {
+      if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
+      else process.env.OCTEN_API_KEY = prevKey;
+    }
+
+    const settingsPath = join(home, ".claude/settings.json");
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    expect(settings.env.OCTEN_API_KEY).toBe("from-login-store");
   });
 });
 
