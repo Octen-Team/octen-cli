@@ -88,7 +88,14 @@ export async function login(deps: LoginDeps): Promise<Credentials> {
         fetchImpl: deps.fetchImpl,
       });
     } catch (err) {
-      log(`warning: could not revoke the previous login grant (continuing): ${(err as Error).message}`);
+      // Name the grant. The file holding this id is about to be overwritten
+      // by step 8, so this line is the last chance the user has to learn
+      // which dashboard authorization was left behind — without it the grant
+      // stays listed server-side with nothing local able to identify it.
+      log(
+        `warning: could not revoke the previous login grant (continuing): ${(err as Error).message}\n` +
+          `  Grant ${existing.grantId} may still be active — revoke it in the dashboard by that id.`,
+      );
     }
   }
 

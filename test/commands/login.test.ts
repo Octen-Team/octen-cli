@@ -345,6 +345,11 @@ describe("octen login", () => {
     expect(readCredentials(h)).toMatchObject({ grantId: "new-grant" });
     const stderrOutput = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
     expect(stderrOutput.toLowerCase()).toContain("revoke");
+    // The warning must name the grant. The file that held "old-grant" has
+    // just been overwritten with "new-grant", so if this line omits the id
+    // the user has no way left to identify the authorization still sitting
+    // in the dashboard.
+    expect(stderrOutput).toContain("old-grant");
   });
 
   it("proceeds and overwrites a corrupt existing credentials file", async () => {

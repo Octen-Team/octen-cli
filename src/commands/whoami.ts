@@ -6,6 +6,7 @@ import { credentialIgnoredReason } from "../config/resolve.js";
 import { OctenAuthError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
 import {
+  notLoggedInMessage,
   renderWhoami,
   type EffectiveKeySource,
   type WhoamiData,
@@ -25,9 +26,6 @@ export interface WhoamiInternalOpts {
    * "this only reads a local file".
    */
 }
-
-const NOT_LOGGED_IN_MESSAGE =
-  "Not logged in (no local credential file). Run `octen login`, or `octen login --api-key <key>`.";
 
 /**
  * `octen whoami` — show the locally stored credential. This reads only the
@@ -83,11 +81,7 @@ export function registerWhoami(program: Command, internal: WhoamiInternalOpts = 
           process.exitCode = 2;
           return;
         }
-        throw new OctenAuthError(
-          shadowSource
-            ? `${NOT_LOGGED_IN_MESSAGE} (${shadowSource} is set, so commands use that key.)`
-            : NOT_LOGGED_IN_MESSAGE,
-        );
+        throw new OctenAuthError(notLoggedInMessage(shadowSource));
       }
 
       // Only reached when nothing shadows the file — mirroring resolveApiKey,
