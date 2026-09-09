@@ -361,8 +361,22 @@ describe("octen login", () => {
     // listener at all, so this failure mode (the realistic one) went
     // completely uncaught. A test that only injects a synchronous throw
     // (see "falls back to printing the URL...", above) cannot catch that.
+    //
+    // This drives the REAL openBrowser -> spawnDetached -> spawn path (no
+    // mocking) but forces a guaranteed-nonexistent command via the optional
+    // `resolveCommand` override, rather than relying on a real platform
+    // opener (xdg-open here) being absent from whatever machine happens to
+    // run this suite — plenty of Linux desktops ship xdg-utils, and running
+    // against the real thing risked either a slow timeout-and-fail there or,
+    // worse, actually opening a browser window mid-test-run.
     const onFailure = vi.fn();
-    expect(() => openBrowser("https://auth.octen.ai/x", onFailure, "linux")).not.toThrow();
+    const resolveNonexistentCommand = (): [string, string[]] => [
+      "octen-cli-test-nonexistent-binary-2a71fd",
+      [],
+    ];
+    expect(() =>
+      openBrowser("https://auth.octen.ai/x", onFailure, process.platform, resolveNonexistentCommand),
+    ).not.toThrow();
 
     await vi.waitFor(() => {
       expect(onFailure).toHaveBeenCalledTimes(1);

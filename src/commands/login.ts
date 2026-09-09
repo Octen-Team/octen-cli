@@ -62,13 +62,20 @@ export function spawnDetached(cmd: string, args: string[], onFailure: (err: unkn
  * either a synchronous spawn error or (the common real-world case) an
  * asynchronous one, and the caller (`src/auth/login.ts`) routes both to the
  * same "print the URL instead" fallback.
+ *
+ * `resolveCommand` defaults to `browserCommand` and exists only so a test
+ * can drive this real function — real `spawnDetached`, real `spawn`, real
+ * `'error'` handling — against a guaranteed-nonexistent command, instead of
+ * a real platform opener (`xdg-open`, `open`, `rundll32`) whose presence on
+ * the machine running the suite is not something a test controls.
  */
 export function openBrowser(
   url: string,
   onFailure: (err: unknown) => void,
   platform: NodeJS.Platform = process.platform,
+  resolveCommand: (platform: NodeJS.Platform, url: string) => [string, string[]] = browserCommand,
 ): void {
-  const [cmd, args] = browserCommand(platform, url);
+  const [cmd, args] = resolveCommand(platform, url);
   spawnDetached(cmd, args, onFailure);
 }
 
