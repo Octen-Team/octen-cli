@@ -79,6 +79,23 @@ export function openBrowser(
   spawnDetached(cmd, args, onFailure);
 }
 
+/**
+ * A credential written while `OCTEN_API_KEY` is exported will never be read
+ * by any command: `resolveApiKey` returns the env var before it touches the
+ * file (src/config/resolve.ts:31-32). Reporting an unqualified "Logged in"
+ * for that would tell the user a browser consent flow accomplished something
+ * it did not (F2). Warns on stderr only — stdout keeps carrying just the
+ * result — and never echoes either key.
+ */
+function warnIfEnvKeyShadows(env: NodeJS.ProcessEnv): void {
+  if (!env.OCTEN_API_KEY) return;
+  process.stderr.write(
+    "warning: OCTEN_API_KEY is set in the environment and takes precedence over the stored " +
+      "credential, so nothing will use the credential just saved. Unset OCTEN_API_KEY for this " +
+      "login to take effect (`octen whoami` shows which source is in effect).\n",
+  );
+}
+
 export function registerLogin(program: Command, internal: LoginInternalOpts = {}): void {
   program
     .command("login")
@@ -95,6 +112,7 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
       if (g.apiKey) {
         writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: g.apiKey });
         process.stdout.write("API key saved.\n");
+        warnIfEnvKeyShadows(env);
         return;
       }
 
@@ -115,5 +133,6 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
       process.stdout.write(
         `Logged in${creds.source === "login" && creds.accountId ? ` as ${creds.accountId}` : ""}. Credentials saved to ${credentialsPath(home)}\n`,
       );
+      warnIfEnvKeyShadows(env);
     });
 }

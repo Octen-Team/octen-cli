@@ -108,6 +108,55 @@ describe("octen login", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("warns that OCTEN_API_KEY shadows the credential it just wrote", async () => {
+    const h = tmp();
+    const fetchImpl = tokenAndKeyFetch();
+    const openBrowser = autoCompleteBrowser();
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, env: { OCTEN_API_KEY: "env-key" }, fetchImpl: fetchImpl as any, openBrowser });
+
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(err).toContain("OCTEN_API_KEY");
+    expect(err).toMatch(/takes precedence/i);
+    expect(err).toMatch(/unset/i);
+    expect(err).not.toContain("env-key");
+    expect(err).not.toContain("resolved-key");
+  });
+
+  it("does not warn about OCTEN_API_KEY when it is not set", async () => {
+    const h = tmp();
+    const fetchImpl = tokenAndKeyFetch();
+    const openBrowser = autoCompleteBrowser();
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, env: {}, fetchImpl: fetchImpl as any, openBrowser });
+
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    expect(stderrSpy.mock.calls.map((c) => String(c[0])).join("")).not.toContain("OCTEN_API_KEY");
+  });
+
+  it("--api-key warns too when OCTEN_API_KEY shadows the file it just wrote", async () => {
+    const h = tmp();
+    const fetchImpl = vi.fn();
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, env: { OCTEN_API_KEY: "env-key" }, fetchImpl: fetchImpl as any, openBrowser: vi.fn() });
+
+    await prog.parseAsync(["node", "octen", "login", "--api-key", "manual-key"]);
+
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(err).toContain("OCTEN_API_KEY");
+    expect(err).toMatch(/takes precedence/i);
+    expect(err).not.toContain("manual-key");
+    expect(err).not.toContain("env-key");
+    // Still zero network requests on this branch.
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("makes no DCR call: the fetch sequence is token -> cli/key only", async () => {
     const h = tmp();
     const fetchImpl = tokenAndKeyFetch();
