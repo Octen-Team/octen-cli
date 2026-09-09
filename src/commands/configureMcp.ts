@@ -70,30 +70,6 @@ export function registerConfigureMcp(
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();
 
-      // Resolve API key — tolerate a missing one, but only a missing one.
-      let key: string;
-      let keyMissing = false;
-      try {
-        key = resolveApiKey(g.apiKey, process.env, { home });
-      } catch (err) {
-        // Only "no usable credential" (OctenAuthError) becomes the
-        // ${OCTEN_API_KEY} placeholder. Anything else — a corrupt or
-        // unknown-version credentials file, a malformed
-        // OCTEN_AUTH_ISSUER/OCTEN_AUTH_RESOURCE — is a distinct, fixable
-        // problem, and silently writing a degraded config for it hides the
-        // cause. Symmetric with configureSkills.ts's --set-key branch.
-        if (!(err instanceof OctenAuthError)) throw err;
-        key = "${OCTEN_API_KEY}";
-        keyMissing = true;
-      }
-
-      // Build the MCP server entry
-      const entry = {
-        command: "npx",
-        args: ["-y", pin ? `octen-mcp@${pin}` : "octen-mcp"],
-        env: { OCTEN_API_KEY: key },
-      };
-
       const isInstalled =
         internal.isInstalled ?? ((id: string) => isClientInstalled(id, { home }));
 
@@ -127,7 +103,35 @@ export function registerConfigureMcp(
         return;
       }
 
-      // INSTALL MODE — determine which clients to act on, gated by detection.
+      // INSTALL MODE. Everything below needs a key; STATUS MODE above
+      // deliberately returns first, so a broken credentials file never fails
+      // a read-only status listing that does not consult it.
+
+      // Resolve API key — tolerate a missing one, but only a missing one.
+      let key: string;
+      let keyMissing = false;
+      try {
+        key = resolveApiKey(g.apiKey, process.env, { home });
+      } catch (err) {
+        // Only "no usable credential" (OctenAuthError) becomes the
+        // ${OCTEN_API_KEY} placeholder. Anything else — a corrupt or
+        // unknown-version credentials file, a malformed
+        // OCTEN_AUTH_ISSUER/OCTEN_AUTH_RESOURCE — is a distinct, fixable
+        // problem, and silently writing a degraded config for it hides the
+        // cause. Symmetric with configureSkills.ts's --set-key branch.
+        if (!(err instanceof OctenAuthError)) throw err;
+        key = "${OCTEN_API_KEY}";
+        keyMissing = true;
+      }
+
+      // Build the MCP server entry
+      const entry = {
+        command: "npx",
+        args: ["-y", pin ? `octen-mcp@${pin}` : "octen-mcp"],
+        env: { OCTEN_API_KEY: key },
+      };
+
+      // Determine which clients to act on, gated by detection.
       let selected: typeof MCP_CLIENTS;
       if (opts.all) {
         // Start from the full registry, then filter to installed ones.

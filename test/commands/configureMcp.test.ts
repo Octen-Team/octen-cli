@@ -300,6 +300,20 @@ describe("configure-mcp credential resolution", () => {
     expect(existsSync(join(home, ".cursor/mcp.json"))).toBe(false);
   });
 
+  it("status mode does not consult credentials, so a corrupt file never fails it", async () => {
+    // Narrowing the catch must not make the read-only status listing fail on
+    // a broken file it never reads.
+    const home = makeTmp();
+    mkdirSync(join(home, ".octen"), { recursive: true });
+    writeFileSync(join(home, ".octen/credentials.json"), "{ not json");
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = makeProgram(home, home);
+
+    await withCleanAuthEnv(() => prog.parseAsync(["node", "octen", "configure-mcp"]));
+
+    expect(stdoutSpy.mock.calls.map((c) => String(c[0])).join("")).toMatch(/Cursor:/);
+  });
+
   it("a trailing slash on OCTEN_AUTH_ISSUER names itself instead of being swallowed", async () => {
     const home = makeTmp();
     writeCredentials(home, {
