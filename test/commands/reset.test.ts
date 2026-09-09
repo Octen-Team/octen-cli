@@ -311,3 +311,50 @@ describe("reset --scope validation", () => {
     expect(user.mcp_servers.octen).toBeDefined();
   });
 });
+
+describe("reset --credentials", () => {
+  it("clears only credentials; MCP/skills configs are untouched", async () => {
+    const home = makeTmp();
+    const { writeCredentials, readCredentials, CREDENTIALS_VERSION } = await import(
+      "../../src/auth/store.js"
+    );
+    writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "k" });
+
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    const configContent = JSON.stringify({ mcpServers: { octen: { command: "npx" } } });
+    writeFileSync(join(home, ".cursor/mcp.json"), configContent, "utf8");
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    expect(readCredentials(home)).toBeUndefined();
+    // MCP config is a different surface entirely — --credentials must not touch it.
+    expect(readFileSync(join(home, ".cursor/mcp.json"), "utf8")).toBe(configContent);
+  });
+
+  it("--all does not touch credentials — its existing meaning is both surfaces x all clients", async () => {
+    const home = makeTmp();
+    const { writeCredentials, readCredentials, CREDENTIALS_VERSION } = await import(
+      "../../src/auth/store.js"
+    );
+    writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "k" });
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--all"]);
+
+    // The credential is a login concern, not an MCP/skills concern — --all
+    // logging the user out would be an unwelcome surprise (design/brief).
+    expect(readCredentials(home)).toMatchObject({ source: "api-key", apiKey: "k" });
+  });
+
+  it("reports when there is no credential to clear", async () => {
+    const home = makeTmp();
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = makeProgram(home, home);
+
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toMatch(/no (local )?credentials/i);
+  });
+});

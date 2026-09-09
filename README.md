@@ -43,15 +43,154 @@ octen completion zsh --install     # writes to ~/.zshrc — then: source ~/.zshr
 
 ## Auth
 
-Set your API key (get one at https://octen.ai):
+Octen CLI resolves the API key to use in this order — each step stopping resolution before
+the next, so an explicit value always wins over a stored one:
+
+1. `--api-key <key>` on the command itself
+2. `OCTEN_API_KEY` in the environment
+3. `~/.octen/credentials.json`, written by `octen login`
+
+Get a key at https://octen.ai. Either export it directly:
 
 ```sh
 export OCTEN_API_KEY=your_key_here
 ```
 
-You can also pass `--api-key <key>` on any command. To point at a self-hosted or staging endpoint, set `OCTEN_API_URL` or pass `--base-url <url>`.
+or log in once and let the CLI manage it:
+
+```sh
+octen login
+```
+
+`octen login` opens your browser, completes an OAuth consent flow, and stores the resulting
+API key at `~/.octen/credentials.json` (written with `0600` permissions). That key does not
+expire, so `octen configure-mcp` and `octen configure-skills --set-key` can write it into
+AI-client configs once and forget about it.
+
+You can also pass `--api-key <key>` or `--base-url <url>` on any command; to point at a
+self-hosted or staging endpoint, set `OCTEN_API_URL` or pass `--base-url <url>`.
+
+**Add `.octen/` to your global gitignore.** A credentials file living in a dotfile directory
+is more likely to be committed by accident than an environment variable ever was:
+
+```sh
+git config --global core.excludesfile ~/.gitignore_global
+echo ".octen/" >> ~/.gitignore_global
+```
+
+**No browser on this machine (CI, containers)?** Paste a key directly — this branch makes
+zero network requests:
+
+```sh
+octen login --api-key "$OCTEN_API_KEY"
+```
+
+**Over SSH**, forward the loopback callback port and pin it on both ends:
+
+```sh
+# on the remote machine
+octen login --port 8765
+# from your local machine, before approving the consent screen in your browser
+ssh -L 8765:localhost:8765 remote-host
+```
+
+### `octen logout`'s exact semantics
+
+`octen logout` deletes `~/.octen/credentials.json` and revokes *this device's authorization*
+(the OAuth grant behind it). Revoking the authorization only prevents it from being used to
+silently mint a new credential later — it does **not** deactivate the underlying API key.
+That key is your own account-wide, long-lived key, and the same key is very likely also
+sitting on other machines, in your production code, and in the AI-client configs `octen
+configure-mcp` wrote. All of those keep working after `octen logout` — that's by design,
+since they're your own legitimate uses of your own key. If you believe the key itself was
+exposed, deactivate or rotate it from the key management page at https://octen.ai — that
+action, unlike `logout`, affects every place holding the key.
+
+`octen logout --local` skips the network call entirely and only removes the local file,
+without attempting to revoke the authorization.
+
+### Dashboard "revoke" and an already-logged-in CLI (F12)
+
+The dashboard's per-authorization "revoke" button has **no effect on a device that already
+holds a credential**: it only stops that device from obtaining a *new* one without going
+through the consent screen again — the API key it already has keeps working exactly as
+before. The dashboard states this next to CLI authorizations. To actually stop a key from
+working anywhere, deactivate or rotate it from the key management page, not the
+authorization list.
+
+### Switching from a browser login to a pasted key
+
+`octen login --api-key <KEY>` overwrites any existing `source: login` credential on disk
+without revoking its grant — that branch makes no network request at all, by design (see
+above). So if you switch a machine from a browser login to a pasted key, the old
+authorization is left behind: it stays listed as active in the dashboard's authorization
+list, and once its `grantId` is gone from this machine's disk, nothing here can revoke it —
+only the dashboard can. Revoke it there directly if you want to clean it up.
 
 ## Commands
+
+### `octen login`
+
+Log in via your browser and store the resulting long-lived API key at
+`~/.octen/credentials.json`.
+
+```sh
+octen login
+
+# print the authorize URL instead of opening a browser
+octen login --no-browser
+
+# pin the loopback callback port, e.g. for the ssh -L forwarding above
+octen login --port 8765
+
+# no browser available: store a key directly, with zero network requests
+octen login --api-key "$OCTEN_API_KEY"
+```
+
+If a `source: login` credential already exists, `octen login` best-effort revokes its grant
+before starting the new login, so repeated logins don't accumulate orphaned authorizations
+in the dashboard. A failure to revoke never blocks the new login.
+
+Options: `--port <n>`, `--no-browser`.
+
+---
+
+### `octen logout`
+
+Revoke this device's authorization and remove the locally stored credential. See
+[Auth](#auth) above for the exact semantics — this does **not** deactivate the API key
+itself.
+
+```sh
+octen logout
+
+# skip the network call; only remove the local file
+octen logout --local
+```
+
+A credential created with `octen login --api-key` has no authorization to revoke, so this
+just removes the file, with zero network requests, and the output never mentions revocation
+for that case.
+
+Options: `--local`.
+
+---
+
+### `octen whoami`
+
+Show the locally stored credential: account, credential source, and the `grantId` you can
+use to find and revoke this device in the dashboard's authorization list. This reads only
+`~/.octen/credentials.json` — it makes **zero network requests** and does not verify that
+the key still works (run `octen search` for that; there's deliberately no `--verify` flag).
+
+```sh
+octen whoami
+octen whoami --json
+```
+
+Exits non-zero when not logged in.
+
+---
 
 ### `octen search`
 
@@ -307,7 +446,8 @@ Run without flags to show installed skills per client.
 
 ### `octen reset`
 
-Remove the Octen MCP server and/or skills from AI clients.
+Remove the Octen MCP server and/or skills from AI clients, or clear the stored login
+credential.
 
 ```sh
 # Remove everything from all clients
@@ -318,9 +458,18 @@ octen reset --mcp
 
 # Remove only skills from a specific client
 octen reset --skills --claude-code
+
+# Clear ~/.octen/credentials.json (equivalent to octen logout --local)
+octen reset --credentials
 ```
 
 Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, plus per-client flags: `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project).
+
+`--credentials` is **not** included in `--all` — `--all`'s existing meaning is "both
+surfaces (MCP + skills) across all clients", and folding in the login credential would mean
+`--all` silently logs you out, which would be an unwelcome surprise. Reach for `octen
+logout` instead of `reset --credentials` when there's a remote authorization to revoke too;
+`reset --credentials` only ever touches the local file, with no network request.
 
 ---
 

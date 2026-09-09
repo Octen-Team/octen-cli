@@ -7,6 +7,7 @@ import { removeMcp, type InstallOpts } from "../mcp/install.js";
 import { removeSkills } from "../skills/install.js";
 import { quotePath } from "../util/quotePath.js";
 import { parseScopeOpt, type ConfigScope } from "./utils.js";
+import { deleteCredentials, credentialsPath } from "../auth/store.js";
 
 interface ResetInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -35,6 +36,10 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
     .description("Remove Octen MCP server and/or skills from AI clients")
     .option("--mcp", "remove MCP entries")
     .option("--skills", "remove skills")
+    .option(
+      "--credentials",
+      "remove the locally stored login credential (~/.octen/credentials.json); not included in --all",
+    )
     .option("--all", "remove from both surfaces across all clients")
     .option("--claude-code", "target Claude Code")
     .option("--cursor", "target Cursor")
@@ -54,6 +59,7 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
       const opts = command.opts() as {
         mcp?: boolean;
         skills?: boolean;
+        credentials?: boolean;
         all?: boolean;
         claudeCode?: boolean;
         cursor?: boolean;
@@ -72,15 +78,29 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
       const scope = opts.scope as ConfigScope;
       const installOpts: InstallOpts = { hasClaudeCli: internal.hasClaudeCli };
 
-      // Surface selection
+      // Surface selection. `--credentials` is deliberately NOT folded into
+      // `--all` — `--all`'s existing meaning is "both surfaces x all
+      // clients" (MCP + skills), and silently logging the user out as a
+      // side effect of that would be an unwelcome surprise.
       const doMcp = opts.all ? true : !!opts.mcp;
       const doSkills = opts.all ? true : !!opts.skills;
+      const doCredentials = !!opts.credentials;
 
-      if (!doMcp && !doSkills) {
+      if (!doMcp && !doSkills && !doCredentials) {
         process.stdout.write(
           "specify --mcp, --skills, or --all to select what to remove\n",
         );
         return;
+      }
+
+      // --- Credentials surface (independent of MCP/skills and of --all) ---
+      if (doCredentials) {
+        const removed = deleteCredentials(home);
+        process.stdout.write(
+          removed
+            ? `removed local credentials (${quotePath(credentialsPath(home))})\n`
+            : "no local credentials found\n",
+        );
       }
 
       // Determine which client ids were explicitly requested via per-client flags

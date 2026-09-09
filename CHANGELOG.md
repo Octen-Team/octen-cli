@@ -7,6 +7,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`octen login`.** Logs in via a one-time browser-based OAuth flow (loopback callback,
+  PKCE) and stores the resulting long-lived API key at `~/.octen/credentials.json`
+  (`0600`). `--api-key <key>` stores a pasted key directly with zero network requests;
+  `--port <n>` pins the loopback port for `ssh -L` forwarding; `--no-browser` prints the
+  authorize URL instead of opening one.
+- **`octen logout`.** Revokes this device's authorization and removes the local
+  credential. `--local` skips the network call and only removes the file. Revoking the
+  authorization does not deactivate the underlying API key — see the README's Auth
+  section for the exact semantics.
+- **`octen whoami`.** Shows the locally stored credential — account, credential source,
+  and the `grantId` used to find and revoke this device in the dashboard's authorization
+  list. Reads only the local credentials file; makes no network requests. Supports
+  `--json`. Exits non-zero when not logged in.
+- **`octen reset --credentials`.** Clears the locally stored login credential.
+  Deliberately not folded into `--all`, whose existing meaning is "both surfaces (MCP +
+  skills) across all clients."
+- `octen configure-skills --set-key` now resolves the key through the same
+  `--api-key` > `OCTEN_API_KEY` > `octen login` credential priority as every other
+  command, instead of reading `OCTEN_API_KEY` directly — a login credential now feeds
+  straight into AI-client configs.
+
 ## [0.8.0] — 2026-09-08
 
 ### Fixed
