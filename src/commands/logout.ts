@@ -1,7 +1,12 @@
 import os from "node:os";
 import type { Command } from "commander";
 import { readCredentials, deleteCredentials } from "../auth/store.js";
-import { revokeCliGrant } from "../auth/revoke.js";
+// The 400 case ("the grant is already gone server-side", so logout's goal
+// is already met) is identified by importing revoke.ts's own constant rather
+// than re-typing its sentence: editing that copy now breaks the build here
+// instead of silently downgrading this branch to the generic 401/403 message
+// with no test failure (F10).
+import { revokeCliGrant, GRANT_ALREADY_GONE_MESSAGE } from "../auth/revoke.js";
 import { OctenNetworkError } from "../api/errors.js";
 
 export interface LogoutInternalOpts {
@@ -15,15 +20,6 @@ export interface LogoutInternalOpts {
    */
   fetchImpl?: typeof fetch;
 }
-
-/**
- * Mirrors the exact fixed message `src/auth/revoke.ts` throws for a 400
- * response (`revoke.ts:70`) — the grant is already gone server-side
- * (already revoked, or never existed), so logout's goal is already met.
- * This is a deliberate string-match coupling to that module's copy rather
- * than a rewrite of its logic (revoke.ts is Task 6's, consumed here as-is).
- */
-const GRANT_ALREADY_GONE_MESSAGE = "The grant id was not recognized.";
 
 /**
  * `octen logout` — revoke this device's authorization, then remove the
@@ -43,7 +39,7 @@ const GRANT_ALREADY_GONE_MESSAGE = "The grant id was not recognized.";
  * fault the design says must never be treated as "the credential is
  * invalid" (§6.5), so the file is kept and `--local` is suggested. Every
  * other failure `revokeCliGrant` can throw is `OctenAuthError` from one of
- * three deterministic causes (401/403/400, revoke.ts:61-71) — the stored
+ * three deterministic causes (401/403/400 in revoke.ts) — the stored
  * key is no longer valid, the grant isn't bound to it, or the grant id
  * isn't recognized. All three fail identically on every retry of plain
  * `octen logout`, so keeping the file there would strand the user with

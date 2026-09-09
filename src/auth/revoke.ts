@@ -2,6 +2,18 @@ import { OctenAuthError, OctenNetworkError } from "../api/errors.js";
 import { REQUEST_TIMEOUT_MS } from "./constants.js";
 
 /**
+ * The 400 response's message: the grant id is unknown or malformed, i.e. the
+ * grant is already gone server-side (already revoked, or never existed).
+ *
+ * Exported because `octen logout` branches on exactly this case to say
+ * "already gone" instead of the generic 401/403 copy. It used to match the
+ * literal string, so editing the sentence here would silently downgrade that
+ * branch with no test failure (F10). Importing the constant makes the
+ * coupling break at compile time instead.
+ */
+export const GRANT_ALREADY_GONE_MESSAGE = "The grant id was not recognized.";
+
+/**
  * Revoke a CLI OAuth grant at `POST {issuer}/api/oauth/cli/revoke`.
  *
  * Not RFC 7009 (design §4.3) — logout has no usable bearer (access tokens
@@ -67,7 +79,7 @@ export async function revokeCliGrant(a: {
   }
 
   if (res.status === 400) {
-    throw new OctenAuthError("The grant id was not recognized.");
+    throw new OctenAuthError(GRANT_ALREADY_GONE_MESSAGE);
   }
 
   if (!res.ok) {
