@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Release blocker — read before tagging.**
+>
+> **Do not publish this release until the server side is live in production.** Merging this
+> branch is safe; tagging is not. `octen login` authenticates as the pre-registered public
+> client `octen-cli`, and that client row is seeded by a SQL script a human runs **once per
+> environment** — it is not created by a migration and does not appear as a side effect of a
+> deploy.
+>
+> Until that row exists in production, every `octen login` dies at the authorize step with
+> `invalid_client` before the browser ever shows a consent screen. Every user who upgrades
+> hits it; there is no client-side fallback, and no CLI change can work around a missing row.
+>
+> So the order is: **server released to production → the `octen-cli` client row seeded and
+> verified in production → only then push the `v*` tag here.** Pushing the tag runs
+> `release.yml` (npm publish) and `binaries.yml`, both of which are hard to walk back once
+> users have installed. Verify with a real `octen login` against production before tagging,
+> not after.
+>
+> The rest of the CLI is unaffected: `--api-key`, `OCTEN_API_KEY`, and every existing command
+> work regardless, so an early release degrades exactly one new command — but it degrades it
+> for everyone.
+
 ### Added
 
 - **`octen login`.** Logs in via a one-time browser-based OAuth flow (loopback callback,
