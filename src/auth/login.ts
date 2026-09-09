@@ -14,11 +14,13 @@ export interface LoginDeps {
   /** Injected fetch (for testing); defaults to global fetch. */
   fetchImpl?: typeof fetch;
   /**
-   * Opens the authorize URL in a browser. May throw synchronously (e.g. a
-   * failed spawn) — a throw here never fails the login, it only falls back
-   * to printing the URL (design §6.4).
+   * Opens the authorize URL in a browser. Real-world spawn failures (e.g. a
+   * missing browser binary) surface asynchronously, so this reports a
+   * failure either by throwing synchronously OR by calling the `onFailure`
+   * callback it's given — neither one fails the login, both fall back to
+   * printing the URL (design §6.4).
    */
-  openBrowser: (url: string) => void;
+  openBrowser: (url: string, onFailure: (err: unknown) => void) => void;
   /** `--no-browser`: print the URL instead of calling `openBrowser` at all. */
   noBrowser?: boolean;
   /** `--port`: pin the loopback callback port (for `ssh -L` forwarding). */
@@ -53,7 +55,18 @@ export async function login(deps: LoginDeps): Promise<Credentials> {
   // Step 1: best-effort revoke of a prior login grant so repeated logins
   // don't accumulate orphaned authorizations. Every failure mode here is
   // non-blocking (R4) — network error, 401/403/400/503 all just log.
-  const existing = readCredentials(deps.home);
+  //
+  // Reading the existing file is itself guarded: `octen login` is precisely
+  // the command that must not depend on an old file being readable, since
+  // step 8 is about to overwrite it regardless. A corrupt file or one from
+  // a future CREDENTIALS_VERSION must not make login the one command that
+  // can't recover from it.
+  let existing: Credentials | undefined;
+  try {
+    existing = readCredentials(deps.home);
+  } catch (err) {
+    log(`warning: ignoring an unreadable existing credentials file (continuing): ${(err as Error).message}`);
+  }
   if (existing?.source === "login") {
     try {
       await revokeCliGrant({
@@ -84,15 +97,20 @@ export async function login(deps: LoginDeps): Promise<Credentials> {
       scope: CLI_SCOPE,
     });
 
-    // Step 4: open the browser, or print the URL.
+    // Step 4: open the browser, or print the URL. A spawn failure is
+    // usually asynchronous (e.g. ENOENT for a missing binary), so both the
+    // synchronous-throw path and the async onFailure callback route to this
+    // one fallback — there is exactly one "print the URL instead" message.
     if (deps.noBrowser) {
       log(`Open this URL to log in:\n${url}`);
     } else {
+      const printFallback = () =>
+        log(`Could not open your browser automatically. Open this URL to log in:\n${url}`);
       try {
-        deps.openBrowser(url);
+        deps.openBrowser(url, printFallback);
         log("Opening your browser to continue login...");
       } catch {
-        log(`Could not open your browser automatically. Open this URL to log in:\n${url}`);
+        printFallback();
       }
     }
 

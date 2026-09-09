@@ -3,6 +3,7 @@ import { spawn } from "node:child_process";
 import type { Command } from "commander";
 import { login } from "../auth/login.js";
 import { CREDENTIALS_VERSION, credentialsPath, writeCredentials } from "../auth/store.js";
+import { assertRange } from "../api/search.js";
 import { parseIntOpt } from "./utils.js";
 
 export interface LoginInternalOpts {
@@ -13,7 +14,7 @@ export interface LoginInternalOpts {
   /** Injected fetch (for testing); defaults to global fetch. */
   fetchImpl?: typeof fetch;
   /** Injected browser opener (for testing); defaults to spawning the OS opener. */
-  openBrowser?: (url: string) => void;
+  openBrowser?: (url: string, onFailure: (err: unknown) => void) => void;
 }
 
 /**
@@ -32,15 +33,43 @@ export function browserCommand(platform: NodeJS.Platform, url: string): [cmd: st
 }
 
 /**
- * Fire-and-forget browser launch: `detached: true` + `stdio: "ignore"` +
- * `unref()` so the CLI never waits on the browser process, and a slow or
- * hung browser can't hang the login. A synchronous spawn failure is left to
- * the caller (`src/auth/login.ts` falls back to printing the URL).
+ * Spawn `cmd args` detached and ignored (`stdio: "ignore"`, `unref()`), so
+ * the CLI never waits on the child. Reports a failure — sync OR async — via
+ * `onFailure` instead of letting it propagate.
+ *
+ * This is the piece the original implementation got wrong: `spawn()` only
+ * throws synchronously for a narrow set of argument-validation failures. A
+ * missing binary (ENOENT — the common case: a headless box or a slim
+ * container without `xdg-open`, exactly the environment this fallback
+ * exists for) is reported asynchronously via the child's `'error'` event.
+ * An EventEmitter with no `'error'` listener turns that into an uncaught
+ * exception that kills the process — so the listener below is not optional.
  */
-export function openBrowser(url: string, platform: NodeJS.Platform = process.platform): void {
-  const [cmd, args] = browserCommand(platform, url);
-  const child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+export function spawnDetached(cmd: string, args: string[], onFailure: (err: unknown) => void): void {
+  let child;
+  try {
+    child = spawn(cmd, args, { detached: true, stdio: "ignore" });
+  } catch (err) {
+    onFailure(err);
+    return;
+  }
+  child.on("error", onFailure);
   child.unref();
+}
+
+/**
+ * Open `url` in the platform's default browser. `onFailure` is called for
+ * either a synchronous spawn error or (the common real-world case) an
+ * asynchronous one, and the caller (`src/auth/login.ts`) routes both to the
+ * same "print the URL instead" fallback.
+ */
+export function openBrowser(
+  url: string,
+  onFailure: (err: unknown) => void,
+  platform: NodeJS.Platform = process.platform,
+): void {
+  const [cmd, args] = browserCommand(platform, url);
+  spawnDetached(cmd, args, onFailure);
 }
 
 export function registerLogin(program: Command, internal: LoginInternalOpts = {}): void {
@@ -62,11 +91,16 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
         return;
       }
 
+      // A bad --port names itself instead of surfacing as Node's own
+      // ERR_SOCKET_BAD_PORT, or (for 0) silently picking a random port and
+      // quietly defeating the `ssh -L` pinning the flag exists for.
+      assertRange("--port", g.port, { min: 1, max: 65535 });
+
       const creds = await login({
         home,
         env,
         fetchImpl: internal.fetchImpl,
-        openBrowser: internal.openBrowser ?? ((url: string) => openBrowser(url)),
+        openBrowser: internal.openBrowser ?? ((url, onFailure) => openBrowser(url, onFailure)),
         noBrowser: g.browser === false,
         port: g.port,
       });

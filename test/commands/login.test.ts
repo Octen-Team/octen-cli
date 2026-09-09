@@ -1,12 +1,18 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { Command } from "commander";
-import { registerLogin, browserCommand } from "../../src/commands/login.js";
-import { readCredentials, writeCredentials, CREDENTIALS_VERSION } from "../../src/auth/store.js";
+import { registerLogin, browserCommand, openBrowser, spawnDetached } from "../../src/commands/login.js";
+import {
+  readCredentials,
+  writeCredentials,
+  credentialsPath,
+  CREDENTIALS_VERSION,
+  type Credentials,
+} from "../../src/auth/store.js";
 
 let tmpDirs: string[] = [];
 function tmp(): string {
@@ -215,6 +221,42 @@ describe("octen login", () => {
     expect(stderrOutput.toLowerCase()).toContain("revoke");
   });
 
+  it("proceeds and overwrites a corrupt existing credentials file", async () => {
+    // octen login is precisely the command that must not depend on the old
+    // file being readable — it's about to overwrite it at step 8 regardless.
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(credentialsPath(h), "{ not valid json", "utf8");
+
+    const fetchImpl = tokenAndKeyFetch();
+    const openBrowser = autoCompleteBrowser();
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser });
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    expect(readCredentials(h)).toMatchObject({ source: "login", apiKey: "resolved-key" });
+  });
+
+  it("proceeds and overwrites a credentials file with an unrecognized version", async () => {
+    // Simulates the day CREDENTIALS_VERSION bumps: an upgraded user's old
+    // file must not become unrecoverable via the one command meant to fix it.
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(
+      credentialsPath(h),
+      JSON.stringify({ version: 99, source: "login", apiKey: "old" }),
+      "utf8",
+    );
+
+    const fetchImpl = tokenAndKeyFetch();
+    const openBrowser = autoCompleteBrowser();
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser });
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    expect(readCredentials(h)).toMatchObject({ source: "login", apiKey: "resolved-key" });
+  });
+
   it("--no-browser prints the URL instead of opening it", async () => {
     const h = tmp();
     const fetchImpl = tokenAndKeyFetch();
@@ -275,15 +317,19 @@ describe("octen login", () => {
   it("progress messages go to stderr, not stdout", async () => {
     const h = tmp();
     const fetchImpl = tokenAndKeyFetch();
-    const openBrowser = autoCompleteBrowser();
+    const openBrowserSpy = autoCompleteBrowser();
     const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
     const prog = baseProgram();
-    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser });
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser: openBrowserSpy });
     await prog.parseAsync(["node", "octen", "login"]);
 
-    const stdoutOutput = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
-    expect(stdoutOutput).not.toContain("http");
+    // stdout carries EXACTLY the single final confirmation line — nothing
+    // else. A regression that moved a progress line to stdout (or dropped
+    // the confirmation, or duplicated it) fails this.
+    expect(stdoutSpy.mock.calls).toEqual([
+      [`Logged in as acct-1. Credentials saved to ${credentialsPath(h)}\n`],
+    ]);
     expect(stderrSpy.mock.calls.length).toBeGreaterThan(0);
   });
 
@@ -294,7 +340,36 @@ describe("octen login", () => {
     expect(browserCommand("linux", url)).toEqual(["xdg-open", [url]]);
   });
 
-  it("a failed exchange leaves no partial credential file", async () => {
+  it("spawnDetached: a real async ENOENT (missing binary) does not crash the process and calls onFailure", async () => {
+    // This is the real `child_process.spawn`, not a mock — a missing binary
+    // fails asynchronously via the child's 'error' event, not a synchronous
+    // throw. If `spawnDetached` failed to attach an 'error' listener, that
+    // event would be an unhandled exception and this test process would
+    // crash rather than merely fail the assertion below.
+    const onFailure = vi.fn();
+    spawnDetached("octen-cli-test-nonexistent-binary-9f3e7c21", [], onFailure);
+
+    await vi.waitFor(() => {
+      expect(onFailure).toHaveBeenCalledTimes(1);
+    });
+    const err = onFailure.mock.calls[0][0] as NodeJS.ErrnoException;
+    expect(err.code).toBe("ENOENT");
+  });
+
+  it("openBrowser: an async spawn failure falls back via onFailure, not a synchronous throw", async () => {
+    // The bug this pins: the original implementation had no 'error'
+    // listener at all, so this failure mode (the realistic one) went
+    // completely uncaught. A test that only injects a synchronous throw
+    // (see "falls back to printing the URL...", above) cannot catch that.
+    const onFailure = vi.fn();
+    expect(() => openBrowser("https://auth.octen.ai/x", onFailure, "linux")).not.toThrow();
+
+    await vi.waitFor(() => {
+      expect(onFailure).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it("a failed exchange leaves no partial credential file (first login)", async () => {
     const h = tmp();
     const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
       const u = String(url);
@@ -308,5 +383,58 @@ describe("octen login", () => {
 
     await expect(prog.parseAsync(["node", "octen", "login"])).rejects.toThrow();
     expect(readCredentials(h)).toBeUndefined();
+  });
+
+  it("a failed exchange during a re-login leaves the previous credential file untouched", async () => {
+    // Disk state after a failure differs by starting state: a first login
+    // leaves nothing (above); a re-login leaves the OLD file exactly as it
+    // was — never deleted, never partially overwritten — even though step 1
+    // already revoked its grant server-side. The stored key still works (the
+    // server only flips the grant's status, never the key's), so this is a
+    // still-working credential whose grantId now names a vanished grant, not
+    // a dead one.
+    const h = tmp();
+    const oldCreds: Credentials = {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "old-key",
+      apiKeyExpiresAt: null,
+      grantId: "old-grant",
+    };
+    writeCredentials(h, oldCreds);
+
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
+      const u = String(url);
+      if (u.endsWith("/api/oauth/cli/revoke")) return new Response("{}", { status: 200 });
+      if (u.endsWith("/api/oauth/token")) return new Response(JSON.stringify({ access_token: "at-1" }), { status: 200 });
+      if (u.endsWith("/api/oauth/cli/key")) return new Response("{}", { status: 503 });
+      throw new Error(`unexpected fetch to ${u}`);
+    });
+    const openBrowser = autoCompleteBrowser();
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser });
+
+    await expect(prog.parseAsync(["node", "octen", "login"])).rejects.toThrow();
+    expect(readCredentials(h)).toEqual(oldCreds);
+  });
+
+  it("rejects --port 0 (would silently pick a random port, defeating ssh -L pinning)", async () => {
+    const h = tmp();
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: vi.fn() as any, openBrowser: vi.fn() });
+    await expect(prog.parseAsync(["node", "octen", "login", "--port", "0"])).rejects.toThrow(
+      /--port must be 1-65535/,
+    );
+  });
+
+  it("rejects --port above the valid TCP port range", async () => {
+    const h = tmp();
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: vi.fn() as any, openBrowser: vi.fn() });
+    await expect(prog.parseAsync(["node", "octen", "login", "--port", "65536"])).rejects.toThrow(
+      /--port must be 1-65535/,
+    );
   });
 });
