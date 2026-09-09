@@ -8,7 +8,7 @@ import { resolveSkillsDir } from "../skills/source.js";
 import { installSkills, skillStatus } from "../skills/install.js";
 import { setClientEnvKey } from "../skills/setkey.js";
 import { resolveApiKey } from "../config/resolve.js";
-import { OctenValidationError } from "../api/errors.js";
+import { OctenValidationError, OctenAuthError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { quotePath } from "../util/quotePath.js";
 import { parseCsvOpt, parseScopeOpt, type ConfigScope } from "./utils.js";
@@ -220,7 +220,12 @@ export function registerConfigureSkills(
         let key: string;
         try {
           key = resolveApiKey(g.apiKey, process.env, { home });
-        } catch {
+        } catch (err) {
+          // Only "no usable credential" (OctenAuthError) becomes the generic
+          // "needs a key" message. Anything else — a corrupt credentials file,
+          // a malformed OCTEN_AUTH_ISSUER/OCTEN_AUTH_RESOURCE — is a distinct,
+          // fixable problem and must name itself rather than be swallowed.
+          if (!(err instanceof OctenAuthError)) throw err;
           throw new OctenValidationError(
             "--set-key needs a key: pass --api-key, set OCTEN_API_KEY, or run `octen login`",
           );

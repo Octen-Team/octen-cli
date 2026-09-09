@@ -1,12 +1,31 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import os, { tmpdir } from "node:os";
 import { resolveApiKey, resolveBaseUrl } from "../../src/config/resolve.js";
 import { OctenAuthError } from "../../src/api/errors.js";
 import { writeCredentials, readCredentials, CREDENTIALS_VERSION, type Credentials } from "../../src/auth/store.js";
 
 const H = () => mkdtempSync(join(tmpdir(), "octen-resolve-"));
+
+/**
+ * `resolveApiKey` falls back to `os.homedir()` when a test doesn't pass an
+ * explicit `opts.home`. Left unmocked, that reaches for the *real* machine's
+ * `~/.octen/credentials.json` — hermetic today only because no such file
+ * exists here, but `octen login` (Task 6) writes exactly that file, so a
+ * developer who has logged in locally would get a result that depends on
+ * whether their stored issuer/resource happen to match the defaults. Every
+ * test in this suite either passes `{ home }` explicitly, or — for the one
+ * that doesn't — relies on this redirect to a guaranteed-empty directory.
+ */
+let unmockedHomeFallback: string;
+beforeEach(() => {
+  unmockedHomeFallback = H();
+  vi.spyOn(os, "homedir").mockReturnValue(unmockedHomeFallback);
+});
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 /** A valid source:"login" credential with sensible defaults, overridable per test. */
 function loginCreds(overrides: Partial<Extract<Credentials, { source: "login" }>>): Credentials {
@@ -31,6 +50,14 @@ describe("resolve", () => {
   });
   it("throws OctenAuthError when missing", () => {
     expect(() => resolveApiKey(undefined, {})).toThrow(OctenAuthError);
+  });
+  it("falls back to os.homedir() when opts.home is omitted (proves the mock, not just no-throw)", () => {
+    // Writes directly into the mocked os.homedir() target from beforeEach,
+    // without ever passing opts.home to resolveApiKey. If this ever read the
+    // real machine's home directory instead, it would throw here (no file
+    // there) rather than returning the stored key.
+    writeCredentials(unmockedHomeFallback, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "from-default-home" });
+    expect(resolveApiKey(undefined, {})).toBe("from-default-home");
   });
   it("resolves base url flag > env > default", () => {
     expect(resolveBaseUrl("https://f", {})).toBe("https://f");

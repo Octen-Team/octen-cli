@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import os, { tmpdir } from "node:os";
 import { Command } from "commander";
 import { registerConfigureMcp } from "../../src/commands/configureMcp.js";
 
@@ -251,6 +251,11 @@ describe("configure-mcp missing API key", () => {
     // Make sure OCTEN_API_KEY is not set
     const origKey = process.env.OCTEN_API_KEY;
     delete process.env.OCTEN_API_KEY;
+    // configureMcp.ts's production call site passes no `home` to resolveApiKey
+    // (an R2-protected two-argument call), so it falls back to os.homedir().
+    // Redirect that to this test's empty tmp dir so the assertion below never
+    // depends on whether the real machine happens to have a login credential.
+    vi.spyOn(os, "homedir").mockReturnValue(home);
 
     try {
       await prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]);
