@@ -44,6 +44,13 @@ const IMAGE_URL =
 
 const client = new OctenClient({
   apiKey: API_KEY ?? "missing",
+  // Honours OCTEN_API_URL the same way the CLI itself does
+  // (src/config/resolve.ts), so this matrix can be pointed at a non-production
+  // environment. pre and prod share every hostname and are told apart only by
+  // an `x-apt-env` request header, which this client cannot set — reaching pre
+  // means pointing this at a local forwarder that adds it. Unset = production,
+  // which is the historical behaviour.
+  baseUrl: process.env.OCTEN_API_URL,
   timeoutMs: CLIENT_TIMEOUT_MS,
   // The contract bugs we hunt for are 4xx "Invalid params" responses; those
   // are NOT retryable, so retries only cost time on transient 5xx. Keep one
