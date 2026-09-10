@@ -1,7 +1,7 @@
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, statSync } from "node:fs";
 import { join } from "node:path";
-import { tmpdir } from "node:os";
+import { tmpdir, platform } from "node:os";
 import { parse as tomlParse } from "smol-toml";
 import { MCP_CLIENTS } from "../../src/mcp/clients.js";
 import { installMcp, removeMcp } from "../../src/mcp/install.js";
@@ -103,24 +103,27 @@ describe("installMcp – claude-code (claude-cli path)", () => {
     execFileSyncMock.mockReturnValue(undefined as any);
   });
 
-  it("invokes execFileSync with exact args array (injection-safe) when hasClaudeCli=true", () => {
+  // 占位符不是秘密，仍走 claude CLI。这条继续钉住"参数以数组元素传递、不做字符串
+  // 拼接"，因为这条路径依然存在。
+  it("invokes execFileSync with exact args array (injection-safe) for the placeholder", () => {
     const home = makeTmp();
     const cwd = home;
     const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
-    const entry = { command: "npx", args: ["-y", "octen-mcp"], env: { OCTEN_API_KEY: "k" } };
+    const entry = {
+      command: "npx",
+      args: ["-y", "octen-mcp"],
+      env: { OCTEN_API_KEY: "${OCTEN_API_KEY}" },
+    };
 
     const result = installMcp(client, "user", entry, home, cwd, { hasClaudeCli: true });
 
     expect(result.method).toBe("claude-cli");
 
-    // Find the call to `claude` (not `which`)
     const claudeCall = execFileSyncMock.mock.calls.find((call) => call[0] === "claude");
     expect(claudeCall).toBeDefined();
 
     const [cmd, args] = claudeCall!;
     expect(cmd).toBe("claude");
-    // Assert the full args array – this documents injection-safety:
-    // the key value is a single array element, not shell-interpolated
     expect(args).toEqual([
       "mcp",
       "add",
@@ -128,7 +131,7 @@ describe("installMcp – claude-code (claude-cli path)", () => {
       "user",
       "octen",
       "-e",
-      "OCTEN_API_KEY=k",
+      "OCTEN_API_KEY=${OCTEN_API_KEY}",
       "--",
       "npx",
       "-y",
@@ -136,25 +139,36 @@ describe("installMcp – claude-code (claude-cli path)", () => {
     ]);
   });
 
-  it("key with special chars (spaces, semicolons) stays as one array element (no injection)", () => {
+  // 一个真实的 key 绝不能进另一个进程的 argv：`ps -ww` 与 /proc/<pid>/cmdline 在子
+  // 进程存活期间对同机任意用户可见。改动前这条路径是可达的——凭证解析学会读
+  // ~/.octen/credentials.json 之后，一个只存在于 0600 文件里的 key 会流到这里。
+  // 所以字面 key 一律改走文件路径（本函数在没有 claude CLI 时本来就用它）。
+  it("never puts a literal key in a child process argv — it takes the file path instead", () => {
     const home = makeTmp();
     const cwd = home;
     const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
-    const specialKey = "a b;c";
-    const entry = { command: "npx", args: ["-y", "octen-mcp"], env: { OCTEN_API_KEY: specialKey } };
+    const entry = {
+      command: "npx",
+      args: ["-y", "octen-mcp"],
+      env: { OCTEN_API_KEY: "octen-literal-secret" },
+    };
 
-    installMcp(client, "user", entry, home, cwd, { hasClaudeCli: true });
+    const result = installMcp(client, "user", entry, home, cwd, { hasClaudeCli: true });
 
+    expect(result.method).toBe("file");
     const claudeCall = execFileSyncMock.mock.calls.find((call) => call[0] === "claude");
-    expect(claudeCall).toBeDefined();
+    expect(claudeCall).toBeUndefined();
+    const everySpawnedArg = JSON.stringify(execFileSyncMock.mock.calls);
+    expect(everySpawnedArg).not.toContain("octen-literal-secret");
 
-    const [, args] = claudeCall!;
-    // The entire "OCTEN_API_KEY=a b;c" must be a single element — no shell splitting
-    expect(args).toContain("OCTEN_API_KEY=a b;c");
-    // Confirm it's one element at a specific index, not fragmented
-    const envIdx = (args as string[]).indexOf("OCTEN_API_KEY=a b;c");
-    expect(envIdx).toBeGreaterThanOrEqual(0);
+    // 条目仍然被正确写入，且文件被限制成 0600（见 util/secretFile.ts）。
+    const written = readFileSync(join(home, ".claude.json"), "utf8");
+    expect(written).toContain("octen-literal-secret");
+    if (platform() !== "win32") {
+      expect(statSync(join(home, ".claude.json")).mode & 0o777).toBe(0o600);
+    }
   });
+
 });
 
 describe("removeMcp – cursor (file path)", () => {

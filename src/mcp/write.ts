@@ -3,8 +3,20 @@ import { dirname } from "node:path";
 import { parse as tomlParse, stringify as tomlStringify } from "smol-toml";
 import type { McpFormat } from "./clients.js";
 import { OctenValidationError } from "../api/errors.js";
+import { writeSecretFile } from "../util/secretFile.js";
 
 type JsonObj = Record<string, unknown>;
+
+/**
+ * True when this entry embeds an actual key rather than the
+ * `${OCTEN_API_KEY}` placeholder, i.e. when the file we are about to write
+ * becomes a secret-bearing file.
+ */
+function carriesLiteralSecret(entry: object): boolean {
+  const env = (entry as { env?: Record<string, unknown> }).env;
+  const value = env?.["OCTEN_API_KEY"];
+  return typeof value === "string" && value !== "" && !value.startsWith("${");
+}
 
 function assertNever(x: never): never {
   throw new Error(`unhandled McpFormat: ${String(x)}`);
@@ -38,6 +50,7 @@ function readTomlFile(filePath: string): JsonObj {
 
 export function upsertMcpServer(filePath: string, format: McpFormat, entry: object): void {
   mkdirSync(dirname(filePath), { recursive: true });
+  const restrict = carriesLiteralSecret(entry);
 
   switch (format) {
     case "json-mcpServers":
@@ -47,7 +60,8 @@ export function upsertMcpServer(filePath: string, format: McpFormat, entry: obje
         obj.mcpServers = {} as JsonObj;
       }
       (obj.mcpServers as JsonObj)["octen"] = entry;
-      writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
+      if (restrict) writeSecretFile(filePath, JSON.stringify(obj, null, 2));
+      else writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
       return;
     }
     case "json-servers": {
@@ -56,7 +70,8 @@ export function upsertMcpServer(filePath: string, format: McpFormat, entry: obje
         obj.servers = {} as JsonObj;
       }
       (obj.servers as JsonObj)["octen"] = entry;
-      writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
+      if (restrict) writeSecretFile(filePath, JSON.stringify(obj, null, 2));
+      else writeFileSync(filePath, JSON.stringify(obj, null, 2), "utf8");
       return;
     }
     case "toml": {
@@ -65,7 +80,8 @@ export function upsertMcpServer(filePath: string, format: McpFormat, entry: obje
         obj.mcp_servers = {} as JsonObj;
       }
       (obj.mcp_servers as JsonObj)["octen"] = entry;
-      writeFileSync(filePath, tomlStringify(obj), "utf8");
+      if (restrict) writeSecretFile(filePath, tomlStringify(obj));
+      else writeFileSync(filePath, tomlStringify(obj), "utf8");
       return;
     }
     default:
