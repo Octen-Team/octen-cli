@@ -16,6 +16,9 @@ import { registerVideoSearch } from "./commands/videoSearch.js";
 import { registerConfigureMcp } from "./commands/configureMcp.js";
 import { registerConfigureSkills } from "./commands/configureSkills.js";
 import { registerReset } from "./commands/reset.js";
+import { registerLogin } from "./commands/login.js";
+import { registerLogout } from "./commands/logout.js";
+import { registerWhoami } from "./commands/whoami.js";
 import { registerCompletion } from "./commands/completion.js";
 
 // Injected at build time for standalone binaries (bun --compile --define),
@@ -54,6 +57,9 @@ registerEmbed(program);
 registerVlEmbed(program);
 registerImageSearch(program);
 registerVideoSearch(program);
+registerLogin(program);
+registerLogout(program);
+registerWhoami(program);
 
 // Register LAST so introspection sees every command and its flags.
 registerCompletion(program);

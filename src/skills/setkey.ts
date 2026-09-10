@@ -1,4 +1,5 @@
-import { mkdirSync, readFileSync, writeFileSync, existsSync } from "node:fs";
+import { mkdirSync, readFileSync, existsSync } from "node:fs";
+import { writeSecretFile } from "../util/secretFile.js";
 import { dirname, join } from "node:path";
 import { parse, stringify } from "smol-toml";
 import { OctenValidationError } from "../api/errors.js";
@@ -66,7 +67,7 @@ export function setClientEnvKey(
         OCTEN_API_KEY: key,
       };
       mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, JSON.stringify(obj, null, 2) + "\n", "utf8");
+      writeSecretFile(path, JSON.stringify(obj, null, 2) + "\n");
       return { clientId, written: true, path };
     }
     case "codex": {
@@ -78,7 +79,7 @@ export function setClientEnvKey(
         OCTEN_API_KEY: key,
       };
       mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, stringify(obj), "utf8");
+      writeSecretFile(path, stringify(obj));
       return { clientId, written: true, path };
     }
     case "openclaw": {
@@ -95,7 +96,7 @@ export function setClientEnvKey(
       }
       if (!replaced) lines.push(`OCTEN_API_KEY=${key}`);
       mkdirSync(dirname(path), { recursive: true });
-      writeFileSync(path, lines.join("\n") + "\n", "utf8");
+      writeSecretFile(path, lines.join("\n") + "\n");
       return { clientId, written: true, path };
     }
     default:

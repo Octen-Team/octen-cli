@@ -1,0 +1,175 @@
+import { OctenAuthError, OctenNetworkError } from "../api/errors.js";
+import { REQUEST_TIMEOUT_MS } from "./constants.js";
+
+/**
+ * The account's long-lived API key, resolved from an access token via
+ * `POST {issuer}/api/oauth/cli/key`.
+ */
+export interface ExchangeResult {
+  apiKey: string;
+  /**
+   * Epoch seconds, or `null` for "does not expire". The server returns null
+   * for every credential it mints today — this is a forward-compatibility
+   * slot, kept so that if short-lived API keys ever ship, the client already
+   * records the deadline instead of needing a storage-format change.
+   */
+  expiresAt: number | null;
+  /**
+   * The id of the OAuth grant behind this credential. Stored on disk and
+   * surfaced by `octen whoami`, and it is the only thing `octen logout` can
+   * use to name the authorization it wants revoked — no refresh token is ever
+   * kept, so this id plus the API key is the whole revocation credential.
+   */
+  grantId: string;
+  accountId?: string;
+  accountType?: string;
+  /**
+   * Human-readable name for the account — "Octen family", or "Personal" for a
+   * user account. Display-only, and deliberately NOT written to disk: the
+   * login confirmation line is the only thing that renders it, so a name that
+   * drifts after the organization is renamed can never be shown.
+   *
+   * Optional in both directions. A server older than the field omits it, so
+   * does a current server that could not load the name, and prod omits it
+   * until this ships there — every caller must fall back to `accountId`.
+   */
+  accountName?: string;
+}
+
+/**
+ * Convert the server's ISO-8601 `expires_at` to epoch seconds. `null` stays
+ * `null` and means "does not expire" — the only value the server sends today.
+ *
+ * Anything else that fails to parse returns `undefined`, deliberately
+ * distinct from `null`, so the caller can treat it as a contract violation.
+ * The alternative — falling back to a locally computed deadline — would
+ * invent an expiry the server never stated and expire a working credential.
+ */
+function parseExpiresAt(value: unknown): number | null | undefined {
+  if (value === null) return null;
+  if (typeof value !== "string") return undefined;
+  const ms = Date.parse(value);
+  if (Number.isNaN(ms)) return undefined;
+  return Math.floor(ms / 1000);
+}
+
+/**
+ * Exchange an access token for the account's own long-lived API key at
+ * `POST {issuer}/api/oauth/cli/key`.
+ *
+ * This is the public counterpart of the server's existing internal
+ * `/internal/oauth/resolve-key` service call: same authorization facts,
+ * different authentication — a Bearer access token instead of a shared
+ * service secret. The server reads the grant id out of
+ * the token's own session, never from the caller, so this request carries no
+ * body at all.
+ *
+ * Error classification — by transport layer FIRST, then body, mirroring
+ * `exchangeCode` in `./oauthClient.ts`. The ordering matters because an
+ * `OctenAuthError` is grounds for discarding a credential while an
+ * `OctenNetworkError` means "retry later": if a response body were allowed to
+ * decide, a struggling server could talk the CLI into throwing away a
+ * credential that was never invalid.
+ *   - a fetch-level failure (DNS, connection reset, our own timeout) is
+ *     always `OctenNetworkError`.
+ *   - any 3xx (or an opaque redirect from `redirect: "manual"`) is treated as
+ *     a transport-layer fault, never followed: a request carrying a bearer
+ *     token must not be forwarded to an unintended host.
+ *   - 408 / 429 / 5xx are always `OctenNetworkError`, EVEN IF the body claims
+ *     `active: false` — a server fault dressed up as a credential problem
+ *     must never trigger credential deletion downstream.
+ *   - 401 is always `OctenAuthError`: missing/non-Bearer/unusable token, or
+ *     (via the 200 path below) a grant that no longer resolves.
+ *   - 403 is always `OctenAuthError`: audience/scope/client mismatch,
+ *     independent of the body; retrying cannot help.
+ *   - a 200 body with `active: false` is `OctenAuthError` too.
+ *   - a 200 body missing `api_key`, or whose `expires_at` cannot be parsed,
+ *     is `OctenNetworkError` — a contract violation, never silently absorbed.
+ *
+ * No error message here ever includes `a.accessToken` or a returned API key.
+ */
+export async function exchangeForApiKey(a: {
+  issuer: string;
+  accessToken: string;
+  fetchImpl?: typeof fetch;
+}): Promise<ExchangeResult> {
+  const f = a.fetchImpl ?? fetch;
+
+  let res: Response;
+  try {
+    res = await f(`${a.issuer}/api/oauth/cli/key`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${a.accessToken}` },
+      // This request carries a bearer token — never let a redirect silently
+      // forward it to a different host.
+      redirect: "manual",
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    throw new OctenNetworkError("Could not reach the authorization server; please try again.");
+  }
+
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+    throw new OctenNetworkError("The authorization server returned an unexpected redirect; please try again.");
+  }
+
+  // Transport-layer classification wins over the body, even when the body
+  // claims a credential problem: a 5xx/408/429 is a server or infrastructure
+  // fault, and nothing about it establishes that the token or key is bad.
+  if (res.status === 408 || res.status === 429 || res.status >= 500) {
+    throw new OctenNetworkError("The authorization server is unavailable; please retry later.");
+  }
+
+  if (res.status === 401) {
+    throw new OctenAuthError("Your session is no longer valid. Run `octen login` again.");
+  }
+
+  if (res.status === 403) {
+    throw new OctenAuthError("Authorization was refused. Run `octen login` again.");
+  }
+
+  if (!res.ok) {
+    throw new OctenAuthError(`Key exchange failed (HTTP ${res.status}). Run \`octen login\` again.`);
+  }
+
+  let payload: unknown;
+  try {
+    payload = await res.json();
+  } catch {
+    throw new OctenNetworkError("The authorization server returned an invalid response; please try again.");
+  }
+
+  const body = payload !== null && typeof payload === "object" ? (payload as Record<string, unknown>) : {};
+
+  if (body.active === false) {
+    throw new OctenAuthError("Your session is no longer valid. Run `octen login` again.");
+  }
+
+  const apiKey = body.api_key;
+  if (typeof apiKey !== "string" || apiKey.length === 0) {
+    throw new OctenNetworkError("The authorization server did not return an API key; please try again.");
+  }
+
+  const grantId = body.grant_id;
+  if (typeof grantId !== "string" || grantId.length === 0) {
+    throw new OctenNetworkError("The authorization server did not return a grant id; please try again.");
+  }
+
+  const expiresAt = parseExpiresAt(body.expires_at);
+  if (expiresAt === undefined) {
+    throw new OctenNetworkError("The authorization server returned an invalid expiry; please try again.");
+  }
+
+  const accountId = typeof body.account_id === "string" ? body.account_id : undefined;
+  const accountType = typeof body.account_type === "string" ? body.account_type : undefined;
+
+  // Unlike the fields above, a blank name is normalized away rather than
+  // passed through: it is only ever interpolated into a sentence, and
+  // "Logged in as ." is worse than falling back to the account id. This is a
+  // display default, never a contract violation — the server omits the field
+  // by design whenever it has no name to give.
+  const rawAccountName = typeof body.account_name === "string" ? body.account_name.trim() : "";
+  const accountName = rawAccountName.length > 0 ? rawAccountName : undefined;
+
+  return { apiKey, expiresAt, grantId, accountId, accountType, accountName };
+}

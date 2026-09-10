@@ -96,7 +96,10 @@ describe("reset with no surface flags", () => {
     await prog.parseAsync(["node", "octen", "reset", "--cursor"]);
 
     const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
-    expect(output).toMatch(/specify --mcp, --skills, or --all/);
+    // --credentials is a valid selector too, and omitting it from this
+    // line was the only place the CLI told the user what to pass.
+    expect(output).toMatch(/specify --mcp, --skills, --credentials, or --all/);
+    expect(output).toContain("--credentials");
 
     // Config was not modified
     const current = readFileSync(join(home, ".cursor/mcp.json"), "utf8");
@@ -309,5 +312,108 @@ describe("reset --scope validation", () => {
       readFileSync(join(home, ".codex/config.toml"), "utf8"),
     ) as Record<string, any>;
     expect(user.mcp_servers.octen).toBeDefined();
+  });
+});
+
+describe("reset --credentials", () => {
+  it("clears only credentials; MCP/skills configs are untouched", async () => {
+    const home = makeTmp();
+    const { writeCredentials, readCredentials, CREDENTIALS_VERSION } = await import(
+      "../../src/auth/store.js"
+    );
+    writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "k" });
+
+    mkdirSync(join(home, ".cursor"), { recursive: true });
+    const configContent = JSON.stringify({ mcpServers: { octen: { command: "npx" } } });
+    writeFileSync(join(home, ".cursor/mcp.json"), configContent, "utf8");
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    expect(readCredentials(home)).toBeUndefined();
+    // MCP config is a different surface entirely — --credentials must not touch it.
+    expect(readFileSync(join(home, ".cursor/mcp.json"), "utf8")).toBe(configContent);
+  });
+
+  it("--all does not touch credentials — its existing meaning is both surfaces x all clients", async () => {
+    const home = makeTmp();
+    const { writeCredentials, readCredentials, CREDENTIALS_VERSION } = await import(
+      "../../src/auth/store.js"
+    );
+    writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "k" });
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--all"]);
+
+    // The credential is a login concern, not an MCP/skills concern — --all
+    // logging the user out would be an unwelcome surprise.
+    expect(readCredentials(home)).toMatchObject({ source: "api-key", apiKey: "k" });
+  });
+
+  it("prints the grantId when it destroys a source=login credential", async () => {
+    // Without the grantId printed here, the grant stays listed in the
+    // dashboard and nothing on this machine can name it any more — the same
+    // stranding `logout --local` was fixed for.
+    const home = makeTmp();
+    const { writeCredentials, readCredentials, CREDENTIALS_VERSION } = await import(
+      "../../src/auth/store.js"
+    );
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "sk-must-not-leak",
+      apiKeyExpiresAt: null,
+      grantId: "grant-reset-test",
+    });
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    expect(readCredentials(home)).toBeUndefined();
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toContain("grant-reset-test");
+    expect(output).toMatch(/dashboard/i);
+    expect(output).not.toContain("sk-must-not-leak");
+  });
+
+  it("says nothing about a grant for an api-key credential — there is none", async () => {
+    const home = makeTmp();
+    const { writeCredentials, CREDENTIALS_VERSION } = await import("../../src/auth/store.js");
+    writeCredentials(home, { version: CREDENTIALS_VERSION, source: "api-key", apiKey: "k" });
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).not.toMatch(/grant|dashboard/i);
+  });
+
+  it("tolerates an unreadable credentials file and still removes it", async () => {
+    const home = makeTmp();
+    mkdirSync(join(home, ".octen"), { recursive: true });
+    writeFileSync(join(home, ".octen/credentials.json"), "{ not json");
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    expect(existsSync(join(home, ".octen/credentials.json"))).toBe(false);
+    expect(stdoutSpy.mock.calls.map((c) => String(c[0])).join("")).toMatch(/removed local credentials/i);
+  });
+
+  it("reports when there is no credential to clear", async () => {
+    const home = makeTmp();
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = makeProgram(home, home);
+
+    await prog.parseAsync(["node", "octen", "reset", "--credentials"]);
+
+    const output = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(output).toMatch(/no (local )?credentials/i);
   });
 });

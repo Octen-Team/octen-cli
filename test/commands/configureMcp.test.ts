@@ -1,9 +1,10 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
 import { registerConfigureMcp } from "../../src/commands/configureMcp.js";
+import { writeCredentials, CREDENTIALS_VERSION } from "../../src/auth/store.js";
 
 let tmpDir: string;
 
@@ -242,6 +243,130 @@ describe("configure-mcp client-installed detection", () => {
   });
 });
 
+describe("configure-mcp credential resolution", () => {
+  /** Clear the env vars that would short-circuit resolveApiKey before the file. */
+  function withCleanAuthEnv<T>(fn: () => T): T {
+    const saved = {
+      OCTEN_API_KEY: process.env.OCTEN_API_KEY,
+      OCTEN_AUTH_ISSUER: process.env.OCTEN_AUTH_ISSUER,
+      OCTEN_AUTH_RESOURCE: process.env.OCTEN_AUTH_RESOURCE,
+    };
+    delete process.env.OCTEN_API_KEY;
+    delete process.env.OCTEN_AUTH_ISSUER;
+    delete process.env.OCTEN_AUTH_RESOURCE;
+    try {
+      return fn();
+    } finally {
+      for (const [k, v] of Object.entries(saved)) {
+        if (v === undefined) delete process.env[k];
+        else process.env[k] = v;
+      }
+    }
+  }
+
+  it("reads the login credential from the injected home, not os.homedir()", async () => {
+    const home = makeTmp();
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "key-from-injected-home",
+      apiKeyExpiresAt: null,
+      grantId: "grant-1",
+    });
+    const prog = makeProgram(home, home);
+
+    await withCleanAuthEnv(() => prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]));
+
+    const obj = JSON.parse(readFileSync(join(home, ".cursor/mcp.json"), "utf8"));
+    expect(obj.mcpServers.octen.env.OCTEN_API_KEY).toBe("key-from-injected-home");
+  });
+
+  it("a corrupt credentials file names itself instead of degrading to a placeholder", async () => {
+    const home = makeTmp();
+    mkdirSync(join(home, ".octen"), { recursive: true });
+    writeFileSync(join(home, ".octen/credentials.json"), "{ not json");
+    const prog = makeProgram(home, home);
+
+    // This used to be swallowed by a bare catch, which silently produced a
+    // ${OCTEN_API_KEY} placeholder config for a distinct, fixable problem.
+    await withCleanAuthEnv(async () => {
+      await expect(
+        prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]),
+      ).rejects.toThrow(/Invalid credentials file/);
+    });
+
+    expect(existsSync(join(home, ".cursor/mcp.json"))).toBe(false);
+  });
+
+  it("status mode does not consult credentials, so a corrupt file never fails it", async () => {
+    // Narrowing the catch must not make the read-only status listing fail on
+    // a broken file it never reads.
+    const home = makeTmp();
+    mkdirSync(join(home, ".octen"), { recursive: true });
+    writeFileSync(join(home, ".octen/credentials.json"), "{ not json");
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = makeProgram(home, home);
+
+    await withCleanAuthEnv(() => prog.parseAsync(["node", "octen", "configure-mcp"]));
+
+    expect(stdoutSpy.mock.calls.map((c) => String(c[0])).join("")).toMatch(/Cursor:/);
+  });
+
+  it("an issuer mismatch names itself instead of degrading to a placeholder", async () => {
+    // 改动前：这里输出 "no API key found"、写占位符配置、exit 0 —— 用户手上明明有
+    // 一份可用凭证，被告知没有 key，而真正的原因（OCTEN_AUTH_ISSUER 覆盖）一字未提。
+    // 根因是判据用的是 `instanceof OctenAuthError`，它同时匹配过期与 issuer/resource
+    // 不匹配；只有"完全没有凭证"才该退化成占位符。
+    const home = makeTmp();
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "stored-and-perfectly-usable",
+      apiKeyExpiresAt: null,
+      grantId: "grant-1",
+    });
+    const prog = makeProgram(home, home);
+
+    await withCleanAuthEnv(async () => {
+      process.env.OCTEN_AUTH_ISSUER = "https://auth.example.test";
+      await expect(
+        prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]),
+      ).rejects.toThrow(/OCTEN_AUTH_ISSUER/);
+    });
+
+    // 而且绝不能留下一个写着占位符的半吊子配置。
+    const cfg = join(home, ".cursor/mcp.json");
+    if (existsSync(cfg)) {
+      expect(readFileSync(cfg, "utf8")).not.toContain("${OCTEN_API_KEY}");
+    }
+  });
+
+  it("a trailing slash on OCTEN_AUTH_ISSUER names itself instead of being swallowed", async () => {
+    const home = makeTmp();
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "stored",
+      apiKeyExpiresAt: null,
+      grantId: "grant-1",
+    });
+    const prog = makeProgram(home, home);
+
+    await withCleanAuthEnv(async () => {
+      process.env.OCTEN_AUTH_ISSUER = "https://auth.octen.ai/";
+      await expect(
+        prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]),
+      ).rejects.toThrow(/OCTEN_AUTH_ISSUER/);
+    });
+  });
+});
+
 describe("configure-mcp missing API key", () => {
   it("uses placeholder key and prints warning on stderr", async () => {
     const home = makeTmp();
@@ -251,6 +376,9 @@ describe("configure-mcp missing API key", () => {
     // Make sure OCTEN_API_KEY is not set
     const origKey = process.env.OCTEN_API_KEY;
     delete process.env.OCTEN_API_KEY;
+    // No os.homedir spy is needed: configureMcp.ts now threads its injected
+    // `home` into resolveApiKey, so this assertion is hermetic by
+    // construction rather than by one remembered mock.
 
     try {
       await prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]);

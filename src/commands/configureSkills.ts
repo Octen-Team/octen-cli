@@ -7,7 +7,8 @@ import { SKILL_CLIENTS } from "../skills/clients.js";
 import { resolveSkillsDir } from "../skills/source.js";
 import { installSkills, skillStatus } from "../skills/install.js";
 import { setClientEnvKey } from "../skills/setkey.js";
-import { OctenValidationError } from "../api/errors.js";
+import { resolveApiKey } from "../config/resolve.js";
+import { OctenValidationError, OctenNoCredentialError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { quotePath } from "../util/quotePath.js";
 import { parseCsvOpt, parseScopeOpt, type ConfigScope } from "./utils.js";
@@ -216,10 +217,21 @@ export function registerConfigureSkills(
 
       if (opts.setKey) {
         const g = command.optsWithGlobals() as { apiKey?: string };
-        const key = g.apiKey || process.env.OCTEN_API_KEY;
-        if (!key) {
+        let key: string;
+        try {
+          key = resolveApiKey(g.apiKey, process.env, { home });
+        } catch (err) {
+          // ONLY a total absence of credentials becomes the generic "needs a
+          // key" message. This used to test `instanceof OctenAuthError`, which
+          // also matches expiry and issuer/resource mismatch — so a user with a
+          // perfectly good credential and an OCTEN_AUTH_ISSUER override was told
+          // to run `octen login`, which cannot fix an OCTEN_AUTH_* override.
+          // Those errors already carry a message naming the real problem
+          // (resolve.ts's `mismatchMessage` exists for exactly this); rethrow
+          // and let it be seen.
+          if (!(err instanceof OctenNoCredentialError)) throw err;
           throw new OctenValidationError(
-            "--set-key needs a key: pass --api-key or set OCTEN_API_KEY",
+            "--set-key needs a key: pass --api-key, set OCTEN_API_KEY, or run `octen login`",
           );
         }
         for (const client of selected) {

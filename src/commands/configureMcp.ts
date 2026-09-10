@@ -5,6 +5,7 @@ import { MCP_CLIENTS } from "../mcp/clients.js";
 import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
+import { OctenNoCredentialError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { parseScopeOpt, type ConfigScope } from "./utils.js";
 import { quotePath } from "../util/quotePath.js";
@@ -62,26 +63,13 @@ export function registerConfigureMcp(
       const scope = opts.scope as ConfigScope;
       const pin: string | undefined = opts.pin;
 
-      // Resolve API key — tolerate missing
-      let key: string;
-      let keyMissing = false;
-      try {
-        key = resolveApiKey(g.apiKey, process.env);
-      } catch {
-        key = "${OCTEN_API_KEY}";
-        keyMissing = true;
-      }
-
-      // Build the MCP server entry
-      const entry = {
-        command: "npx",
-        args: ["-y", pin ? `octen-mcp@${pin}` : "octen-mcp"],
-        env: { OCTEN_API_KEY: key },
-      };
-
-      // Determine the effective home/cwd
+      // Determine the effective home/cwd. `home` is computed before the key
+      // resolution below so it can be threaded into resolveApiKey: without
+      // it that call fell back to os.homedir() and read the real machine's
+      // credentials file, which is not this command's to read under test.
       const home = internal.home ?? os.homedir();
       const cwd = internal.cwd ?? process.cwd();
+
       const isInstalled =
         internal.isInstalled ?? ((id: string) => isClientInstalled(id, { home }));
 
@@ -115,7 +103,36 @@ export function registerConfigureMcp(
         return;
       }
 
-      // INSTALL MODE — determine which clients to act on, gated by detection.
+      // INSTALL MODE. Everything below needs a key; STATUS MODE above
+      // deliberately returns first, so a broken credentials file never fails
+      // a read-only status listing that does not consult it.
+
+      // Resolve API key — tolerate a missing one, but only a missing one.
+      let key: string;
+      let keyMissing = false;
+      try {
+        key = resolveApiKey(g.apiKey, process.env, { home });
+      } catch (err) {
+        // ONLY a total absence of credentials becomes the ${OCTEN_API_KEY}
+        // placeholder. This used to test `instanceof OctenAuthError`, which
+        // also matches expiry and issuer/resource mismatch — so a user with a
+        // working credential and an OCTEN_AUTH_ISSUER override got
+        // "no API key found", a placeholder config, and exit 0, while the
+        // actual cause went unmentioned. Those errors name themselves; let them.
+        // Symmetric with configureSkills.ts's --set-key branch.
+        if (!(err instanceof OctenNoCredentialError)) throw err;
+        key = "${OCTEN_API_KEY}";
+        keyMissing = true;
+      }
+
+      // Build the MCP server entry
+      const entry = {
+        command: "npx",
+        args: ["-y", pin ? `octen-mcp@${pin}` : "octen-mcp"],
+        env: { OCTEN_API_KEY: key },
+      };
+
+      // Determine which clients to act on, gated by detection.
       let selected: typeof MCP_CLIENTS;
       if (opts.all) {
         // Start from the full registry, then filter to installed ones.

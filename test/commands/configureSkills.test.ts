@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import * as tar from "tar";
 import { Command } from "commander";
 import { registerConfigureSkills } from "../../src/commands/configureSkills.js";
+import { writeCredentials, credentialsPath, CREDENTIALS_VERSION } from "../../src/auth/store.js";
 
 let tmpDirs: string[] = [];
 
@@ -320,6 +321,74 @@ describe("configure-skills --set-key", () => {
       if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
       else process.env.OCTEN_API_KEY = prevKey;
     }
+  });
+
+  it("configure-skills --set-key now honours the login store", async () => {
+    // configureSkills.ts used to read process.env.OCTEN_API_KEY directly,
+    // bypassing resolveApiKey, so a logged-in user's credential never applied
+    // here. The key login stores is the user's own long-lived key,
+    // so writing it into shell config is safe.
+    const home = makeTmp();
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "from-login-store",
+      apiKeyExpiresAt: null,
+      grantId: "grant-1",
+    });
+    const prog = makeProgram(home, home);
+
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prevKey = process.env.OCTEN_API_KEY;
+    delete process.env.OCTEN_API_KEY;
+    try {
+      await prog.parseAsync([
+        "node", "octen", "configure-skills",
+        "--claude-code", "--offline", "--set-key",
+      ]);
+    } finally {
+      if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
+      else process.env.OCTEN_API_KEY = prevKey;
+    }
+
+    const settingsPath = join(home, ".claude/settings.json");
+    const settings = JSON.parse(readFileSync(settingsPath, "utf8"));
+    expect(settings.env.OCTEN_API_KEY).toBe("from-login-store");
+  });
+
+  it("a corrupt credentials file surfaces as a validation error, not as 'needs a key'", async () => {
+    // resolveApiKey's OctenAuthError ("no usable credential") collapses into
+    // "needs a key" — but a corrupt file is a different, fixable problem
+    // (OctenValidationError from store.ts's fail()) and must name itself
+    // instead of being swallowed into the generic message.
+    const home = makeTmp();
+    mkdirSync(join(home, ".octen"), { recursive: true });
+    writeFileSync(credentialsPath(home), JSON.stringify({ version: 2, source: "api-key", apiKey: "k" }));
+    const prog = makeProgram(home, home);
+
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+
+    const prevKey = process.env.OCTEN_API_KEY;
+    delete process.env.OCTEN_API_KEY;
+    let caught: Error | undefined;
+    try {
+      await prog.parseAsync([
+        "node", "octen", "configure-skills",
+        "--claude-code", "--offline", "--set-key",
+      ]);
+    } catch (err) {
+      caught = err as Error;
+    } finally {
+      if (prevKey === undefined) delete process.env.OCTEN_API_KEY;
+      else process.env.OCTEN_API_KEY = prevKey;
+    }
+
+    expect(caught).toBeDefined();
+    expect(caught!.message).toMatch(/Invalid credentials file/);
+    expect(caught!.message).not.toMatch(/needs a key/);
   });
 });
 

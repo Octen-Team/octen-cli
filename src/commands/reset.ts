@@ -7,6 +7,7 @@ import { removeMcp, type InstallOpts } from "../mcp/install.js";
 import { removeSkills } from "../skills/install.js";
 import { quotePath } from "../util/quotePath.js";
 import { parseScopeOpt, type ConfigScope } from "./utils.js";
+import { deleteCredentials, readCredentials, credentialsPath } from "../auth/store.js";
 
 interface ResetInternalOpts {
   /** Injected home dir (for testing); defaults to os.homedir() */
@@ -35,6 +36,10 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
     .description("Remove Octen MCP server and/or skills from AI clients")
     .option("--mcp", "remove MCP entries")
     .option("--skills", "remove skills")
+    .option(
+      "--credentials",
+      "remove the locally stored login credential (~/.octen/credentials.json); not included in --all",
+    )
     .option("--all", "remove from both surfaces across all clients")
     .option("--claude-code", "target Claude Code")
     .option("--cursor", "target Cursor")
@@ -54,6 +59,7 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
       const opts = command.opts() as {
         mcp?: boolean;
         skills?: boolean;
+        credentials?: boolean;
         all?: boolean;
         claudeCode?: boolean;
         cursor?: boolean;
@@ -72,15 +78,55 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
       const scope = opts.scope as ConfigScope;
       const installOpts: InstallOpts = { hasClaudeCli: internal.hasClaudeCli };
 
-      // Surface selection
+      // Surface selection. `--credentials` is deliberately NOT folded into
+      // `--all` — `--all`'s existing meaning is "both surfaces x all
+      // clients" (MCP + skills), and silently logging the user out as a
+      // side effect of that would be an unwelcome surprise.
       const doMcp = opts.all ? true : !!opts.mcp;
       const doSkills = opts.all ? true : !!opts.skills;
+      const doCredentials = !!opts.credentials;
 
-      if (!doMcp && !doSkills) {
+      if (!doMcp && !doSkills && !doCredentials) {
         process.stdout.write(
-          "specify --mcp, --skills, or --all to select what to remove\n",
+          "specify --mcp, --skills, --credentials, or --all to select what to remove\n" +
+            "(--all covers --mcp and --skills across all clients; --credentials is separate)\n",
         );
         return;
+      }
+
+      // --- Credentials surface (independent of MCP/skills and of --all) ---
+      if (doCredentials) {
+        // Read before deleting: a `source: "login"` credential is the only
+        // place this machine records its grantId, and destroying it without
+        // printing that id strands the user — the grant stays listed in the
+        // dashboard and nothing here can name it any more — the same
+        // stranding `octen logout --local` prints the id to avoid. A
+        // corrupt/unreadable file is tolerated, exactly as `octen logout`
+        // tolerates it: reset's job is to remove the file, not diagnose it.
+        let grantId: string | undefined;
+        try {
+          const existing = readCredentials(home);
+          if (existing?.source === "login") grantId = existing.grantId;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          process.stderr.write(
+            `warning: ignoring an unreadable credentials file (removing it): ${msg}\n`,
+          );
+        }
+
+        const removed = deleteCredentials(home);
+        process.stdout.write(
+          removed
+            ? `removed local credentials (${quotePath(credentialsPath(home))})\n`
+            : "no local credentials found\n",
+        );
+        if (removed && grantId) {
+          process.stdout.write(
+            `Grant ${grantId} was not revoked — \`reset --credentials\` makes no network ` +
+              `request. It can still mint a new credential without a fresh consent screen; ` +
+              `revoke it from the dashboard's authorization list if you want to close it out.\n`,
+          );
+        }
       }
 
       // Determine which client ids were explicitly requested via per-client flags

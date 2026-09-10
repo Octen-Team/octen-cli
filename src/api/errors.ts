@@ -1,5 +1,19 @@
 export class OctenError extends Error {}
 export class OctenAuthError extends OctenError {}
+/**
+ * There is no credential at all — no flag, no env var, no credentials file.
+ *
+ * A subclass rather than a flag so that every existing `instanceof
+ * OctenAuthError` keeps matching, while the two callers that must tell "you
+ * have nothing" apart from "you have something that doesn't apply here"
+ * (`configure-mcp`, `configure-skills --set-key`) can do it without matching on
+ * message text. Both used to treat any OctenAuthError as "no credential", so a
+ * working credential plus an OCTEN_AUTH_ISSUER override produced "no API key
+ * found", a `${OCTEN_API_KEY}` placeholder config, exit 0 — and, in
+ * configure-skills, advice to run `octen login`, which cannot fix an
+ * OCTEN_AUTH_* override.
+ */
+export class OctenNoCredentialError extends OctenAuthError {}
 export class OctenValidationError extends OctenError {}
 export class OctenTimeoutError extends OctenError {}
 export class OctenNetworkError extends OctenError {}

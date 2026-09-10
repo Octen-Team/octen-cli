@@ -7,9 +7,113 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+> **Release blocker — read before tagging.**
+>
+> **Do not publish this release until the server side is live in production.** Merging this
+> branch is safe; tagging is not. `octen login` authenticates as the pre-registered public
+> client `octen-cli`, and the server creates that client row itself the first time a login
+> reaches for it — so no manual database step gates the release, but the **server code that
+> does it** must be running in production first.
+>
+> Until that server code is live, every `octen login` dies at the authorize step with
+> `invalid_client` before the browser ever shows a consent screen. Every user who upgrades
+> hits it; there is no client-side fallback, and no CLI change can work around it.
+>
+> So the order is: **server released to production → a real `octen login` verified against
+> production → only then push the `v*` tag here.** Pushing the tag runs
+> `release.yml` (npm publish) and `binaries.yml`, both of which are hard to walk back once
+> users have installed. Verify with a real `octen login` against production before tagging,
+> not after.
+>
+> The rest of the CLI is unaffected: `--api-key`, `OCTEN_API_KEY`, and every existing command
+> work regardless, so an early release degrades exactly one new command — but it degrades it
+> for everyone.
+
+### Added
+
+- **`octen login`.** Logs in via a one-time browser-based OAuth flow (loopback callback,
+  PKCE) and stores the resulting long-lived API key at `~/.octen/credentials.json`
+  (`0600`). `--api-key <key>` stores a pasted key directly with zero network requests;
+  `--port <n>` pins the loopback port for `ssh -L` forwarding; `--no-browser` prints the
+  authorize URL instead of opening one. The confirmation line names the account the way
+  the consent screen did — `Logged in as Octen family.` — falling back to the raw account
+  id when the server does not supply a name, which is also what happens against any server
+  older than that field.
+- **`octen logout`.** Revokes this device's authorization and removes the local
+  credential. `--local` skips the network call and only removes the file. Revoking the
+  authorization does not deactivate the underlying API key — see the README's Auth
+  section for the exact semantics.
+- **`octen whoami`.** Shows the locally stored credential — account, credential source,
+  and the `grantId` used to find and revoke this device in the dashboard's authorization
+  list. Reads only the local credentials file; makes no network requests. Supports
+  `--json`. Exits non-zero when not logged in.
+- **`octen reset --credentials`.** Clears the locally stored login credential.
+  Deliberately not folded into `--all`, whose existing meaning is "both surfaces (MCP +
+  skills) across all clients." Like `octen logout --local`, it prints the `grantId` of a
+  `source: login` credential before destroying it — otherwise the authorization stays
+  listed in the dashboard with nothing left on the machine able to name it. `octen login
+  --api-key` prints the same warning when it overwrites a browser login.
+- **`OCTEN_AUTH_ISSUER` and `OCTEN_AUTH_RESOURCE`** are now documented (README Auth
+  section and `octen login --help`). They override the OAuth authorization server and
+  the token audience for local development against a self-hosted AS; both default to
+  production, must have no trailing slash, and changing either makes an existing stored
+  credential inapplicable — the CLI now says exactly that and names the variable, instead
+  of reusing the generic "No API key. Run `octen login`" message for a case where
+  logging in again would not have helped.
+- `octen configure-skills --set-key` now resolves the key through the same
+  `--api-key` > `OCTEN_API_KEY` > `octen login` credential priority as every other
+  command, instead of reading `OCTEN_API_KEY` directly — a login credential now feeds
+  straight into AI-client configs.
+
 ## [0.8.0] — 2026-09-08
 
 ### Fixed
+
+- **The stored issuer is no longer trusted with the API key.** `octen login`'s
+  cleanup step and `octen logout` sent the credential's account-wide API key to
+  whatever host the credentials file named, without checking it against the
+  issuer this run is for — while credential *resolution* refused to use that
+  same credential for exactly the reason that it belongs to another
+  environment. Neither `OCTEN_AUTH_ISSUER` nor the stored issuer was checked for
+  a scheme either, so `http://` put the access token and the API key on the wire
+  in cleartext with no warning. Both now require https, with a `127.0.0.1`
+  loopback literal as the only exception (local development); `localhost` is not
+  exempt, since the hosts file can redirect it. `octen login` now leaves a
+  credential from another issuer or audience alone and prints its grant id
+  rather than silently mailing its key away.
+
+- **`octen logout` no longer claims an authorization is gone when it may not
+  be.** The server answers 400 to three different situations and the response
+  carries nothing to tell them apart — including one where the grant is still
+  active and only this key can no longer act on it, which is what happens after
+  you are removed from the organization that owns the key. Those users were told
+  "nothing left to revoke". The message now states both possibilities and points
+  at the grant id in the dashboard.
+
+- **A key from `~/.octen/credentials.json` no longer reaches another process's
+  argv or a world-readable file.** `octen configure-mcp` passed it to
+  `claude mcp add` as a command-line argument, visible in `ps` for the child's
+  lifetime, and both `configure-mcp` and `configure-skills --set-key` wrote it
+  into client configs with the default 0644. Config files carrying a key are now
+  written 0600 (existing files are chmod'ed, since a merge does not recreate
+  them), and a literal key is written directly to the config instead of being
+  handed to a subprocess.
+
+- **`octen whoami` no longer contradicts what other commands do.** With a
+  corrupt credentials file and `OCTEN_API_KEY` set, every other command worked
+  while `whoami` exited 2 — and in `--json` mode printed no JSON at all. Its
+  exit code also tracked "does a credentials file exist" rather than "is a key
+  in effect", so it exited 0 while reporting that nothing was in effect, and 2
+  while an environment key was working fine. It now tolerates an unreadable file
+  whenever a flag or environment key already decides the answer, and exits
+  non-zero exactly when no key is in effect.
+
+- **`configure-mcp` and `configure-skills` name the real problem.** A usable
+  stored credential plus an `OCTEN_AUTH_ISSUER` override produced "no API key
+  found", a `${OCTEN_API_KEY}` placeholder config and exit 0 — and, from
+  `configure-skills`, advice to run `octen login`, which cannot fix an
+  `OCTEN_AUTH_*` override. Only a total absence of credentials is treated as a
+  missing key now; expiry and issuer/resource mismatch report themselves.
 
 - **Numeric flags are parsed strictly.** `parseInt`/`parseFloat` accepted a
   numeric prefix and threw the rest away, so `--count 1.5` was sent as `1`,
