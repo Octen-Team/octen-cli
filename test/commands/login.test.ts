@@ -316,6 +316,99 @@ describe("octen login", () => {
     expect(readCredentials(h)).toMatchObject({ grantId: "new-grant", apiKey: "new-key" });
   });
 
+  // 这条钉住的是一个实测出过的泄漏：凭证文件里的 issuer 会被无条件信任，
+  // step 1 把账户级长期 API key 发给它——而 config/resolve.ts 对同一份凭证的
+  // 判断是"不属于本环境、绝不使用"。不用它调 API 却肯把 key 交给它，是同一个
+  // 凭证在唯一会泄漏的方向上被信任。
+  it("does NOT revoke — or send the key to — a credential from a different issuer", async () => {
+    const h = tmp();
+    writeCredentials(h, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "http://127.0.0.1:9911",
+      resource: "https://cli.octen.ai",
+      apiKey: "sk-other-environment-must-not-leak",
+      apiKeyExpiresAt: null,
+      grantId: "grant-other-environment",
+    });
+
+    const touchedHosts: string[] = [];
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
+      const u = String(url);
+      touchedHosts.push(new URL(u).host);
+      if (u.endsWith("/api/oauth/token")) {
+        return new Response(JSON.stringify({ access_token: "at-1" }), { status: 200 });
+      }
+      if (u.endsWith("/api/oauth/cli/key")) {
+        return new Response(
+          JSON.stringify({ active: true, api_key: "new-key", expires_at: null, grant_id: "new-grant" }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch to ${u}`);
+    });
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser: autoCompleteBrowser() });
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    // 没有任何一次请求打到那个 issuer。
+    expect(touchedHosts).not.toContain("127.0.0.1:9911");
+    const bodies = fetchImpl.mock.calls.map((c) => JSON.stringify(c[1] ?? {})).join("");
+    expect(bodies).not.toContain("sk-other-environment-must-not-leak");
+
+    // 而且必须明确告诉用户那条 grant 没被撤销、以及它的 id ——
+    // 下一行就要覆盖掉这台机器上唯一记着这个 id 的地方。
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(err).toContain("grant-other-environment");
+    expect(err).toContain("http://127.0.0.1:9911");
+    expect(err).toMatch(/NOT revoked/i);
+    expect(err).not.toContain("sk-other-environment-must-not-leak");
+
+    // 新登录本身照常完成。
+    expect(readCredentials(h)).toMatchObject({ grantId: "new-grant", apiKey: "new-key" });
+  });
+
+  it("does NOT revoke a credential whose audience differs from this login's", async () => {
+    const h = tmp();
+    writeCredentials(h, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.other.example",
+      apiKey: "sk-other-audience",
+      apiKeyExpiresAt: null,
+      grantId: "grant-other-audience",
+    });
+    const revoked: string[] = [];
+    const fetchImpl = vi.fn(async (url: RequestInfo | URL) => {
+      const u = String(url);
+      if (u.endsWith("/api/oauth/cli/revoke")) {
+        revoked.push(u);
+        return new Response("{}", { status: 200 });
+      }
+      if (u.endsWith("/api/oauth/token")) {
+        return new Response(JSON.stringify({ access_token: "at-1" }), { status: 200 });
+      }
+      if (u.endsWith("/api/oauth/cli/key")) {
+        return new Response(
+          JSON.stringify({ active: true, api_key: "new-key", expires_at: null, grant_id: "new-grant" }),
+          { status: 200 },
+        );
+      }
+      throw new Error(`unexpected fetch to ${u}`);
+    });
+    const stderrSpy = vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser: autoCompleteBrowser() });
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    expect(revoked).toEqual([]);
+    const err = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(err).toContain("grant-other-audience");
+    expect(err).toMatch(/NOT revoked/i);
+  });
+
   it("a failed revoke (network error) does not block the new login", async () => {
     const h = tmp();
     writeCredentials(h, {

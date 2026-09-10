@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync, renameSync, readFileSync, existsSync, unlinkS
 import { join } from "node:path";
 import { randomBytes } from "node:crypto";
 import { OctenValidationError } from "../api/errors.js";
+import { assertSecureOrigin } from "./constants.js";
 
 export const CREDENTIALS_VERSION = 1;
 
@@ -75,6 +76,16 @@ function validate(obj: unknown): Credentials {
 
   if (rec.source === "login") {
     if (!isNonEmptyString(rec.issuer)) fail("missing issuer");
+    // The stored issuer is not inert data: `login`'s step-1 cleanup and
+    // `logout` both POST this credential's API key to it. So it gets exactly
+    // the same https-or-loopback rule as OCTEN_AUTH_ISSUER — a file naming a
+    // plaintext host would otherwise be a standing instruction to mail an
+    // account-wide key there in the clear.
+    try {
+      assertSecureOrigin("credentials.issuer", rec.issuer);
+    } catch {
+      fail("insecure issuer");
+    }
     if (!isNonEmptyString(rec.resource)) fail("missing resource");
     if (!isNonEmptyString(rec.apiKey)) fail("missing apiKey");
     if (!isValidExpiry(rec.apiKeyExpiresAt)) fail("invalid apiKeyExpiresAt");

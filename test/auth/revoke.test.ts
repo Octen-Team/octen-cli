@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
-import { revokeCliGrant, GRANT_ALREADY_GONE_MESSAGE } from "../../src/auth/revoke.js";
+import { revokeCliGrant, GRANT_NOT_RECOGNIZED_MESSAGE } from "../../src/auth/revoke.js";
 import { OctenAuthError, OctenNetworkError } from "../../src/api/errors.js";
 
 // Distinctive secret-shaped values so any test that finds them in an error
@@ -46,7 +46,7 @@ describe("revokeCliGrant", () => {
     ).rejects.toBeInstanceOf(OctenAuthError);
   });
 
-  it("400 (unknown/malformed grant_id) -> OctenAuthError carrying GRANT_ALREADY_GONE_MESSAGE", async () => {
+  it("400 (unknown/malformed grant_id) -> OctenAuthError carrying GRANT_NOT_RECOGNIZED_MESSAGE", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(new Response("{}", { status: 400 }));
     let thrown: unknown;
     await revokeCliGrant({
@@ -62,7 +62,7 @@ describe("revokeCliGrant", () => {
     // message. It now imports this constant instead of re-typing the
     // sentence, so the two can no longer drift silently — this assertion
     // pins the 400 branch to the constant from revoke.ts's own side.
-    expect((thrown as Error).message).toBe(GRANT_ALREADY_GONE_MESSAGE);
+    expect((thrown as Error).message).toBe(GRANT_NOT_RECOGNIZED_MESSAGE);
   });
 
   it("503 (infrastructure failure) -> OctenNetworkError", async () => {

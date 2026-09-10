@@ -92,7 +92,27 @@ export async function login(deps: LoginDeps): Promise<LoginResult> {
   } catch (err) {
     log(`warning: ignoring an unreadable existing credentials file (continuing): ${(err as Error).message}`);
   }
-  if (existing?.source === "login") {
+  if (existing?.source === "login" && existing.issuer !== issuer) {
+    // A credential minted against a different issuer is another environment's,
+    // and `resolveApiKey` already refuses to *use* it for exactly that reason
+    // (config/resolve.ts: "never use it… it isn't ours to manage"). Sending its
+    // API key to the host that file happens to name would be the same
+    // credential being trusted in the one direction that leaks it. So: don't.
+    //
+    // Say so loudly rather than silently, because step 8 is about to overwrite
+    // the only local record of that grant's id.
+    log(
+      `warning: the existing credential was issued by ${existing.issuer}, not ${issuer} — leaving it alone.\n` +
+        `  Grant ${existing.grantId} is NOT revoked. To close it out, run \`octen logout\` with\n` +
+        `  OCTEN_AUTH_ISSUER=${existing.issuer} before logging in here, or revoke it in that\n` +
+        `  environment's dashboard by that id.`,
+    );
+  } else if (existing?.source === "login" && existing.resource !== resource) {
+    log(
+      `warning: the existing credential names audience ${existing.resource}, not ${resource} — leaving it alone.\n` +
+        `  Grant ${existing.grantId} is NOT revoked; revoke it in the dashboard by that id.`,
+    );
+  } else if (existing?.source === "login") {
     try {
       await revokeCliGrant({
         issuer: existing.issuer,

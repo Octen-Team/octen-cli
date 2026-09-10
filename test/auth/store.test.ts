@@ -109,4 +109,34 @@ describe("credential store", () => {
     writeCredentials(h, { version: 1, source: "api-key", apiKey: "k" });
     expect(deleteCredentials(h)).toBe(true);
   });
+
+  // 存储的 issuer 不是惰性数据：login 的 step-1 清理与 logout 都会把这份凭证的
+  // API key POST 给它。所以它必须和 OCTEN_AUTH_ISSUER 走同一条 https-或-loopback
+  // 规则——否则一个文件就等于一条"把账户级 key 明文寄到这里"的常驻指令。
+  it("rejects a stored issuer that is neither https nor a loopback literal", () => {
+    const h = mkdtempSync(join(tmpdir(), "octen-store-"));
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(
+      join(h, ".octen", "credentials.json"),
+      JSON.stringify({
+        version: 1, source: "login", issuer: "http://evil.example",
+        resource: "https://cli.octen.ai", apiKey: "k", apiKeyExpiresAt: null, grantId: "g",
+      }),
+    );
+    expect(() => readCredentials(h)).toThrow(OctenValidationError);
+    expect(() => readCredentials(h)).toThrow(/insecure issuer/);
+  });
+
+  it("still accepts a loopback http issuer — local development writes those", () => {
+    const h = mkdtempSync(join(tmpdir(), "octen-store-"));
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(
+      join(h, ".octen", "credentials.json"),
+      JSON.stringify({
+        version: 1, source: "login", issuer: "http://127.0.0.1:8788",
+        resource: "https://cli.octen.ai", apiKey: "k", apiKeyExpiresAt: null, grantId: "g",
+      }),
+    );
+    expect(readCredentials(h)).toMatchObject({ issuer: "http://127.0.0.1:8788" });
+  });
 });

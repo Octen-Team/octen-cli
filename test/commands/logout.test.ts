@@ -144,21 +144,29 @@ describe("octen logout", () => {
     expect(process.exitCode).toBe(1);
   });
 
-  it("deletes the file when the server says the grant id was not recognized (400) — the goal is already met", async () => {
+  it("deletes the file on 400, but must NOT claim the authorization is gone", async () => {
     const h = tmp();
     seedLoginCreds(h, { grantId: "grant-400" });
     const fetchImpl = vi.fn(async () => new Response("{}", { status: 400 }));
 
     const { out, err } = await runLogout(h, fetchImpl);
 
-    // Deterministic failure: retrying plain `octen logout` would fail
-    // identically forever, and the grant is already gone server-side — so
-    // this must NOT be treated like the network-failure "keep the file" case.
+    // Deleting the file is still right: retrying plain `octen logout` fails
+    // identically forever, so keeping it only strands the user.
     expect(readCredentials(h)).toBeUndefined();
     expect(process.exitCode).toBeUndefined();
-    expect(out).toMatch(/already gone/i);
     expect(out).toContain("grant-400");
     expect(err).toBe("");
+
+    // 但绝不能断言"已经没了"。服务端的 400 覆盖三种情况，响应无 body 无法区分，
+    // 其中一种是 grant 仍然 active、只是这把 key 不再能操作它（比如用户已被移出
+    // 拥有该 key 的组织）。对那些用户说"nothing left to revoke"，会留下一条活着的
+    // grant 继续能换出凭证——正是 logout 自己的文档承诺绝不发生的事。
+    expect(out).not.toMatch(/already gone/i);
+    expect(out).not.toMatch(/nothing left to revoke/i);
+    // 必须把另一种可能说出来，并给出可执行的下一步。
+    expect(out).toMatch(/still\s*\n?\s*active/i);
+    expect(out).toMatch(/dashboard/i);
   });
 
   it("deletes the file when the stored key is no longer valid (401) and prints the grantId", async () => {

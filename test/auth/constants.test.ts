@@ -29,4 +29,34 @@ describe("auth constants", () => {
   it("a trailing slash on the resource throws instead of being trimmed", () => {
     expect(() => authResource({ OCTEN_AUTH_RESOURCE: "https://cli.octen.ai/" })).toThrow();
   });
+
+  // 这两条钉住的是一个已经实测出过泄漏的路径：`exchange.ts` 把 access token、
+  // `revoke.ts` 把账户级长期 API key 发到 issuer 指向的任何主机。此前 authIssuer
+  // 只拒尾斜杠，`OCTEN_AUTH_ISSUER=http://…` 会让两者明文上线且无任何提示。
+  it("a non-loopback plaintext issuer is rejected", () => {
+    expect(() => authIssuer({ OCTEN_AUTH_ISSUER: "http://auth-staging.internal" })).toThrow(
+      /must use https/,
+    );
+    expect(() => authIssuer({ OCTEN_AUTH_ISSUER: "http://localhost:8080" })).toThrow(
+      // localhost 不算 loopback 豁免：它可以被 hosts 文件改指向（RFC 8252 §8.3）。
+      /must use https/,
+    );
+  });
+
+  it("http on a loopback literal stays allowed — local development depends on it", () => {
+    expect(authIssuer({ OCTEN_AUTH_ISSUER: "http://127.0.0.1:8080" })).toBe("http://127.0.0.1:8080");
+    expect(authIssuer({ OCTEN_AUTH_ISSUER: "http://[::1]:8080" })).toBe("http://[::1]:8080");
+  });
+
+  it("an issuer that is not an absolute URL, or carries userinfo, is rejected", () => {
+    expect(() => authIssuer({ OCTEN_AUTH_ISSUER: "auth.octen.ai" })).toThrow(/absolute URL/);
+    expect(() => authIssuer({ OCTEN_AUTH_ISSUER: "https://u:p@auth.octen.ai" })).toThrow(
+      /must not contain credentials/,
+    );
+  });
+
+  // resource 不受 https 规则约束，理由是它从不被拨号——只作为 audience 逐字节比较。
+  it("the resource is an identifier, not an origin: no https rule applies", () => {
+    expect(authResource({ OCTEN_AUTH_RESOURCE: "http://cli.example" })).toBe("http://cli.example");
+  });
 });

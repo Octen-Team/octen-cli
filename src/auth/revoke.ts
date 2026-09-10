@@ -2,16 +2,28 @@ import { OctenAuthError, OctenNetworkError } from "../api/errors.js";
 import { REQUEST_TIMEOUT_MS } from "./constants.js";
 
 /**
- * The 400 response's message: the grant id is unknown or malformed, i.e. the
- * grant is already gone server-side (already revoked, or never existed).
+ * The 400 response's message.
  *
- * Exported because `octen logout` branches on exactly this case to say
- * "already gone" instead of the generic 401/403 copy. That branch used to
- * match the literal string, so editing this sentence would have silently
- * downgraded it to the wrong message with no test failure anywhere.
- * Importing the constant makes the coupling break at compile time instead.
+ * This deliberately does NOT say "already gone". The server returns 400 from
+ * three places and the response carries no body to tell them apart:
+ *
+ *   1. the grant id is unknown          → it really is gone
+ *   2. the body/grant_id was unparseable → unreachable from this client
+ *   3. the revoke was refused after the row was found — e.g. the subject is no
+ *      longer a joined member of the organization that owns the key, or that
+ *      organization is deactivated. **The grant is still `active` in this case.**
+ *
+ * An earlier version asserted case 1 for all three, so a user who had been
+ * removed from an organization was told "nothing left to revoke" while a live
+ * grant kept its ability to mint credentials — the exact outcome this command's
+ * own doc comment says must never happen.
+ *
+ * Exported because `octen logout` branches on this case for wording. That
+ * branch used to match the literal string, so editing this sentence would have
+ * silently changed behaviour with no test failure anywhere; importing the
+ * constant makes the coupling break at compile time instead.
  */
-export const GRANT_ALREADY_GONE_MESSAGE = "The grant id was not recognized.";
+export const GRANT_NOT_RECOGNIZED_MESSAGE = "The server did not accept that grant id.";
 
 /**
  * Revoke a CLI OAuth grant at `POST {issuer}/api/oauth/cli/revoke`.
@@ -82,7 +94,7 @@ export async function revokeCliGrant(a: {
   }
 
   if (res.status === 400) {
-    throw new OctenAuthError(GRANT_ALREADY_GONE_MESSAGE);
+    throw new OctenAuthError(GRANT_NOT_RECOGNIZED_MESSAGE);
   }
 
   if (!res.ok) {

@@ -6,7 +6,7 @@ import { readCredentials, deleteCredentials } from "../auth/store.js";
 // than re-typing its sentence: editing that copy now breaks the build here
 // instead of silently downgrading this branch to the generic 401/403 message
 // with no test failure.
-import { revokeCliGrant, GRANT_ALREADY_GONE_MESSAGE } from "../auth/revoke.js";
+import { revokeCliGrant, GRANT_NOT_RECOGNIZED_MESSAGE } from "../auth/revoke.js";
 import { OctenNetworkError } from "../api/errors.js";
 
 export interface LogoutInternalOpts {
@@ -133,10 +133,22 @@ export function registerLogout(program: Command, internal: LogoutInternalOpts = 
         // identically every time, so keeping the file only strands the
         // user. Delete it, and say exactly why revocation didn't happen.
         deleteCredentials(home);
-        if (msg === GRANT_ALREADY_GONE_MESSAGE) {
+        if (msg === GRANT_NOT_RECOGNIZED_MESSAGE) {
+          // Do NOT say "already gone". The server's 400 is ambiguous by
+          // construction (see GRANT_NOT_RECOGNIZED_MESSAGE in auth/revoke.ts):
+          // it covers both "that id is unknown" and "the id is real and still
+          // active, but this key may no longer act on it" — the latter happens
+          // when the user has been removed from the organization that owns the
+          // key. Telling those users there is nothing left to revoke leaves a
+          // live grant behind that can still mint credentials, which is exactly
+          // what this command's doc comment above promises never to do.
           process.stdout.write(
-            `Cleared local credentials. The authorization was already gone on the server ` +
-              `(grant ${creds.grantId}) — nothing left to revoke.\n`,
+            `Cleared local credentials, but the server did not accept the revocation of ` +
+              `grant ${creds.grantId}.\n` +
+              `  Most often the authorization no longer exists. It can also mean the ` +
+              `authorization is still active\n  while this key may no longer act on it — for ` +
+              `example after you were removed from the\n  organization that owns it. ` +
+              `Check that grant id in the dashboard if you need to be sure.\n`,
           );
         } else {
           process.stdout.write(
