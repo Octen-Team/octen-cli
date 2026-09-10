@@ -122,13 +122,13 @@ export function renderWhoami(data: WhoamiData): string {
   const lines: string[] = [];
 
   if (!data.loggedIn) {
-    // Unreachable as the code stands: the only call site that builds a
-    // `loggedIn: false` payload is in json mode (src/commands/whoami.ts), and
-    // `emit` ignores the pretty renderer there, while pretty mode throws
-    // instead. It stays because the renderer must be total over WhoamiData —
-    // and it routes through the same helper as that throw, so a later change
-    // that does reach this branch inherits the wording instead of inventing a
-    // second one that nothing tests.
+    // Reachable in both modes now. This used to be dead code because pretty
+    // mode threw instead of rendering; whoami stopped throwing because "not
+    // logged in" is a status this command reports, not a failure — the
+    // non-zero exit code carries that signal. The comment that used to sit
+    // here predicted exactly this: the wording is shared with the json path
+    // through `notLoggedInMessage` so the two cannot drift, and that is what
+    // made the change a one-liner rather than a second message nothing tests.
     return notLoggedInMessage(data.effectiveSource);
   }
 

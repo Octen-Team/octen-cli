@@ -5,7 +5,7 @@ import { MCP_CLIENTS } from "../mcp/clients.js";
 import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
-import { OctenAuthError } from "../api/errors.js";
+import { OctenNoCredentialError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { parseScopeOpt, type ConfigScope } from "./utils.js";
 import { quotePath } from "../util/quotePath.js";
@@ -113,13 +113,14 @@ export function registerConfigureMcp(
       try {
         key = resolveApiKey(g.apiKey, process.env, { home });
       } catch (err) {
-        // Only "no usable credential" (OctenAuthError) becomes the
-        // ${OCTEN_API_KEY} placeholder. Anything else — a corrupt or
-        // unknown-version credentials file, a malformed
-        // OCTEN_AUTH_ISSUER/OCTEN_AUTH_RESOURCE — is a distinct, fixable
-        // problem, and silently writing a degraded config for it hides the
-        // cause. Symmetric with configureSkills.ts's --set-key branch.
-        if (!(err instanceof OctenAuthError)) throw err;
+        // ONLY a total absence of credentials becomes the ${OCTEN_API_KEY}
+        // placeholder. This used to test `instanceof OctenAuthError`, which
+        // also matches expiry and issuer/resource mismatch — so a user with a
+        // working credential and an OCTEN_AUTH_ISSUER override got
+        // "no API key found", a placeholder config, and exit 0, while the
+        // actual cause went unmentioned. Those errors name themselves; let them.
+        // Symmetric with configureSkills.ts's --set-key branch.
+        if (!(err instanceof OctenNoCredentialError)) throw err;
         key = "${OCTEN_API_KEY}";
         keyMissing = true;
       }

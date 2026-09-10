@@ -1,12 +1,10 @@
 import os from "node:os";
 import type { Command } from "commander";
-import { readCredentials } from "../auth/store.js";
+import { readCredentials, type Credentials } from "../auth/store.js";
 import { authIssuer, authResource } from "../auth/constants.js";
 import { credentialIgnoredReason } from "../config/resolve.js";
-import { OctenAuthError } from "../api/errors.js";
 import { chooseMode, emit } from "../output/render.js";
 import {
-  notLoggedInMessage,
   renderWhoami,
   type EffectiveKeySource,
   type WhoamiData,
@@ -70,18 +68,31 @@ export function registerWhoami(program: Command, internal: WhoamiInternalOpts = 
           ? "OCTEN_API_KEY"
           : undefined;
 
-      const creds = readCredentials(home);
+      // The comment above is the whole point, so honour it: when a flag or env
+      // var already decided the outcome, the file is irrelevant and must not be
+      // able to fail this command. `resolveApiKey` returns on that path without
+      // touching disk, so `octen search` works with a corrupt credentials file
+      // while `octen whoami` used to be the one command that exited 2 — and in
+      // --json mode emitted nothing at all, which is worse than useless to the
+      // scripts that read it.
+      let creds: Credentials | undefined;
+      try {
+        creds = readCredentials(home);
+      } catch (err) {
+        if (!shadowSource) throw err;
+        creds = undefined;
+      }
 
       if (!creds) {
         const data: WhoamiData = { loggedIn: false, effectiveSource: shadowSource ?? "none" };
-        if (mode === "json") {
-          // A script should not have to distinguish "not logged in" from
-          // "corrupt credentials file" by their shared exit code 2.
-          emit(data, mode, renderWhoami);
-          process.exitCode = 2;
-          return;
-        }
-        throw new OctenAuthError(notLoggedInMessage(shadowSource));
+        emit(data, mode, renderWhoami);
+        // Exit code tracks "is a key in effect", not "does a file exist".
+        // It used to track the latter and was wrong in both directions: it
+        // exited 0 while reporting effectiveSource "none" (every command would
+        // fail), and exited 2 when an env key was working fine. That made
+        // `octen whoami && octen search …` unreliable in both directions.
+        if (!shadowSource) process.exitCode = 2;
+        return;
       }
 
       // Only reached when nothing shadows the file — mirroring resolveApiKey,
@@ -116,5 +127,9 @@ export function registerWhoami(program: Command, internal: WhoamiInternalOpts = 
             };
 
       emit(data, mode, renderWhoami);
+      // Same rule as the no-credential branch: "none" means every command would
+      // fail, so it must not exit 0. A credential that exists but is shadowed
+      // or belongs to another environment is exactly that case.
+      if (effectiveSource === "none") process.exitCode = 2;
     });
 }

@@ -1,6 +1,6 @@
 import os from "node:os";
 import { DEFAULT_BASE_URL } from "../api/constants.js";
-import { OctenAuthError } from "../api/errors.js";
+import { OctenAuthError, OctenNoCredentialError } from "../api/errors.js";
 import { readCredentials, type Credentials } from "../auth/store.js";
 import { authIssuer, authResource } from "../auth/constants.js";
 
@@ -98,7 +98,7 @@ export function resolveApiKey(
   const home = opts.home ?? os.homedir();
   const creds = readCredentials(home);
   if (!creds) {
-    throw new OctenAuthError(NO_CREDENTIAL_MESSAGE);
+    throw new OctenNoCredentialError(NO_CREDENTIAL_MESSAGE);
   }
 
   if (creds.source === "login") {

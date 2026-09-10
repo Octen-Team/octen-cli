@@ -314,6 +314,37 @@ describe("configure-mcp credential resolution", () => {
     expect(stdoutSpy.mock.calls.map((c) => String(c[0])).join("")).toMatch(/Cursor:/);
   });
 
+  it("an issuer mismatch names itself instead of degrading to a placeholder", async () => {
+    // 改动前：这里输出 "no API key found"、写占位符配置、exit 0 —— 用户手上明明有
+    // 一份可用凭证，被告知没有 key，而真正的原因（OCTEN_AUTH_ISSUER 覆盖）一字未提。
+    // 根因是判据用的是 `instanceof OctenAuthError`，它同时匹配过期与 issuer/resource
+    // 不匹配；只有"完全没有凭证"才该退化成占位符。
+    const home = makeTmp();
+    writeCredentials(home, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "stored-and-perfectly-usable",
+      apiKeyExpiresAt: null,
+      grantId: "grant-1",
+    });
+    const prog = makeProgram(home, home);
+
+    await withCleanAuthEnv(async () => {
+      process.env.OCTEN_AUTH_ISSUER = "https://auth.example.test";
+      await expect(
+        prog.parseAsync(["node", "octen", "configure-mcp", "--cursor"]),
+      ).rejects.toThrow(/OCTEN_AUTH_ISSUER/);
+    });
+
+    // 而且绝不能留下一个写着占位符的半吊子配置。
+    const cfg = join(home, ".cursor/mcp.json");
+    if (existsSync(cfg)) {
+      expect(readFileSync(cfg, "utf8")).not.toContain("${OCTEN_API_KEY}");
+    }
+  });
+
   it("a trailing slash on OCTEN_AUTH_ISSUER names itself instead of being swallowed", async () => {
     const home = makeTmp();
     writeCredentials(home, {

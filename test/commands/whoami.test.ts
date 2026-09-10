@@ -1,11 +1,10 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdtempSync, rmSync, mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
 import { registerWhoami } from "../../src/commands/whoami.js";
 import { writeCredentials, CREDENTIALS_VERSION } from "../../src/auth/store.js";
-import { OctenAuthError, exitCodeFor } from "../../src/api/errors.js";
 
 let tmpDirs: string[] = [];
 function tmp(): string {
@@ -96,23 +95,24 @@ describe("octen whoami", () => {
     expect(JSON.stringify(parsed)).not.toContain("the-real-key");
   });
 
-  it("reports clearly when not logged in and exits non-zero", async () => {
+  it("reports clearly when not logged in and exits non-zero — without throwing", async () => {
     const h = tmp();
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
     const prog = baseProgram();
     registerWhoami(prog, { home: h, env: {} });
 
-    // The old version of this test asserted only that the promise
-    // rejects, while its name promised an exit code. The code itself comes
-    // from cli.ts's exitCodeFor(err), which a bare test program never runs,
-    // so assert that mapping directly rather than leaving the name a claim
-    // nothing here verifies.
+    // whoami no longer throws here. "Not logged in" is a state this command
+    // exists to report, not a failure of the command; the non-zero exit code
+    // carries that signal instead. Throwing also meant --json emitted nothing
+    // at all, which is worse than useless to the scripts that parse it.
     let thrown: unknown;
     await prog.parseAsync(["node", "octen", "whoami", "--pretty"]).catch((err) => {
       thrown = err;
     });
-    expect(thrown).toBeInstanceOf(OctenAuthError);
-    expect((thrown as Error).message).toMatch(/not logged in/i);
-    expect(exitCodeFor(thrown)).toBe(2);
+    expect(thrown).toBeUndefined();
+    const out = stdoutSpy.mock.calls.map((c) => String(c[0])).join("");
+    expect(out).toMatch(/not logged in/i);
+    expect(process.exitCode).toBe(2);
   });
 
   it("on an api-key credential shows the source and no account fields", async () => {
@@ -330,7 +330,71 @@ describe("octen whoami", () => {
     const json = JSON.parse(stdoutSpy.mock.calls.map((c) => String(c[0])).join(""));
     expect(json).toEqual({ loggedIn: false, effectiveSource: "OCTEN_API_KEY" });
     expect(JSON.stringify(json)).not.toContain("env-key");
+    // Exit 0: the exit code tracks "is a key in effect", not "does a file
+    // exist". OCTEN_API_KEY is set, so every command works — exiting 2 here
+    // (as this used to) made `octen whoami && octen search …` refuse to run a
+    // search that would have succeeded.
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("exits non-zero when a credential exists but nothing is in effect", async () => {
+    // The other half of the same inversion: this used to exit 0 while
+    // reporting effectiveSource "none", i.e. while saying every command would
+    // fail. `octen whoami && octen search …` was unreliable in both directions.
+    const h = tmp();
+    writeCredentials(h, {
+      version: CREDENTIALS_VERSION,
+      source: "login",
+      issuer: "https://auth.octen.ai",
+      resource: "https://cli.octen.ai",
+      apiKey: "stored-key",
+      apiKeyExpiresAt: null,
+      grantId: "g-1",
+    });
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerWhoami(prog, { home: h, env: { OCTEN_AUTH_ISSUER: "https://auth.example.test" } });
+
+    await prog.parseAsync(["node", "octen", "whoami", "--json"]);
+
+    const json = JSON.parse(stdoutSpy.mock.calls.map((c) => String(c[0])).join(""));
+    expect(json).toMatchObject({ effectiveSource: "none", inEffect: false, ignoredReason: "issuer-mismatch" });
     expect(process.exitCode).toBe(2);
+  });
+
+  it("a corrupt credentials file does not fail whoami when a flag or env key is in effect", async () => {
+    // resolveApiKey returns on the flag/env path without touching disk, so
+    // `octen search` works fine here. whoami used to be the one command that
+    // exited 2 on this input — and in --json mode emitted no JSON at all.
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(join(h, ".octen", "credentials.json"), "{");
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerWhoami(prog, { home: h, env: { OCTEN_API_KEY: "env-key" } });
+
+    await prog.parseAsync(["node", "octen", "whoami", "--json"]);
+
+    const json = JSON.parse(stdoutSpy.mock.calls.map((c) => String(c[0])).join(""));
+    expect(json).toEqual({ loggedIn: false, effectiveSource: "OCTEN_API_KEY" });
+    expect(process.exitCode).toBeUndefined();
+  });
+
+  it("a corrupt credentials file STILL fails whoami when nothing shadows it", async () => {
+    // The tolerance above is scoped to "the file is irrelevant anyway". With
+    // no flag and no env key the file is the answer, so a corrupt one must
+    // still name itself rather than be reported as "not logged in".
+    const h = tmp();
+    mkdirSync(join(h, ".octen"), { recursive: true });
+    writeFileSync(join(h, ".octen", "credentials.json"), "{");
+    const prog = baseProgram();
+    registerWhoami(prog, { home: h, env: {} });
+
+    let thrown: unknown;
+    await prog.parseAsync(["node", "octen", "whoami", "--json"]).catch((err) => {
+      thrown = err;
+    });
+    expect((thrown as Error | undefined)?.message).toMatch(/corrupt JSON/i);
   });
 
   it("makes zero network requests even when reporting a shadowed credential", async () => {

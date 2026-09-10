@@ -8,7 +8,7 @@ import { resolveSkillsDir } from "../skills/source.js";
 import { installSkills, skillStatus } from "../skills/install.js";
 import { setClientEnvKey } from "../skills/setkey.js";
 import { resolveApiKey } from "../config/resolve.js";
-import { OctenValidationError, OctenAuthError } from "../api/errors.js";
+import { OctenValidationError, OctenNoCredentialError } from "../api/errors.js";
 import { isClientInstalled } from "../util/detectClient.js";
 import { quotePath } from "../util/quotePath.js";
 import { parseCsvOpt, parseScopeOpt, type ConfigScope } from "./utils.js";
@@ -221,11 +221,15 @@ export function registerConfigureSkills(
         try {
           key = resolveApiKey(g.apiKey, process.env, { home });
         } catch (err) {
-          // Only "no usable credential" (OctenAuthError) becomes the generic
-          // "needs a key" message. Anything else — a corrupt credentials file,
-          // a malformed OCTEN_AUTH_ISSUER/OCTEN_AUTH_RESOURCE — is a distinct,
-          // fixable problem and must name itself rather than be swallowed.
-          if (!(err instanceof OctenAuthError)) throw err;
+          // ONLY a total absence of credentials becomes the generic "needs a
+          // key" message. This used to test `instanceof OctenAuthError`, which
+          // also matches expiry and issuer/resource mismatch — so a user with a
+          // perfectly good credential and an OCTEN_AUTH_ISSUER override was told
+          // to run `octen login`, which cannot fix an OCTEN_AUTH_* override.
+          // Those errors already carry a message naming the real problem
+          // (resolve.ts's `mismatchMessage` exists for exactly this); rethrow
+          // and let it be seen.
+          if (!(err instanceof OctenNoCredentialError)) throw err;
           throw new OctenValidationError(
             "--set-key needs a key: pass --api-key, set OCTEN_API_KEY, or run `octen login`",
           );
