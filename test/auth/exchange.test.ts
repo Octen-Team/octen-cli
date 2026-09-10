@@ -41,6 +41,43 @@ describe("exchangeForApiKey", () => {
     expect((init as any).headers.Authorization).toBe("Bearer at");
   });
 
+  // `account_name` is the display name for the login confirmation line. It is
+  // optional on the wire in both directions: a server older than the field
+  // omits it, and so does a current server that could not load the name. Every
+  // unusable shape must collapse to `undefined` so the caller falls back to
+  // the account id — an empty or blank string reaching the message would print
+  // "Logged in as ." and read like a bug.
+  it.each([
+    ["a usable name", "Octen family", "Octen family"],
+    ["an absent field", undefined, undefined],
+    ["an empty string", "", undefined],
+    ["a blank string", "   ", undefined],
+    ["a non-string", 42, undefined],
+    ["null", null, undefined],
+  ])("account_name: %s", async (_label, wire, expected) => {
+    const body: Record<string, unknown> = {
+      active: true,
+      api_key: "user-real-key",
+      expires_at: null,
+      grant_id: "g-1",
+      account_type: "organization",
+      account_id: "org-1",
+    };
+    if (wire !== undefined) body.account_name = wire;
+
+    const fetchImpl = vi.fn().mockResolvedValue(new Response(JSON.stringify(body), { status: 200 }));
+    const r = await exchangeForApiKey({
+      issuer: "https://auth.octen.ai",
+      accessToken: "at",
+      fetchImpl: fetchImpl as any,
+    });
+
+    expect(r.accountName).toBe(expected);
+    // A missing name must never cost the caller the key itself.
+    expect(r.apiKey).toBe("user-real-key");
+    expect(r.accountId).toBe("org-1");
+  });
+
   it("sends no request body", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(
       new Response(

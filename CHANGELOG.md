@@ -35,7 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   PKCE) and stores the resulting long-lived API key at `~/.octen/credentials.json`
   (`0600`). `--api-key <key>` stores a pasted key directly with zero network requests;
   `--port <n>` pins the loopback port for `ssh -L` forwarding; `--no-browser` prints the
-  authorize URL instead of opening one.
+  authorize URL instead of opening one. The confirmation line names the account the way
+  the consent screen did — `Logged in as Octen family.` — falling back to the raw account
+  id when the server does not supply a name, which is also what happens against any server
+  older than that field.
 - **`octen logout`.** Revokes this device's authorization and removes the local
   credential. `--local` skips the network call and only removes the file. Revoking the
   authorization does not deactivate the underlying API key — see the README's Auth

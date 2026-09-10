@@ -23,6 +23,17 @@ export interface ExchangeResult {
   grantId: string;
   accountId?: string;
   accountType?: string;
+  /**
+   * Human-readable name for the account — "Octen family", or "Personal" for a
+   * user account. Display-only, and deliberately NOT written to disk: the
+   * login confirmation line is the only thing that renders it, so a name that
+   * drifts after the organization is renamed can never be shown.
+   *
+   * Optional in both directions. A server older than the field omits it, so
+   * does a current server that could not load the name, and prod omits it
+   * until this ships there — every caller must fall back to `accountId`.
+   */
+  accountName?: string;
 }
 
 /**
@@ -152,5 +163,13 @@ export async function exchangeForApiKey(a: {
   const accountId = typeof body.account_id === "string" ? body.account_id : undefined;
   const accountType = typeof body.account_type === "string" ? body.account_type : undefined;
 
-  return { apiKey, expiresAt, grantId, accountId, accountType };
+  // Unlike the fields above, a blank name is normalized away rather than
+  // passed through: it is only ever interpolated into a sentence, and
+  // "Logged in as ." is worse than falling back to the account id. This is a
+  // display default, never a contract violation — the server omits the field
+  // by design whenever it has no name to give.
+  const rawAccountName = typeof body.account_name === "string" ? body.account_name.trim() : "";
+  const accountName = rawAccountName.length > 0 ? rawAccountName : undefined;
+
+  return { apiKey, expiresAt, grantId, accountId, accountType, accountName };
 }

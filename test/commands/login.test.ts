@@ -40,7 +40,7 @@ function baseProgram(): Command {
 }
 
 /** Fake token endpoint + fake key-exchange endpoint. No DCR call ever appears. */
-function tokenAndKeyFetch() {
+function tokenAndKeyFetch(accountName?: string) {
   return vi.fn(async (url: RequestInfo | URL) => {
     const u = String(url);
     if (u.endsWith("/api/oauth/token")) {
@@ -55,6 +55,9 @@ function tokenAndKeyFetch() {
           grant_id: "grant-1",
           account_id: "acct-1",
           account_type: "user",
+          // Omitted unless a test asks for it: that is what prod and any
+          // server older than the field actually send.
+          ...(accountName !== undefined ? { account_name: accountName } : {}),
         }),
         { status: 200 },
       );
@@ -462,6 +465,40 @@ describe("octen login", () => {
       [`Logged in as acct-1. Credentials saved to ${credentialsPath(h)}\n`],
     ]);
     expect(stderrSpy.mock.calls.length).toBeGreaterThan(0);
+  });
+
+  // The confirmation line prefers the server's human-readable account name and
+  // falls back to the raw account id. Both halves matter: the fallback is what
+  // every user sees against prod until the server side of this ships, and what
+  // anyone sees when the name could not be loaded.
+  it("names the account by its label when the server sends one", async () => {
+    const h = tmp();
+    const fetchImpl = tokenAndKeyFetch("Octen family");
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser: autoCompleteBrowser() });
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    expect(stdoutSpy.mock.calls).toEqual([
+      [`Logged in as Octen family. Credentials saved to ${credentialsPath(h)}\n`],
+    ]);
+    // Display-only: the name must not reach the credential file, or a renamed
+    // organization would keep showing its old name until the next login.
+    expect(readCredentials(h)).not.toHaveProperty("accountName");
+    expect(readCredentials(h)).toMatchObject({ accountId: "acct-1" });
+  });
+
+  it("falls back to the account id when the server sends no label", async () => {
+    const h = tmp();
+    const fetchImpl = tokenAndKeyFetch();
+    const stdoutSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
+    const prog = baseProgram();
+    registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser: autoCompleteBrowser() });
+    await prog.parseAsync(["node", "octen", "login"]);
+
+    expect(stdoutSpy.mock.calls).toEqual([
+      [`Logged in as acct-1. Credentials saved to ${credentialsPath(h)}\n`],
+    ]);
   });
 
   it("builds a Windows command that survives & in the URL", () => {

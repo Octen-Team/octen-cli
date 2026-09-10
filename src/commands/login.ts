@@ -169,7 +169,7 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
       // quietly defeating the `ssh -L` pinning the flag exists for.
       assertRange("--port", g.port, { min: 1, max: 65535 });
 
-      const creds = await login({
+      const { credentials: creds, accountName } = await login({
         home,
         env,
         fetchImpl: internal.fetchImpl,
@@ -178,8 +178,13 @@ export function registerLogin(program: Command, internal: LoginInternalOpts = {}
         port: g.port,
       });
 
+      // Prefer the server's human-readable name ("Octen family", "Personal")
+      // over the raw id, but keep the id as the fallback: the name is optional
+      // on the wire, and it is absent both against a server that predates the
+      // field and whenever the name could not be loaded.
+      const account = creds.source === "login" ? (accountName ?? creds.accountId) : undefined;
       process.stdout.write(
-        `Logged in${creds.source === "login" && creds.accountId ? ` as ${creds.accountId}` : ""}. Credentials saved to ${credentialsPath(home)}\n`,
+        `Logged in${account ? ` as ${account}` : ""}. Credentials saved to ${credentialsPath(home)}\n`,
       );
       warnIfEnvKeyShadows(env);
     });

@@ -31,6 +31,19 @@ export interface LoginDeps {
   log?: (line: string) => void;
 }
 
+export interface LoginResult {
+  /** Exactly what was written to disk. */
+  credentials: Credentials;
+  /**
+   * The account's display name, when the server supplied one. Returned
+   * alongside the credentials rather than inside them because it is
+   * deliberately not persisted: it exists only for the caller's confirmation
+   * line, and a stored copy would go stale the moment an organization is
+   * renamed. Callers must fall back to `credentials.accountId`.
+   */
+  accountName?: string;
+}
+
 /**
  * Orchestrates the eight-step loopback login flow:
  *
@@ -57,7 +70,7 @@ export interface LoginDeps {
  *      resolution stays synchronous, lock-free, and free of any refresh
  *      logic. Nothing here may acquire a second write path.
  */
-export async function login(deps: LoginDeps): Promise<Credentials> {
+export async function login(deps: LoginDeps): Promise<LoginResult> {
   const log = deps.log ?? ((line: string) => { process.stderr.write(`${line}\n`); });
   const issuer = authIssuer(deps.env);
   const resource = authResource(deps.env);
@@ -167,7 +180,7 @@ export async function login(deps: LoginDeps): Promise<Credentials> {
       ...(result.accountType !== undefined ? { accountType: result.accountType } : {}),
     };
     writeCredentials(deps.home, creds);
-    return creds;
+    return { credentials: creds, accountName: result.accountName };
   } finally {
     // Idempotent: the server already closed itself on the success path
     // (loopback.ts finalizes on code receipt). This covers every other
