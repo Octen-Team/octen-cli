@@ -69,6 +69,52 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **The stored issuer is no longer trusted with the API key.** `octen login`'s
+  cleanup step and `octen logout` sent the credential's account-wide API key to
+  whatever host the credentials file named, without checking it against the
+  issuer this run is for — while credential *resolution* refused to use that
+  same credential for exactly the reason that it belongs to another
+  environment. Neither `OCTEN_AUTH_ISSUER` nor the stored issuer was checked for
+  a scheme either, so `http://` put the access token and the API key on the wire
+  in cleartext with no warning. Both now require https, with a `127.0.0.1`
+  loopback literal as the only exception (local development); `localhost` is not
+  exempt, since the hosts file can redirect it. `octen login` now leaves a
+  credential from another issuer or audience alone and prints its grant id
+  rather than silently mailing its key away.
+
+- **`octen logout` no longer claims an authorization is gone when it may not
+  be.** The server answers 400 to three different situations and the response
+  carries nothing to tell them apart — including one where the grant is still
+  active and only this key can no longer act on it, which is what happens after
+  you are removed from the organization that owns the key. Those users were told
+  "nothing left to revoke". The message now states both possibilities and points
+  at the grant id in the dashboard.
+
+- **A key from `~/.octen/credentials.json` no longer reaches another process's
+  argv or a world-readable file.** `octen configure-mcp` passed it to
+  `claude mcp add` as a command-line argument, visible in `ps` for the child's
+  lifetime, and both `configure-mcp` and `configure-skills --set-key` wrote it
+  into client configs with the default 0644. Config files carrying a key are now
+  written 0600 (existing files are chmod'ed, since a merge does not recreate
+  them), and a literal key is written directly to the config instead of being
+  handed to a subprocess.
+
+- **`octen whoami` no longer contradicts what other commands do.** With a
+  corrupt credentials file and `OCTEN_API_KEY` set, every other command worked
+  while `whoami` exited 2 — and in `--json` mode printed no JSON at all. Its
+  exit code also tracked "does a credentials file exist" rather than "is a key
+  in effect", so it exited 0 while reporting that nothing was in effect, and 2
+  while an environment key was working fine. It now tolerates an unreadable file
+  whenever a flag or environment key already decides the answer, and exits
+  non-zero exactly when no key is in effect.
+
+- **`configure-mcp` and `configure-skills` name the real problem.** A usable
+  stored credential plus an `OCTEN_AUTH_ISSUER` override produced "no API key
+  found", a `${OCTEN_API_KEY}` placeholder config and exit 0 — and, from
+  `configure-skills`, advice to run `octen login`, which cannot fix an
+  `OCTEN_AUTH_*` override. Only a total absence of credentials is treated as a
+  missing key now; expiry and issuer/resource mismatch report themselves.
+
 - **Numeric flags are parsed strictly.** `parseInt`/`parseFloat` accepted a
   numeric prefix and threw the rest away, so `--count 1.5` was sent as `1`,
   `--count 2junk` as `2` and `--count 1e2` as `1`. A value that is not exactly
