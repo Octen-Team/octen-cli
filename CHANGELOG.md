@@ -5,29 +5,15 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] — 2026-09-11
 
-> **Release blocker — read before tagging.**
+> **发布前提已满足（2026-09-10）。** 本次发布曾有一条硬性顺序约束：`octen login` 以预注册
+> 公共客户端 `octen-cli` 身份授权，而那一行客户端记录由服务端在首次被用到时自动创建 ——
+> 所以服务端代码必须先在生产运行，否则每一次 `octen login` 都会在 authorize 阶段以
+> `invalid_client` 失败，客户端无任何回退。
 >
-> **Do not publish this release until the server side is live in production.** Merging this
-> branch is safe; tagging is not. `octen login` authenticates as the pre-registered public
-> client `octen-cli`, and the server creates that client row itself the first time a login
-> reaches for it — so no manual database step gates the release, but the **server code that
-> does it** must be running in production first.
->
-> Until that server code is live, every `octen login` dies at the authorize step with
-> `invalid_client` before the browser ever shows a consent screen. Every user who upgrades
-> hits it; there is no client-side fallback, and no CLI change can work around it.
->
-> So the order is: **server released to production → a real `octen login` verified against
-> production → only then push the `v*` tag here.** Pushing the tag runs
-> `release.yml` (npm publish) and `binaries.yml`, both of which are hard to walk back once
-> users have installed. Verify with a real `octen login` against production before tagging,
-> not after.
->
-> The rest of the CLI is unaffected: `--api-key`, `OCTEN_API_KEY`, and every existing command
-> work regardless, so an early release degrades exactly one new command — but it degrades it
-> for everyone.
+> 约束已按顺序满足：服务端发布生产 → 对生产跑通一次真实 `octen login`（含首次按需建行）
+> → 才有此次发布。
 
 ### Added
 
