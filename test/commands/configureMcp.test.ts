@@ -315,10 +315,12 @@ describe("configure-mcp credential resolution", () => {
   });
 
   it("an issuer mismatch names itself instead of degrading to a placeholder", async () => {
-    // 改动前：这里输出 "no API key found"、写占位符配置、exit 0 —— 用户手上明明有
-    // 一份可用凭证，被告知没有 key，而真正的原因（OCTEN_AUTH_ISSUER 覆盖）一字未提。
-    // 根因是判据用的是 `instanceof OctenAuthError`，它同时匹配过期与 issuer/resource
-    // 不匹配；只有"完全没有凭证"才该退化成占位符。
+    // Before the fix this printed "no API key found", wrote a placeholder
+    // config and exited 0 — a user holding a perfectly usable credential was
+    // told there was no key, and the actual cause (an OCTEN_AUTH_ISSUER
+    // override) went unmentioned. The root cause was testing `instanceof
+    // OctenAuthError`, which also matches expiry and issuer/resource mismatch;
+    // only a total absence of credentials may degrade to the placeholder.
     const home = makeTmp();
     writeCredentials(home, {
       version: CREDENTIALS_VERSION,
@@ -338,7 +340,7 @@ describe("configure-mcp credential resolution", () => {
       ).rejects.toThrow(/OCTEN_AUTH_ISSUER/);
     });
 
-    // 而且绝不能留下一个写着占位符的半吊子配置。
+    // And it must not leave a half-written config carrying the placeholder.
     const cfg = join(home, ".cursor/mcp.json");
     if (existsSync(cfg)) {
       expect(readFileSync(cfg, "utf8")).not.toContain("${OCTEN_API_KEY}");

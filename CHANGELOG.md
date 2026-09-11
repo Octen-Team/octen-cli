@@ -7,13 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.9.0] — 2026-09-11
 
-> **发布前提已满足（2026-09-10）。** 本次发布曾有一条硬性顺序约束：`octen login` 以预注册
-> 公共客户端 `octen-cli` 身份授权，而那一行客户端记录由服务端在首次被用到时自动创建 ——
-> 所以服务端代码必须先在生产运行，否则每一次 `octen login` 都会在 authorize 阶段以
-> `invalid_client` 失败，客户端无任何回退。
+> **Release precondition met (2026-09-10).** This release carried a hard ordering
+> constraint: `octen login` authorizes as the pre-registered public client `octen-cli`, and
+> the server creates that client row itself the first time a login reaches for it — so the
+> server code had to be running in production first. Until it was, every `octen login` died
+> at the authorize step with `invalid_client`, with no client-side fallback.
 >
-> 约束已按顺序满足：服务端发布生产 → 对生产跑通一次真实 `octen login`（含首次按需建行）
-> → 才有此次发布。
+> The order was followed: server released to production → a real `octen login` verified
+> against production, including the on-demand creation of that client row → only then this
+> release.
 
 ### Added
 

@@ -125,7 +125,7 @@ describe("octen logout", () => {
     expect(readCredentials(h)).toBeUndefined();
     // Broad enough to catch "revoke", "revoking", "revocation" — not just
     // the exact word "revoked" that a narrower regex would miss.
-    expect(out).not.toMatch(/revok|撤销/i);
+    expect(out).not.toMatch(/revok/i);
   });
 
   it("keeps the file when revocation fails for a network reason and suggests --local", async () => {
@@ -158,13 +158,16 @@ describe("octen logout", () => {
     expect(out).toContain("grant-400");
     expect(err).toBe("");
 
-    // 但绝不能断言"已经没了"。服务端的 400 覆盖三种情况，响应无 body 无法区分，
-    // 其中一种是 grant 仍然 active、只是这把 key 不再能操作它（比如用户已被移出
-    // 拥有该 key 的组织）。对那些用户说"nothing left to revoke"，会留下一条活着的
-    // grant 继续能换出凭证——正是 logout 自己的文档承诺绝不发生的事。
+    // But it must never assert "already gone". The server's 400 covers three
+    // situations and the response carries no body to tell them apart; in one of
+    // them the grant is still active and only this key can no longer act on it
+    // (for example after the user was removed from the organization that owns
+    // the key). Telling those users "nothing left to revoke" leaves a live
+    // grant behind that can still mint credentials — exactly what logout's own
+    // doc comment promises never to do.
     expect(out).not.toMatch(/already gone/i);
     expect(out).not.toMatch(/nothing left to revoke/i);
-    // 必须把另一种可能说出来，并给出可执行的下一步。
+    // The other possibility has to be stated, with an actionable next step.
     expect(out).toMatch(/still\s*\n?\s*active/i);
     expect(out).toMatch(/dashboard/i);
   });
@@ -228,6 +231,6 @@ describe("octen logout", () => {
 
     const { out } = await runLogout(h, fetchImpl);
 
-    expect(out).not.toMatch(/撤销访问|revoked access/);
+    expect(out).not.toMatch(/revoked access/i);
   });
 });

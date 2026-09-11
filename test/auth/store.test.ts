@@ -110,9 +110,11 @@ describe("credential store", () => {
     expect(deleteCredentials(h)).toBe(true);
   });
 
-  // 存储的 issuer 不是惰性数据：login 的 step-1 清理与 logout 都会把这份凭证的
-  // API key POST 给它。所以它必须和 OCTEN_AUTH_ISSUER 走同一条 https-或-loopback
-  // 规则——否则一个文件就等于一条"把账户级 key 明文寄到这里"的常驻指令。
+  // The stored issuer is not inert data: login's step-1 cleanup and logout
+  // both POST this credential's API key to it. So it has to go through the
+  // same https-or-loopback rule as OCTEN_AUTH_ISSUER — otherwise a single file
+  // on disk amounts to a standing instruction to mail the account-wide key
+  // here, in cleartext.
   it("rejects a stored issuer that is neither https nor a loopback literal", () => {
     const h = mkdtempSync(join(tmpdir(), "octen-store-"));
     mkdirSync(join(h, ".octen"), { recursive: true });

@@ -30,15 +30,19 @@ describe("auth constants", () => {
     expect(() => authResource({ OCTEN_AUTH_RESOURCE: "https://cli.octen.ai/" })).toThrow();
   });
 
-  // 这两条钉住的是一个已经实测出过泄漏的路径：`exchange.ts` 把 access token、
-  // `revoke.ts` 把账户级长期 API key 发到 issuer 指向的任何主机。此前 authIssuer
-  // 只拒尾斜杠，`OCTEN_AUTH_ISSUER=http://…` 会让两者明文上线且无任何提示。
+  // These two pin a leak path that was reproduced, not hypothesised:
+  // `exchange.ts` sends the access token and `revoke.ts` sends the
+  // account-wide, long-lived API key to whatever host the issuer names.
+  // authIssuer used to reject only a trailing slash, so
+  // `OCTEN_AUTH_ISSUER=http://…` put both on the wire in cleartext with no
+  // warning at all.
   it("a non-loopback plaintext issuer is rejected", () => {
     expect(() => authIssuer({ OCTEN_AUTH_ISSUER: "http://auth-staging.internal" })).toThrow(
       /must use https/,
     );
     expect(() => authIssuer({ OCTEN_AUTH_ISSUER: "http://localhost:8080" })).toThrow(
-      // localhost 不算 loopback 豁免：它可以被 hosts 文件改指向（RFC 8252 §8.3）。
+      // localhost earns no loopback exemption: the hosts file can redirect it
+      // (RFC 8252 §8.3).
       /must use https/,
     );
   });
@@ -55,7 +59,8 @@ describe("auth constants", () => {
     );
   });
 
-  // resource 不受 https 规则约束，理由是它从不被拨号——只作为 audience 逐字节比较。
+  // The resource is exempt from the https rule because nothing is ever sent to
+  // it: it is only ever compared, byte for byte, as an audience.
   it("the resource is an identifier, not an origin: no https rule applies", () => {
     expect(authResource({ OCTEN_AUTH_RESOURCE: "http://cli.example" })).toBe("http://cli.example");
   });

@@ -103,8 +103,9 @@ describe("installMcp – claude-code (claude-cli path)", () => {
     execFileSyncMock.mockReturnValue(undefined as any);
   });
 
-  // 占位符不是秘密，仍走 claude CLI。这条继续钉住"参数以数组元素传递、不做字符串
-  // 拼接"，因为这条路径依然存在。
+  // The placeholder is not a secret, so it still goes through the claude CLI.
+  // This keeps pinning "arguments are passed as array elements, never string
+  // concatenation", because that path still exists.
   it("invokes execFileSync with exact args array (injection-safe) for the placeholder", () => {
     const home = makeTmp();
     const cwd = home;
@@ -139,10 +140,12 @@ describe("installMcp – claude-code (claude-cli path)", () => {
     ]);
   });
 
-  // 一个真实的 key 绝不能进另一个进程的 argv：`ps -ww` 与 /proc/<pid>/cmdline 在子
-  // 进程存活期间对同机任意用户可见。改动前这条路径是可达的——凭证解析学会读
-  // ~/.octen/credentials.json 之后，一个只存在于 0600 文件里的 key 会流到这里。
-  // 所以字面 key 一律改走文件路径（本函数在没有 claude CLI 时本来就用它）。
+  // A real key must never reach another process's argv: `ps -ww` and
+  // /proc/<pid>/cmdline expose it to every local user for the child's lifetime.
+  // This path became reachable once credential resolution learned to read
+  // ~/.octen/credentials.json — a key that exists nowhere but a 0600 file can
+  // now flow here. So a literal key always takes the file path instead, which
+  // is the same path this function already uses when the claude CLI is absent.
   it("never puts a literal key in a child process argv — it takes the file path instead", () => {
     const home = makeTmp();
     const cwd = home;
@@ -161,7 +164,8 @@ describe("installMcp – claude-code (claude-cli path)", () => {
     const everySpawnedArg = JSON.stringify(execFileSyncMock.mock.calls);
     expect(everySpawnedArg).not.toContain("octen-literal-secret");
 
-    // 条目仍然被正确写入，且文件被限制成 0600（见 util/secretFile.ts）。
+    // The entry is still written correctly, and the file is restricted to 0600
+    // (see util/secretFile.ts).
     const written = readFileSync(join(home, ".claude.json"), "utf8");
     expect(written).toContain("octen-literal-secret");
     if (platform() !== "win32") {

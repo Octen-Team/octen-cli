@@ -316,10 +316,12 @@ describe("octen login", () => {
     expect(readCredentials(h)).toMatchObject({ grantId: "new-grant", apiKey: "new-key" });
   });
 
-  // 这条钉住的是一个实测出过的泄漏：凭证文件里的 issuer 会被无条件信任，
-  // step 1 把账户级长期 API key 发给它——而 config/resolve.ts 对同一份凭证的
-  // 判断是"不属于本环境、绝不使用"。不用它调 API 却肯把 key 交给它，是同一个
-  // 凭证在唯一会泄漏的方向上被信任。
+  // This pins a leak that was reproduced, not hypothesised: the issuer inside
+  // the credentials file was trusted unconditionally, and step 1 sent the
+  // account-wide, long-lived API key to it — while config/resolve.ts judged
+  // that same credential "belongs to another environment, never use it".
+  // Refusing to call the API with it and yet handing it the key is the same
+  // credential being trusted in the one direction that leaks.
   it("does NOT revoke — or send the key to — a credential from a different issuer", async () => {
     const h = tmp();
     writeCredentials(h, {
@@ -352,20 +354,20 @@ describe("octen login", () => {
     registerLogin(prog, { home: h, fetchImpl: fetchImpl as any, openBrowser: autoCompleteBrowser() });
     await prog.parseAsync(["node", "octen", "login"]);
 
-    // 没有任何一次请求打到那个 issuer。
+    // Not one request reached that issuer.
     expect(touchedHosts).not.toContain("127.0.0.1:9911");
     const bodies = fetchImpl.mock.calls.map((c) => JSON.stringify(c[1] ?? {})).join("");
     expect(bodies).not.toContain("sk-other-environment-must-not-leak");
 
-    // 而且必须明确告诉用户那条 grant 没被撤销、以及它的 id ——
-    // 下一行就要覆盖掉这台机器上唯一记着这个 id 的地方。
+    // And it must say plainly that the grant was NOT revoked, and name its id —
+    // the next line overwrites the only place on this machine that records it.
     const err = stderrSpy.mock.calls.map((c) => String(c[0])).join("");
     expect(err).toContain("grant-other-environment");
     expect(err).toContain("http://127.0.0.1:9911");
     expect(err).toMatch(/NOT revoked/i);
     expect(err).not.toContain("sk-other-environment-must-not-leak");
 
-    // 新登录本身照常完成。
+    // The new login itself still completes as usual.
     expect(readCredentials(h)).toMatchObject({ grantId: "new-grant", apiKey: "new-key" });
   });
 
