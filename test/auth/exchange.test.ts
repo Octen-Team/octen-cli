@@ -160,7 +160,7 @@ describe("exchangeForApiKey", () => {
       fetchImpl: fetchImpl as any,
     }).catch((e) => e);
     expect(err).toBeInstanceOf(OctenNetworkError);
-    expect(String(err.message)).toMatch(/重试|retry/i);
+    expect(String(err.message)).toMatch(/retry/i);
   });
 
   it("429 and 408 are network errors too", async () => {

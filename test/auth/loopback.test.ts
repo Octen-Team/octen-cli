@@ -81,7 +81,7 @@ describe("startLoopback", () => {
 
   it("rejects on timeout", async () => {
     const srv = await startLoopback({ state: "s", timeoutMs: 50 });
-    await expect(srv.waitForCode()).rejects.toThrow(/timed out|超时/);
+    await expect(srv.waitForCode()).rejects.toThrow(/timed out/i);
     srv.close();
   });
 
@@ -105,7 +105,7 @@ describe("startLoopback", () => {
 
     // timeout
     srv = await startLoopback({ state: "s", port, timeoutMs: 30 });
-    await expect(srv.waitForCode()).rejects.toThrow(/timed out|超时/);
+    await expect(srv.waitForCode()).rejects.toThrow(/timed out/i);
     await assertPortIsFree(port);
 
     // external close

@@ -5,29 +5,17 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [0.9.0] — 2026-09-11
 
-> **Release blocker — read before tagging.**
+> **Release precondition met (2026-09-10).** This release carried a hard ordering
+> constraint: `octen login` authorizes as the pre-registered public client `octen-cli`, and
+> the server creates that client row itself the first time a login reaches for it — so the
+> server code had to be running in production first. Until it was, every `octen login` died
+> at the authorize step with `invalid_client`, with no client-side fallback.
 >
-> **Do not publish this release until the server side is live in production.** Merging this
-> branch is safe; tagging is not. `octen login` authenticates as the pre-registered public
-> client `octen-cli`, and the server creates that client row itself the first time a login
-> reaches for it — so no manual database step gates the release, but the **server code that
-> does it** must be running in production first.
->
-> Until that server code is live, every `octen login` dies at the authorize step with
-> `invalid_client` before the browser ever shows a consent screen. Every user who upgrades
-> hits it; there is no client-side fallback, and no CLI change can work around it.
->
-> So the order is: **server released to production → a real `octen login` verified against
-> production → only then push the `v*` tag here.** Pushing the tag runs
-> `release.yml` (npm publish) and `binaries.yml`, both of which are hard to walk back once
-> users have installed. Verify with a real `octen login` against production before tagging,
-> not after.
->
-> The rest of the CLI is unaffected: `--api-key`, `OCTEN_API_KEY`, and every existing command
-> work regardless, so an early release degrades exactly one new command — but it degrades it
-> for everyone.
+> The order was followed: server released to production → a real `octen login` verified
+> against production, including the on-demand creation of that client row → only then this
+> release.
 
 ### Added
 
