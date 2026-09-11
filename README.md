@@ -81,7 +81,7 @@ than looking live.
 | `OCTEN_API_KEY` | — | The API key to use. Takes precedence over `~/.octen/credentials.json`, so a stored login is ignored while it is set. |
 | `OCTEN_API_URL` | `https://api.octen.ai` | The Octen API base URL. |
 | `OCTEN_AUTH_ISSUER` | `https://auth.octen.ai` | The OAuth authorization server `octen login` talks to. Only for local development against a self-hosted AS. |
-| `OCTEN_AUTH_RESOURCE` | `https://cli.octen.ai` | The audience `octen login` requests the access token for. Only for local development. |
+| `OCTEN_AUTH_RESOURCE` | `https://cli.octen.ai` | The audience `octen login` requests the access token for. Despite the shape it is an identifier, not a site — nothing ever connects to it. Only for local development. |
 
 `OCTEN_AUTH_ISSUER` and `OCTEN_AUTH_RESOURCE` **must not have a trailing slash** — a
 trailing one is rejected with a named error rather than silently trimmed, because trimming
@@ -94,6 +94,30 @@ belongs to another environment. The CLI never uses it and never deletes it — i
 names the variable. Unset the variable to go back to the stored credential, or run `octen
 login` again to get one for the new environment. `octen whoami` shows both the stored
 `Issuer`/`Resource` and which credential is in effect.
+
+### What the resource is, and why there are two
+
+One authorization server issues access tokens for two different audiences, and they are
+deliberately not interchangeable:
+
+| Audience | Scope | What a token for it can do |
+| --- | --- | --- |
+| `https://mcp.octen.ai/mcp` | `mcp:tools` | Call MCP tools |
+| `https://cli.octen.ai` | `octen:api_key` | Exchange for your account's API key |
+
+Only the second can be traded for the API key. If both shared one audience, a token minted
+for the MCP server — the one an AI client holds — could be replayed against the CLI's
+exchange endpoint and walk away with that key. The `resource` is what keeps them apart: the
+server checks that a token's granted audience is exactly this value before handing anything
+over, and answers `403` otherwise.
+
+That check is a byte-for-byte comparison, with no normalization anywhere along the chain,
+which is why the trailing-slash rule above is a rejection rather than a quiet trim.
+Normalizing in one place and not another produces a 401 on every request while each side
+looks correct in isolation.
+
+You do not need to set `OCTEN_AUTH_RESOURCE` to use Octen. It exists so a locally running
+authorization server can use a different audience string.
 
 **Add `.octen/` to your global gitignore.** A credentials file living in a dotfile directory
 is more likely to be committed by accident than an environment variable ever was:
@@ -133,6 +157,31 @@ action, unlike `logout`, affects every place holding the key.
 
 `octen logout --local` skips the network call entirely and only removes the local file,
 without attempting to revoke the authorization.
+
+### One key, used by both the CLI and MCP
+
+The audience split above applies to OAuth *access tokens*. The API key you end up with is
+not audience-bound at all — it is your own account-wide key, and using it in more than one
+place is the normal case, not a workaround. `octen configure-mcp` does exactly that: it
+resolves your key through the same `--api-key` > `OCTEN_API_KEY` > stored-login order as
+every other command and writes it into the MCP client config.
+
+Three consequences of sharing one key:
+
+- **`octen logout` does not stop MCP.** It revokes this device's authorization, not the key.
+  The key is still sitting in the MCP config and keeps working. To stop it everywhere,
+  deactivate or rotate the key from the key management page at https://octen.ai.
+- **Usage and billing are pooled.** One key, one account — CLI calls and MCP calls land in
+  the same bucket.
+- **The blast radius is shared.** Rotating or losing the key affects both at once.
+
+To keep the two independent, pick a separate key for the CLI in the consent screen's **API
+Key** dropdown instead of accepting the default, and leave MCP on another one.
+
+This applies to the local stdio MCP server (`npx octen-mcp`, what `octen configure-mcp`
+configures). A **remote OAuth connector** holds no API key at all — it carries an
+MCP-audience token that the server resolves internally — so it is already independent of
+whatever the CLI stores.
 
 ### Dashboard "revoke" and an already-logged-in CLI
 
@@ -175,6 +224,19 @@ octen login --port 8765
 # no browser available: store a key directly, with zero network requests
 octen login --api-key "$OCTEN_API_KEY"
 ```
+
+The consent screen asks for two things, and shows one you should check:
+
+- **Account** — whose key this is: your personal account, or an organization you belong to.
+  This decides whose usage and billing the key draws on.
+- **API Key** — which of that account's keys to hand over. Pick a separate one here if you
+  want the CLI's key independent of the one MCP uses (see
+  [One key, used by both the CLI and MCP](#one-key-used-by-both-the-cli-and-mcp)).
+- **"Authorization result will be sent to 127.0.0.1:PORT"** — the loopback listener this
+  `octen login` just opened. If you did not just run it, press **Deny**.
+
+On success the terminal names the account you approved as — `Logged in as Octen family.` —
+falling back to the raw account id when the server does not supply a name.
 
 If a `source: login` credential already exists, `octen login` best-effort revokes its grant
 before starting the new login, so repeated logins don't accumulate orphaned authorizations
