@@ -462,6 +462,64 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       },
       TEST_TIMEOUT_MS,
     );
+
+    for (const mode of ["standard", "advanced", "auto"] as const) {
+      it(
+        `fetch: mode=${mode}`,
+        async () => {
+          const req = buildExtractRequest(URLS, { mode, fetchTimeout: 60 });
+          await expectEnvelopeOk(`fetch mode=${mode}`, ENDPOINTS.extract, req);
+        },
+        TEST_TIMEOUT_MS,
+      );
+    }
+
+    it(
+      "fetch: links (bare)",
+      async () => {
+        const req = buildExtractRequest(URLS, { links: true });
+        await expectEnvelopeOk("fetch links", ENDPOINTS.extract, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "fetch: links=prefer_external max_links=5",
+      async () => {
+        const req = buildExtractRequest(URLS, { links: "prefer_external", maxLinks: 5 });
+        await expectEnvelopeOk("fetch links=prefer_external", ENDPOINTS.extract, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    // Response contract the pretty renderer relies on: resolved_mode on every
+    // success, links as {url, anchor_text, is_external}, and billing counts in
+    // top-level meta (not data.meta). Never asserts resolved_mode == requested.
+    it(
+      "fetch: mode=auto + links response contract",
+      async () => {
+        const req = buildExtractRequest(URLS, { mode: "auto", maxLinks: 5, fetchTimeout: 60 });
+        const resp = await client.request<any>(ENDPOINTS.extract, req);
+        expect(resp.code).toBe(0);
+        const results = resp.data?.results ?? [];
+        expect(results.length).toBe(1);
+        for (const r of results.filter((x: any) => x.status === "success")) {
+          expect(["standard", "advanced"]).toContain(r.resolved_mode);
+          for (const l of r.links ?? []) {
+            expect(typeof l.url).toBe("string");
+            expect(typeof l.anchor_text).toBe("string");
+            expect(typeof l.is_external).toBe("boolean");
+          }
+          expect((r.links ?? []).length).toBeLessThanOrEqual(5);
+        }
+        const byMode = resp.meta?.usage?.successful_by_mode;
+        expect(typeof byMode?.standard_urls).toBe("number");
+        expect(typeof byMode?.advanced_urls).toBe("number");
+        expect(byMode.standard_urls + byMode.advanced_urls).toBe(resp.meta.usage.successful_urls);
+        expect(resp.data?.meta).toBeUndefined();
+      },
+      TEST_TIMEOUT_MS,
+    );
   });
 
   // -------------------------------------------------------------------------
