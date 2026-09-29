@@ -1,5 +1,7 @@
 import { OctenClient } from "../api/client.js";
+import { LINK_SCOPE_OPTIONS } from "../api/constants.js";
 import { OctenValidationError } from "../api/errors.js";
+import type { LinkScope } from "../api/extract.js";
 import { resolveApiKey, resolveBaseUrl } from "../config/resolve.js";
 
 /** Build an OctenClient from resolved global options (flag > env). */
@@ -62,4 +64,21 @@ export const parseScopeOpt = (name: string) => (v: string): ConfigScope => {
     throw new OctenValidationError(`${name} must be one of: ${SCOPE_OPTIONS.join(", ")}`);
   }
   return v as ConfigScope;
+};
+
+/**
+ * Commander option parser for extract's `--links [scope]`. The scope is optional,
+ * so commander hands the next bare word to this parser — which, in
+ * `octen extract --links https://a.com`, is a URL. Name that mistake instead of
+ * letting it surface as an unknown scope (or as "missing required argument").
+ * A bare `--links` never reaches here: commander sets `true` without parsing.
+ */
+export const parseLinkScopeOpt = (name: string) => (v: string): LinkScope => {
+  if ((LINK_SCOPE_OPTIONS as readonly string[]).includes(v)) return v as LinkScope;
+  if (v.includes("://") || v.includes(".")) {
+    throw new OctenValidationError(
+      `${name} got "${v}" as its scope; put ${name} after the URLs or use ${name}=<scope>`,
+    );
+  }
+  throw new OctenValidationError(`${name} must be one of: ${LINK_SCOPE_OPTIONS.join(", ")}`);
 };

@@ -5,6 +5,37 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`octen extract --mode <standard|advanced|auto>`.** Chooses the extraction mode.
+  `standard` (the server default when omitted — the CLI never injects one) is fast and
+  cheap; `advanced` renders in a real browser for hard sites at 2.5x the price; `auto`
+  picks per URL for mixed batches. Validated client-side.
+- **`octen extract --links [scope]` and `--max-links <n>`.** Request each page's links
+  (`include_links`). A bare `--links` sends `{}` so the server applies its defaults;
+  `--links prefer_external` sets the scope; `--max-links` (1–1000, validated client-side
+  because the server rejects rather than clamps) caps the count and implies `--links`.
+  Because the scope is optional, `--links https://a.com` would take the URL as its
+  scope; the CLI now rejects that with an error telling you to put `--links` after the
+  URLs or write `--links=<scope>`.
+- Pretty `extract` output now shows each successful result's `resolved_mode`, its links
+  and its images/videos/audio (capped at 10 each unless `--full`), and a footer from the
+  top-level `meta`: successful/total counts, billed standard/advanced counts from
+  `meta.usage.successful_by_mode`, and `meta.warning`. A successful result whose
+  `page_structure.primary` is "No Main Content" and that did not use advanced, or a
+  failed result, gets a dim `hint: retry with --mode advanced` — unless advanced was
+  already requested.
+
+### Changed
+
+- **`octen extract` no longer gives up at the 30s client default.** The per-attempt
+  request timeout is now derived from the per-URL budget, `min(180s, (--fetch-timeout ??
+  30) + 90s)` — at most 150s, since `--fetch-timeout` ≤ 60 — mirroring octen-mcp. A high
+  `--fetch-timeout`, a 20-URL batch, or advanced/auto mode can legitimately outlast 30s.
+  Other commands are unchanged.
+
 ## [0.9.0] — 2026-09-11
 
 > **Release precondition met (2026-09-10).** This release carried a hard ordering
