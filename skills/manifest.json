@@ -3,6 +3,10 @@
   "ref": "main",
   "skills": [
     "octen-design",
-    "octen-search"
+    "octen-extract",
+    "octen-image-search",
+    "octen-search",
+    "octen-video-search",
+    "octen-web-search"
   ]
 }

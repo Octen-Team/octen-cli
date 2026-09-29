@@ -325,11 +325,31 @@ Extract content from one or more URLs (1–20).
 
 ```sh
 octen extract https://example.com --query "pricing" --max-age 3600 --images
+octen extract https://www.reddit.com/r/programming --mode advanced --fetch-timeout 60
+octen extract https://docs.octen.ai --links prefer_internal --max-links 50
 ```
 
-Options: `--query` (relevance hint), `--max-age <sec>` (cache age, 300–31536000), `--images` (also returns `cover_image` when present), `--videos`, `--audio`, `--format` (markdown|text), `--fetch-timeout <sec>` (1–60), `--full` (print full page content). The page favicon is returned by default when available.
+Options: `--query` (relevance hint), `--max-age <sec>` (cache age, 300–31536000), `--images` (also returns `cover_image` when present), `--videos`, `--audio`, `--format` (markdown|text), `--fetch-timeout <sec>` (per-URL, 1–60), `--mode <m>` (standard|advanced|auto), `--links [scope]` (prefer_internal|prefer_external), `--max-links <n>` (1–1000), `--full` (print full page content, links and media). The page favicon is returned by default when available.
 
-Pretty output truncates page content to ~500 chars for readability; pass `--full` to print the whole thing (or `--json` for the raw response).
+**Choosing `--mode`.** When omitted the server uses `standard`; the CLI never sends a mode you did not ask for.
+
+- `standard` (default): fastest and cheapest ($1 / 1K successful URLs). Right for well-structured pages without anti-bot protection: news, blogs, docs, product pages, static sites. On login-walled, JS-heavy or anti-bot sites it may return empty content or only a page skeleton and still report `success`.
+- `advanced`: highest success rate. Renders in a real browser with stronger anti-bot handling; slower and 2.5x the price ($2.5 / 1K). Use it for known hard sites: anti-bot/WAF-protected sites, JS-heavy SPAs, social sites (Reddit, X, LinkedIn), academic sites (ResearchGate), dynamically loaded content.
+- `auto`: picks per URL — standard where it suffices, advanced only for hard URLs, each billed at the mode it actually used. Use it for a mixed batch when you can't tell which URLs are hard; if most are hard, its cost approaches all-advanced.
+
+| Scenario | mode |
+|---|---|
+| News / blogs / docs / product pages (ordinary sites) | standard (or omit) |
+| Known hard sites (Reddit / X / LinkedIn / ResearchGate / anti-bot / SPA) | advanced |
+| Mixed batch, unsure which are hard | auto |
+| Cost-sensitive, mostly ordinary sites | standard |
+| Quality first, mostly hard sites | advanced |
+
+If a standard result failed or came back empty/skeletal (`page_structure.primary` "No Main Content", or very short content on a page that should have a body), retry just those URLs with `--mode advanced`; pretty output prints that hint under failed and "No Main Content" results unless advanced was already requested or used. With advanced/auto, raise `--fetch-timeout` (e.g. 60). The client's own request timeout follows it: `fetch-timeout + 90s` (capped at 180s), so 120s when `--fetch-timeout` is omitted and at most 150s. That timeout is per attempt, and 429/5xx responses are retried (up to 3 times), so the worst-case wall time is longer. Failed URLs are not billed; each successful result carries `resolved_mode` (the mode actually used, which can differ from the one requested), and the authoritative billing count is `meta.usage.successful_by_mode`, shown in the pretty-output footer.
+
+**Links.** `--links` returns each page's links (`url`, `anchor_text`, `is_external`) — use it to discover a site's pages or follow outbound references. A bare `--links` uses the server defaults; `--links prefer_internal` (the default) lists same-site links first, `--links prefer_external` lists links to other registered domains first, keeping page order within each group. `--max-links <n>` caps the count (1–1000, default 200) and implies `--links`. Because the scope is optional, put `--links` after the URLs or write `--links=<scope>`; if it would swallow a URL as its scope, the CLI stops with an error saying so.
+
+Pretty output truncates page content to ~500 chars and lists at most 10 links and 10 of each media type for readability; pass `--full` to print everything (or `--json` for the raw response).
 
 ---
 

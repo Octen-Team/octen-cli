@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { buildExtractRequest } from "../../src/api/extract.js";
+import { buildExtractRequest, extractClientTimeoutMs } from "../../src/api/extract.js";
 import { OctenValidationError } from "../../src/api/errors.js";
 
 describe("buildExtractRequest", () => {
@@ -90,5 +90,73 @@ describe("buildExtractRequest", () => {
     expect(req.include_images).toBe(true);
     expect(req.include_videos).toBe(true);
     expect(req.include_audio).toBe(true);
+  });
+
+  it("omits mode when not given (the server defaults to standard)", () => {
+    const req = buildExtractRequest(["https://example.com"], {});
+    expect(req).not.toHaveProperty("mode");
+  });
+
+  it("passes each valid mode through", () => {
+    for (const mode of ["standard", "advanced", "auto"] as const) {
+      expect(buildExtractRequest(["https://example.com"], { mode }).mode).toBe(mode);
+    }
+  });
+
+  it("rejects an unknown mode", () => {
+    expect(() =>
+      buildExtractRequest(["https://example.com"], { mode: "turbo" as any }),
+    ).toThrow(/--mode must be one of: standard, advanced, auto/);
+  });
+
+  it("omits include_links unless --links or --max-links is given", () => {
+    expect(buildExtractRequest(["https://example.com"], {})).not.toHaveProperty("include_links");
+  });
+
+  it("sends include_links {} for a bare --links", () => {
+    const req = buildExtractRequest(["https://example.com"], { links: true });
+    expect(req.include_links).toEqual({});
+  });
+
+  it("sends the scope for --links <scope>", () => {
+    const req = buildExtractRequest(["https://example.com"], { links: "prefer_external" });
+    expect(req.include_links).toEqual({ scope: "prefer_external" });
+  });
+
+  it("rejects an unknown link scope", () => {
+    expect(() => buildExtractRequest(["https://example.com"], { links: "external" })).toThrow(
+      /--links must be one of: prefer_internal, prefer_external/,
+    );
+  });
+
+  it("lets --max-links alone imply include_links", () => {
+    const req = buildExtractRequest(["https://example.com"], { maxLinks: 50 });
+    expect(req.include_links).toEqual({ max_links: 50 });
+  });
+
+  it("combines scope and max_links", () => {
+    const req = buildExtractRequest(["https://example.com"], { links: "prefer_internal", maxLinks: 5 });
+    expect(req.include_links).toEqual({ scope: "prefer_internal", max_links: 5 });
+  });
+
+  it("validates maxLinks 1-1000 (the server 400s rather than clamping)", () => {
+    expect(() => buildExtractRequest(["https://example.com"], { maxLinks: 0 })).toThrow(OctenValidationError);
+    expect(() => buildExtractRequest(["https://example.com"], { maxLinks: 1001 })).toThrow(OctenValidationError);
+    expect(() => buildExtractRequest(["https://example.com"], { maxLinks: 1 })).not.toThrow();
+    expect(() => buildExtractRequest(["https://example.com"], { maxLinks: 1000 })).not.toThrow();
+  });
+});
+
+describe("extractClientTimeoutMs", () => {
+  it("defaults to the 30s server budget plus 90s headroom", () => {
+    expect(extractClientTimeoutMs()).toBe(120_000);
+  });
+
+  it("adds headroom to the per-URL fetch timeout", () => {
+    expect(extractClientTimeoutMs(10)).toBe(100_000);
+  });
+
+  it("reaches at most 150s at the largest valid --fetch-timeout (60)", () => {
+    expect(extractClientTimeoutMs(60)).toBe(150_000);
   });
 });

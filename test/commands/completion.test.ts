@@ -67,6 +67,9 @@ describe("completion command", () => {
     // Known per-subcommand flags
     expect(out).toContain("--count"); // from search
     expect(out).toContain("--full"); // from extract
+    expect(out).toContain("--mode"); // from extract
+    expect(out).toContain("--links"); // from extract
+    expect(out).toContain("--max-links"); // from extract
   });
 
   it("emits a non-empty zsh script containing subcommands", async () => {

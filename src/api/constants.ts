@@ -30,6 +30,7 @@ export const LIMITS = {
   excludeText: 5,
   extractUrls: { min: 1, max: 20 },
   extractTimeout: { min: 1, max: 60 },
+  maxLinks: { min: 1, max: 1000 },
   cacheWindow: { min: 300, max: 31_536_000, default: 86_400 },
   highlightMaxTokens: { min: 100, max: 20_000 },
   fullContentMaxTokens: { min: 100, max: 100_000 },
@@ -47,6 +48,8 @@ export const TIME_BASIS_OPTIONS = ["auto", "published", "crawled"] as const;
 export const TIME_RANGE_OPTIONS = ["day", "week", "month", "year", "d", "w", "m", "y"] as const;
 export const SAFESEARCH_OPTIONS = ["off", "strict"] as const;
 export const FORMAT_OPTIONS = ["text", "markdown"] as const;
+export const EXTRACT_MODE_OPTIONS = ["standard", "advanced", "auto"] as const;
+export const LINK_SCOPE_OPTIONS = ["prefer_internal", "prefer_external"] as const;
 
 export const SKILLS_REPO = "Octen-Team/octen-skills";
 export const SKILLS_REPO_TARBALL = (ref: string) =>
