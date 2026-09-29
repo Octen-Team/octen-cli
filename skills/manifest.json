@@ -1,8 +1,12 @@
 {
   "source": "Octen-Team/octen-skills",
-  "ref": "main",
+  "ref": "0477b7b939db8ce668d1d1fb2a6e7761792a9ad5",
   "skills": [
     "octen-design",
-    "octen-search"
+    "octen-extract",
+    "octen-image-search",
+    "octen-search",
+    "octen-video-search",
+    "octen-web-search"
   ]
 }
