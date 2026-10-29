@@ -51,7 +51,7 @@ export function registerConfigureSkills(
     )
     .option(
       "--only <names>",
-      "comma-separated list of skill names to install (e.g. octen-search,octen-design)",
+      "comma-separated list of skill names to install (e.g. octen-search,octen-place-search)",
       parseCsvOpt("--only"),
     )
     .option("--ref <ref>", "upstream git ref to fetch skills from", "main")
