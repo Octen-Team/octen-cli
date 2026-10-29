@@ -412,19 +412,17 @@ Options: `-m/--model` (base|large or full ID), `--fusion`/`--no-fusion`, `--dime
 
 ### `octen image-search`
 
-**In Beta** — contact us to request beta access.
-
 Search the web for images, either by text query or by example image.
 
 ```sh
-octen image-search "red sports car" -n 10 --topic design
+octen image-search "red sports car" -n 10
 octen image-search --image https://example.com/car.jpg
 octen image-search --image ./car.png
 ```
 
 The endpoint takes exactly one input, so pass a query **or** `--image`, not both. `--image` accepts a public URL or a local file path (read inline as base64, max 5MB).
 
-Options: `--image <url|path>`, `--topic` (general|design), `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--safesearch` (off|strict), `--html-snippet` (+`--html-snippet-max-tokens`, 100–100000).
+Options: `--image <url|path>`, `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--safesearch` (off|strict).
 
 Unlike `octen search` and `octen video-search`, this endpoint has no time filters.
 

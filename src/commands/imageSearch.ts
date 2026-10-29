@@ -14,29 +14,23 @@ export function registerImageSearch(program: Command) {
     .command("image-search")
     .argument("[query...]", "search query (optional if --image is given)")
     .description(
-      "In Beta. Contact us to request beta access. — Search the web for images by text or by image (one or the other). Use --topic design for UI design references (returns a style summary and html_snippet per result)",
+      "Search the web for images by text or by image (one or the other)",
     )
     .option("--image <url|path>", "image input: public URL or local file path")
-    .option("--topic <t>", "general|design")
     .option("-n, --count <n>", "results 1-10", parseIntOpt("--count"))
     .option("--include-domains <list>", "comma list", parseCsvOpt("--include-domains"))
     .option("--exclude-domains <list>", "comma list", parseCsvOpt("--exclude-domains"))
     .option("--safesearch <s>", "off|strict")
-    .option("--html-snippet", "include HTML snippet for each result")
-    .option("--html-snippet-max-tokens <n>", "max tokens per HTML snippet", parseIntOpt("--html-snippet-max-tokens"))
     .action(async (queryArg: string[], opts: Record<string, any>, command: Command) => {
       const g = command.optsWithGlobals();
       const client = makeClient(g);
       const query = Array.isArray(queryArg) ? queryArg.join(" ") : (queryArg ?? "");
       const imageOpts: ImageSearchOpts = {
         image: opts.image,
-        topic: opts.topic,
         count: opts.count,
         includeDomains: opts.includeDomains,
         excludeDomains: opts.excludeDomains,
         safesearch: opts.safesearch,
-        htmlSnippet: opts.htmlSnippet,
-        htmlSnippetMaxTokens: opts.htmlSnippetMaxTokens,
       };
       const req = buildImageSearchRequest(query, imageOpts);
       const res = await client.request<ImageSearchResponse>(ENDPOINTS.imageSearch, req);
