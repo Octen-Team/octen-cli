@@ -503,7 +503,7 @@ describe("configure-skills default remote path", () => {
     ]);
     // Claude Desktop reads the same dir as Claude Code, so skills land there.
     expect(existsSync(join(home, ".claude/skills", "octen-search", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(home, ".claude/skills", "octen-design", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(home, ".claude/skills", "octen-place-search", "SKILL.md"))).toBe(true);
   });
 });
 
@@ -527,12 +527,12 @@ describe("configure-skills --only validation", () => {
 
     await prog.parseAsync([
       "node", "octen", "configure-skills", "--cursor", "--offline",
-      "--only", " octen-search, ,octen-design ",
+      "--only", " octen-search, ,octen-place-search ",
     ]);
 
     const skillsDir = join(home, ".cursor/skills");
     expect(existsSync(join(skillsDir, "octen-search", "SKILL.md"))).toBe(true);
-    expect(existsSync(join(skillsDir, "octen-design", "SKILL.md"))).toBe(true);
+    expect(existsSync(join(skillsDir, "octen-place-search", "SKILL.md"))).toBe(true);
   });
 });
 

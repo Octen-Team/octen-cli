@@ -34,7 +34,6 @@ export const LIMITS = {
   cacheWindow: { min: 300, max: 31_536_000, default: 86_400 },
   highlightMaxTokens: { min: 100, max: 20_000 },
   fullContentMaxTokens: { min: 100, max: 100_000 },
-  htmlSnippetMaxTokens: { min: 100, max: 100_000 },
   vlContents: 20,
   vlImages: 5,
   vlVideos: 1,
@@ -43,7 +42,6 @@ export const LIMITS = {
 } as const;
 
 export const TOPIC_OPTIONS = ["general", "news"] as const;
-export const IMAGE_TOPIC_OPTIONS = ["general", "design"] as const;
 export const TIME_BASIS_OPTIONS = ["auto", "published", "crawled"] as const;
 export const TIME_RANGE_OPTIONS = ["day", "week", "month", "year", "d", "w", "m", "y"] as const;
 export const SAFESEARCH_OPTIONS = ["off", "strict"] as const;

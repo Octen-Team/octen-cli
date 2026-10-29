@@ -27,38 +27,32 @@ describe("buildImageSearchRequest", () => {
     expect(() => buildImageSearchRequest("", {})).toThrow(OctenValidationError);
   });
   it("includes only provided fields", () => {
-    expect(buildImageSearchRequest("hi", { count: 5, topic: "design" })).toEqual({
+    expect(buildImageSearchRequest("hi", { count: 5 })).toEqual({
       inputs: [{ type: "text", data: "hi" }],
       count: 5,
-      topic: "design",
     });
   });
   it("rejects count out of range", () => {
     expect(() => buildImageSearchRequest("hi", { count: 0 })).toThrow(OctenValidationError);
     expect(() => buildImageSearchRequest("hi", { count: 11 })).toThrow(OctenValidationError);
   });
-  it("rejects a bad topic", () => {
-    expect(() => buildImageSearchRequest("hi", { topic: "bogus" as never })).toThrow(
-      OctenValidationError,
-    );
-  });
-  it("rejects html-snippet-max-tokens out of range", () => {
-    expect(() =>
-      buildImageSearchRequest("hi", { htmlSnippet: true, htmlSnippetMaxTokens: 99 }),
-    ).toThrow(OctenValidationError);
-    expect(() =>
-      buildImageSearchRequest("hi", { htmlSnippet: true, htmlSnippetMaxTokens: 100_001 }),
-    ).toThrow(OctenValidationError);
-  });
   it("rejects a bad safesearch", () => {
     expect(() => buildImageSearchRequest("hi", { safesearch: "x" as never })).toThrow(
       OctenValidationError,
     );
   });
-  it("maps html-snippet flags into a nested object", () => {
-    expect(
-      buildImageSearchRequest("hi", { htmlSnippet: true, htmlSnippetMaxTokens: 2000 }),
-    ).toMatchObject({ html_snippet: { enable: true, max_tokens: 2000 } });
+  it("sends neither topic nor html_snippet — both were withdrawn", () => {
+    // `topic: "design"` is still accepted by the API but returns nothing now
+    // that the design corpus is gone, and `html_snippet` answers 400. Passing
+    // either through would be worse than not offering it: one fails loudly,
+    // the other hands back an empty result set with no reason given.
+    const req = buildImageSearchRequest("hi", {
+      count: 5,
+      topic: "design",
+      htmlSnippet: true,
+    } as never);
+    expect(req).not.toHaveProperty("topic");
+    expect(req).not.toHaveProperty("html_snippet");
   });
   it("sends no time filters — the endpoint has none", () => {
     // /image-search silently drops time_range/start_time/end_time: it answers

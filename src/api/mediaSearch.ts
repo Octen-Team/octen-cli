@@ -1,7 +1,6 @@
 import { readFileSync, existsSync, statSync } from "node:fs";
 import {
   LIMITS,
-  IMAGE_TOPIC_OPTIONS,
   TIME_RANGE_OPTIONS,
   SAFESEARCH_OPTIONS,
 } from "./constants.js";
@@ -25,7 +24,6 @@ export interface ImageSearchResult {
   time_published?: string;
   time_last_crawled?: string;
   summary?: string;
-  html_snippet?: string;
 }
 
 /** Response shape for the /image-search endpoint. */
@@ -36,13 +34,10 @@ export interface ImageSearchResponse {
 export interface ImageSearchOpts {
   /** Optional image input: a public http(s) URL or a local file path. */
   image?: string;
-  topic?: "general" | "design";
   count?: number;
   includeDomains?: string[];
   excludeDomains?: string[];
   safesearch?: "off" | "strict";
-  htmlSnippet?: boolean;
-  htmlSnippetMaxTokens?: number;
 }
 
 /** A single image input for the /image-search endpoint. */
@@ -96,20 +91,13 @@ export function buildImageSearchRequest(
 
   if (o.count != null && (o.count < LIMITS.imageCount.min || o.count > LIMITS.imageCount.max))
     throw new OctenValidationError(`count must be ${LIMITS.imageCount.min}-${LIMITS.imageCount.max}`);
-  assertRange("--html-snippet-max-tokens", o.htmlSnippetMaxTokens, LIMITS.htmlSnippetMaxTokens);
-  validateEnum("--topic", o.topic, IMAGE_TOPIC_OPTIONS);
   validateEnum("--safesearch", o.safesearch, SAFESEARCH_OPTIONS);
 
   const req: Record<string, unknown> = { inputs };
   const put = (k: string, v: unknown) => { if (v != null) req[k] = v; };
-  put("topic", o.topic); put("count", o.count);
+  put("count", o.count);
   put("include_domains", o.includeDomains); put("exclude_domains", o.excludeDomains);
   put("safesearch", o.safesearch);
-  if (o.htmlSnippet)
-    req.html_snippet = {
-      enable: true,
-      ...(o.htmlSnippetMaxTokens ? { max_tokens: o.htmlSnippetMaxTokens } : {}),
-    };
   return req;
 }
 
