@@ -5,6 +5,31 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.11.0] — 2026-10-29
+
+### Changed
+
+- **Vendored skills resynced from `octen-skills`.** Adds `octen-place-search`,
+  and brings `octen-search` up to date with its news, business and pulse
+  sections — including the note that `include_domains`/`exclude_domains` filter
+  `data.results` only and never reach `data.subjects`, so a source-restricted
+  question answered from the storylines cites outlets the caller excluded.
+- `image-search` is no longer described as Beta. The API opened it to every
+  account; `video-search` is still invite-only and says so.
+
+### Removed
+
+- **`octen image-search --topic`.** The API still accepts the parameter, but the
+  design corpus behind `design` was withdrawn, so `--topic design` returned an
+  empty result set with nothing to explain it — a silent failure is worse than a
+  loud one. `general` was the only value left and is the default, which left the
+  flag with nothing to select.
+- **`octen image-search --html-snippet` and `--html-snippet-max-tokens`.** The
+  API answers 400 for `html_snippet`.
+- **The `octen-design` skill**, withdrawn upstream along with the corpus it
+  documented. `octen configure-skills` no longer installs it; a copy already on
+  disk is left alone.
+
 ## [0.10.0] — 2026-09-29
 
 ### Added
