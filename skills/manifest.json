@@ -2,9 +2,9 @@
   "source": "Octen-Team/octen-skills",
   "ref": "main",
   "skills": [
-    "octen-design",
     "octen-extract",
     "octen-image-search",
+    "octen-place-search",
     "octen-search",
     "octen-video-search",
     "octen-web-search"
