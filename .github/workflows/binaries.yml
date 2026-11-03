@@ -89,3 +89,80 @@ jobs:
             2>/dev/null || true
           gh release upload "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" \
             dist-bin/octen-* dist-bin/SHA256SUMS.txt --clobber
+
+      # The tap formula was updated by hand, so it lagged: it sat on 0.11.0
+      # while npm and the binaries were already on 0.12.0, and nothing said
+      # so. The checksums are in hand here, which is the only place they are
+      # known without downloading the release back.
+      #
+      # Skips when the token is absent rather than failing: a release should
+      # not break because the tap is not wired up yet.
+      - name: Update the Homebrew formula
+        env:
+          TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if [ -z "${TAP_TOKEN:-}" ]; then
+            echo "::warning::HOMEBREW_TAP_TOKEN is not set — the tap still has to be updated by hand"
+            exit 0
+          fi
+          VERSION="${TAG#v}"
+
+          sha() { awk -v n="$1" '$2 == n { print $1 }' dist-bin/SHA256SUMS.txt; }
+          for asset in octen-darwin-arm64 octen-darwin-x64 octen-linux-arm64 octen-linux-x64; do
+            [ -n "$(sha "$asset")" ] || { echo "::error::no checksum for $asset"; exit 1; }
+          done
+
+          git clone --depth 1 \
+            "https://x-access-token:${TAP_TOKEN}@github.com/Octen-Team/homebrew-tap.git" tap
+          cd tap
+
+          cat > Formula/octen.rb <<EOF
+          class Octen < Formula
+            desc "Octen CLI — web search, extract, chat, embeddings, and MCP/Skills setup"
+            homepage "https://github.com/Octen-Team/octen-cli"
+            version "${VERSION}"
+            license "MIT"
+
+            on_macos do
+              on_arm do
+                url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-darwin-arm64"
+                sha256 "$(sha octen-darwin-arm64)"
+              end
+              on_intel do
+                url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-darwin-x64"
+                sha256 "$(sha octen-darwin-x64)"
+              end
+            end
+
+            on_linux do
+              on_arm do
+                url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-linux-arm64"
+                sha256 "$(sha octen-linux-arm64)"
+              end
+              on_intel do
+                url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-linux-x64"
+                sha256 "$(sha octen-linux-x64)"
+              end
+            end
+
+            def install
+              bin.install Dir["octen-*"].first => "octen"
+            end
+
+            test do
+              assert_match version.to_s, shell_output("#{bin}/octen --version")
+            end
+          end
+          EOF
+
+          if git diff --quiet; then
+            echo "formula already at ${VERSION}"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -qam "octen ${VERSION}"
+          git push -q origin HEAD:main
+          echo "tap updated to ${VERSION}"
