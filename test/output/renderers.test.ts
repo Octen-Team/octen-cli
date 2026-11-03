@@ -34,17 +34,35 @@ describe("news renderer", () => {
 });
 
 describe("business renderer", () => {
-  it("renders a person's current position and career", () => {
+  // The two fixtures say different things on purpose: when current_position
+  // echoed the career entry, dropping its rendering left both assertions
+  // passing, so the test could not fail for the bug it exists to catch.
+  it("renders a person's current position", () => {
     const out = renderBusinessSearch(env({
       entities: [{
         name: "A Person",
         type: "person",
         current_position: "Chair & CEO at ACME",
-        career: [{ organization: "ACME", title: "Chair & CEO", start: "February 2022" }],
+        career: [{ organization: "Previous Co", title: "VP Engineering", start: "2015", end: "2022" }],
       }],
     }));
     expect(out).toContain("Chair & CEO at ACME");
-    expect(out).toContain("February 2022 – present");
+  });
+
+  it("renders career history, and does not call an ended role current", () => {
+    const out = renderBusinessSearch(env({
+      entities: [{
+        name: "A Person",
+        type: "person",
+        career: [
+          { organization: "ACME", title: "Chair & CEO", start: "February 2022" },
+          { organization: "Previous Co", title: "VP Engineering", start: "2015", end: "2022" },
+        ],
+      }],
+    }));
+    expect(out).toContain("Chair & CEO at ACME (February 2022 – present)");
+    expect(out).toContain("VP Engineering at Previous Co (2015 – 2022)");
+    expect(out).not.toContain("VP Engineering at Previous Co (2015 – present)");
   });
 
   it("renders activities — otherwise --max-activities does nothing visible", () => {

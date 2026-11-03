@@ -67,7 +67,7 @@ function formatEntity(e: any): string {
       const role = [c?.title, c?.organization].filter(Boolean).join(" at ");
       lines.push(`     ${role || "(role unknown)"}${span ? ` ${pc.dim(`(${span})`)}` : ""}`);
     }
-    if (career.length > SERIES_SHOWN) out(lines, career.length - SERIES_SHOWN, "earlier roles");
+    if (career.length > SERIES_SHOWN) pushElided(lines, career.length - SERIES_SHOWN, "earlier roles");
   }
 
   const people: any[] = e?.key_people ?? [];
@@ -90,7 +90,7 @@ function formatEntity(e: any): string {
       if (a?.url) lines.push(`       ${pc.dim(a.url)}`);
       lines.push(...content(a, "       "));
     }
-    if (activities.length > SERIES_SHOWN) out(lines, activities.length - SERIES_SHOWN, "more");
+    if (activities.length > SERIES_SHOWN) pushElided(lines, activities.length - SERIES_SHOWN, "more");
   }
 
   const news: any[] = e?.news ?? [];
@@ -145,7 +145,7 @@ function formatMetrics(m: any): string[] {
 }
 
 /** `(+N more)`, so a truncated series says what was left out. */
-function out(lines: string[], n: number, label: string): void {
+function pushElided(lines: string[], n: number, label: string): void {
   lines.push(pc.dim(`     (+${n} ${label})`));
 }
 
