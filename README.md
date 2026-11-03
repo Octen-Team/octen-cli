@@ -297,11 +297,71 @@ Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+
 
 ### `octen news`
 
-News-focused web search (same flags as `search` minus `--topic`).
+Recent news from the dedicated `/news-search` endpoint. Returns ranked articles **and** `subjects` — the coverage grouped into storylines, each with a summary and the span it covers, so "what happened with X" is answerable without reading every article.
 
 ```sh
 octen news "OpenAI announcement" --highlight --time-range day
+octen news "EU AI Act" --subjects-count 3
+octen news "chip export rules" --no-subjects
 ```
+
+Options: `-n` (1–100), `--include-domains`, `--exclude-domains`, `--language`, `--time-basis`, `--time-range`, `--start-time`, `--end-time`, `--highlight` (+`--highlight-max-tokens`), `--full-content` (+`--full-content-max-tokens`), `--subjects-count` (1–5), `--max-sub-news` (1–20), `--no-subjects`.
+
+**`--include-domains` / `--exclude-domains` narrow the ranked articles only — never the storylines.** The storylines are built from the open web either way, so a question that restricts its sources has to be answered from the articles.
+
+Not the same flag set as `search`: this endpoint has no `--include-text`/`--exclude-text`, `--format`, `--safesearch` or `--images`. It accepts them and ignores them, so they are not offered here.
+
+---
+
+### `octen business`
+
+A company, or a person in a business context, as **structured cards** — profile, financial and stock metrics, key people and their career history, recent announcements — alongside the ranked sources.
+
+```sh
+octen business "NVIDIA" --highlight
+octen business "AMD and Intel" --entities-count 2
+octen business "Anthropic funding" --no-entities
+```
+
+Options: the same retrieval flags as `news`, plus `--entities-count` (1–20), `--max-activities` (1–20), `--max-entity-news` (1–20), `--no-entities`.
+
+Domain, time and language filters narrow the ranked sources only, never the cards.
+
+---
+
+### `octen place`
+
+Real-world places as structured cards: name, category, address, coordinates, phone, website, opening hours, status, rating and review count.
+
+```sh
+octen place "coffee shop" --latitude 35.6812 --longitude 139.7671
+octen place "ramen in Shinjuku"
+octen place "museums" --city Lisbon
+octen place "coffee shop" --latitude 35.6812 --longitude 139.7671 --max-reviews 3
+```
+
+Pass `--latitude` and `--longitude` to search around a point — each card then carries its `distance` — and `--radius` (metres, 1–50000) to cap how far. When only the city is known, use `--city` / `--region` / `--country`. A query that names its own area needs neither.
+
+Options: `-n` (places, 1–20), `--max-reviews` (0–5, off by default), `--web` (+`--web-count`) to also return pages about these places.
+
+The places arrive in `data.places`; `data.results` is where the optional web pages go.
+
+---
+
+### `octen pulse`
+
+The URL a query most likely means, in about 10ms. One inference predicts destinations instead of searching and ranking them — for official docs, help centres and sites you could almost name.
+
+```sh
+octen pulse "uv documentation"
+octen pulse "github docs" --mode standard --highlight
+```
+
+Options: `--mode` (`lite`/`standard`), `-n` (1–10), `--safesearch`, `--images`, `--highlight` (+`--highlight-max-tokens`), `--full-content` (+`--full-content-max-tokens`).
+
+`lite` (the default) returns titles and URLs only and ignores the content options; `standard` turns them on at roughly twice the latency. The API returns lite URLs **without a scheme**; the CLI puts `https://` back, so what you get is a URL you can actually open.
+
+No domain, text, time or language filters — pulse runs no retrieval to filter. For those, use `search` or `news`.
 
 ---
 

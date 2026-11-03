@@ -5,6 +5,12 @@ import { join } from "node:path";
 import { Command } from "commander";
 import { OctenValidationError } from "../../src/api/errors.js";
 import { registerSearch } from "../../src/commands/search.js";
+import {
+  registerBusinessSearch,
+  registerNewsSearch,
+  registerPulseSearch,
+} from "../../src/commands/verticalSearch.js";
+import { registerPlaceSearch } from "../../src/commands/placeSearch.js";
 import { registerExtract } from "../../src/commands/extract.js";
 import { registerChat } from "../../src/commands/chat.js";
 import { registerEmbed } from "../../src/commands/embed.js";
@@ -29,7 +35,10 @@ function makeProgram(internal: { home?: string } = {}) {
   registerConfigureMcp(prog);
   registerConfigureSkills(prog);
   registerSearch(prog);
-  registerSearch(prog, "news");
+  registerNewsSearch(prog);
+  registerBusinessSearch(prog);
+  registerPlaceSearch(prog);
+  registerPulseSearch(prog);
   registerExtract(prog);
   registerChat(prog);
   registerEmbed(prog);

@@ -5,6 +5,44 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.12.0] — 2026-11-03
+
+### Added
+
+- **`octen business`** — wraps `POST /business-search`. Returns the companies
+  and people behind a query as structured cards (profile, financial and stock
+  metrics, key people and career history, recent announcements) alongside the
+  ranked sources. `--entities-count`, `--max-activities` and
+  `--max-entity-news` tune the cards; `--no-entities` turns them off.
+- **`octen place`** — wraps `POST /place-search`. Real-world places with
+  address, coordinates, phone, hours, status, rating and distance. Takes a
+  coordinate pair with an optional `--radius`, or `--city`/`--region`/
+  `--country` when only the area is known. `--max-reviews` (0-5) returns
+  review excerpts, off by default. `--web` adds pages about the places.
+  Half a coordinate pair, or a radius with no point, is refused before the
+  call rather than spent on a round trip the API answers with a 400.
+- **`octen pulse`** — wraps `POST /pulse-search`. The URL a query most likely
+  means, in about 10ms. `--mode lite` (the default) returns titles and URLs;
+  `standard` adds highlights and content. The API returns lite URLs **without
+  a scheme**, so the CLI puts `https://` back — handing on `docs.astral.sh/uv`
+  gives a URL nothing can open.
+
+### Changed
+
+- **`octen news` posts to `/news-search` instead of `/search` with
+  `topic: "news"`.** It now returns `subjects` — the coverage grouped into
+  storylines with summaries — alongside the ranked articles, which the old
+  path could not return at all. `--subjects-count`, `--max-sub-news` and
+  `--no-subjects` control them.
+
+  Its flag set narrows to match the endpoint: no `--include-text`/
+  `--exclude-text`, `--format`, `--safesearch` or `--images`. The API accepts
+  those and ignores them, so offering them would return results that silently
+  do not reflect the flags given.
+
+  The help text also states that `--include-domains`/`--exclude-domains`
+  narrow the ranked articles only and never the storylines.
+
 ## [0.11.0] — 2026-10-29
 
 ### Changed
