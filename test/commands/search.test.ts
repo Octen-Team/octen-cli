@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { registerSearch } from "../../src/commands/search.js";
+import { registerNewsSearch } from "../../src/commands/verticalSearch.js";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -19,7 +20,7 @@ function makeProgram() {
     .option("--pretty", "human-readable output")
     .exitOverride(); // prevent process.exit in tests
   registerSearch(prog);
-  registerSearch(prog, "news");
+  registerNewsSearch(prog);
   return prog;
 }
 
@@ -75,14 +76,16 @@ describe("search command", () => {
     expect(body).toMatchObject({ query: "openai latest news" });
   });
 
-  it("news command forces topic=news in request body", async () => {
+  it("news command posts to /news-search, with no topic", async () => {
     const prog = makeProgram();
     await prog.parseAsync(["node", "octen", "news", "breaking", "--json", "--api-key", "k"]);
 
     expect(fetchSpy).toHaveBeenCalledOnce();
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ query: "breaking", topic: "news" });
+    expect(body).toMatchObject({ query: "breaking" });
+    expect(body).not.toHaveProperty("topic");
+    expect(String(fetchSpy.mock.calls[0]?.[0])).toContain("/news-search");
   });
 
   it("passes --count to request body", async () => {
@@ -112,13 +115,13 @@ describe("search command", () => {
     expect(body).not.toHaveProperty("language");
   });
 
-  it("news command passes --language to request body alongside topic=news", async () => {
+  it("news command passes --language to request body", async () => {
     const prog = makeProgram();
     await prog.parseAsync(["node", "octen", "news", "breaking", "--json", "--api-key", "k", "--language", "ja"]);
 
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
-    expect(body).toMatchObject({ query: "breaking", topic: "news", language: ["ja"] });
+    expect(body).toMatchObject({ query: "breaking", language: ["ja"] });
   });
 
   it("rejects non-integer --count", async () => {

@@ -6,6 +6,12 @@ import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { exitCodeFor } from "./api/errors.js";
 import { registerSearch } from "./commands/search.js";
+import {
+  registerBusinessSearch,
+  registerNewsSearch,
+  registerPulseSearch,
+} from "./commands/verticalSearch.js";
+import { registerPlaceSearch } from "./commands/placeSearch.js";
 import { registerBroadSearch } from "./commands/broadSearch.js";
 import { registerExtract } from "./commands/extract.js";
 import { registerChat } from "./commands/chat.js";
@@ -49,7 +55,10 @@ registerConfigureMcp(program);
 registerConfigureSkills(program);
 
 registerSearch(program);
-registerSearch(program, "news");
+registerNewsSearch(program);
+registerBusinessSearch(program);
+registerPlaceSearch(program);
+registerPulseSearch(program);
 registerBroadSearch(program);
 registerExtract(program);
 registerChat(program);

@@ -11,6 +11,10 @@ export const ENDPOINTS = {
   chat: "/v1/chat/completions",
   imageSearch: "/image-search",
   videoSearch: "/video-search",
+  newsSearch: "/news-search",
+  businessSearch: "/business-search",
+  placeSearch: "/place-search",
+  pulseSearch: "/pulse-search",
 } as const;
 
 export const EMBEDDING_MODELS: Record<string, string> = {
@@ -39,6 +43,18 @@ export const LIMITS = {
   vlVideos: 1,
   imageCount: { min: 1, max: 10 },
   videoCount: { min: 1, max: 10 },
+  pulseCount: { min: 1, max: 10 },
+  pulseQueryLength: 500,
+  subjectsCount: { min: 1, max: 5 },
+  maxSubNews: { min: 1, max: 20 },
+  entitiesCount: { min: 1, max: 20 },
+  maxActivities: { min: 1, max: 20 },
+  maxEntityNews: { min: 1, max: 20 },
+  placesCount: { min: 1, max: 20 },
+  maxReviews: { min: 0, max: 5 },
+  placeRadius: { min: 1, max: 50_000 },
+  latitude: { min: -90, max: 90 },
+  longitude: { min: -180, max: 180 },
 } as const;
 
 export const TOPIC_OPTIONS = ["general", "news"] as const;
@@ -48,6 +64,7 @@ export const SAFESEARCH_OPTIONS = ["off", "strict"] as const;
 export const FORMAT_OPTIONS = ["text", "markdown"] as const;
 export const EXTRACT_MODE_OPTIONS = ["standard", "advanced", "auto"] as const;
 export const LINK_SCOPE_OPTIONS = ["prefer_internal", "prefer_external"] as const;
+export const PULSE_MODE_OPTIONS = ["lite", "standard"] as const;
 
 export const SKILLS_REPO = "Octen-Team/octen-skills";
 export const SKILLS_REPO_TARBALL = (ref: string) =>

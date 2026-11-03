@@ -5,10 +5,10 @@ import { chooseMode, emit } from "../output/render.js";
 import { renderSearch } from "../output/pretty/search.js";
 import { makeClient, parseCsvOpt, parseIntOpt } from "./utils.js";
 
-export function registerSearch(program: Command, fixedTopic?: "news") {
-  const cmd = program.command(fixedTopic ?? "search")
+export function registerSearch(program: Command) {
+  const cmd = program.command("search")
     .argument("<query...>", "search query")
-    .description(fixedTopic ? "News-focused web search" : "Search the live web")
+    .description("Search the live web")
     .option("-n, --count <n>", "results 1-100", parseIntOpt("--count"))
     .option("--include-domains <list>", "comma list", parseCsvOpt("--include-domains"))
     .option("--exclude-domains <list>", "comma list", parseCsvOpt("--exclude-domains"))
@@ -22,14 +22,13 @@ export function registerSearch(program: Command, fixedTopic?: "news") {
     .option("--highlight").option("--highlight-max-tokens <n>", "max tokens per highlight", parseIntOpt("--highlight-max-tokens"))
     .option("--full-content").option("--full-content-max-tokens <n>", "max tokens per result", parseIntOpt("--full-content-max-tokens"))
     .option("--images");
-  if (!fixedTopic) cmd.option("--topic <t>", "general|news");
+  cmd.option("--topic <t>", "general|news");
 
   cmd.action(async (queryArg: string[] | string, opts: SearchOpts, command: Command) => {
     const g = command.optsWithGlobals();
     const client = makeClient(g);
     const query = Array.isArray(queryArg) ? queryArg.join(" ") : queryArg;
-    const searchOpts: SearchOpts = { ...opts, topic: fixedTopic ?? opts.topic };
-    const req = buildSearchRequest(query, searchOpts);
+    const req = buildSearchRequest(query, opts);
     const res = await client.request<SearchResponse>(ENDPOINTS.search, req);
     emit(res, chooseMode(g, process.stdout.isTTY ?? false), renderSearch);
   });
