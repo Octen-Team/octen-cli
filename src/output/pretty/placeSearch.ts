@@ -52,6 +52,21 @@ function formatPlace(p: any, i: number): string {
   const hours: string[] = Array.isArray(p?.opening_hours) ? p.opening_hours.filter(Boolean) : [];
   if (hours.length) lines.push(...hours.map((h) => `   ${pc.dim(h)}`));
 
+  // `false` is printed, not dropped: "not wheelchair accessible" is a reason
+  // to pick a different place, and dropping it makes a definite no read the
+  // same as an unknown.
+  if (p?.attributes && typeof p.attributes === "object") {
+    const attrs = Object.entries(p.attributes)
+      .map(([k, v]) => (v === true ? k : v === false ? `no ${k}` : v == null ? "" : `${k}=${v}`))
+      .filter(Boolean)
+      .join(", ");
+    if (attrs) lines.push(`   ${pc.dim(attrs)}`);
+  }
+
+  if (typeof p?.latitude === "number" && typeof p?.longitude === "number") {
+    lines.push(`   ${pc.dim(`${p.latitude}, ${p.longitude}`)}`);
+  }
+
   // Only present when `--max-reviews` asked for them, so nothing is printed
   // that was not requested — and nothing requested is dropped.
   const reviews: any[] = Array.isArray(p?.reviews) ? p.reviews.filter(Boolean) : [];

@@ -43,6 +43,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   The help text also states that `--include-domains`/`--exclude-domains`
   narrow the ranked articles only and never the storylines.
 
+### Fixed
+
+- **The new renderers no longer drop content the caller paid for.** Found in
+  review, confirmed against the live API: storyline articles carried a
+  `summary` and a 1,665-character `highlight` that printed as a bare title and
+  URL; business entities dropped `activities` entirely, which made
+  `--max-activities` do nothing visible, along with a person's
+  `current_position` and `career` and the `highlight` on entity news; place
+  cards dropped the coordinates and the amenity attributes, where a `false`
+  would otherwise read the same as an unknown.
+
 ## [0.11.0] — 2026-10-29
 
 ### Changed

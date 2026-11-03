@@ -55,6 +55,21 @@ function formatEntity(e: any): string {
 
   lines.push(...formatMetrics(e?.metrics));
 
+  // A person entity carries its own role and history where a company carries
+  // key_people. Rendering only the latter leaves a person card with no career
+  // information at all.
+  if (e?.current_position) lines.push(`   ${e.current_position}`);
+  const career: any[] = e?.career ?? [];
+  if (career.length) {
+    lines.push(`   ${pc.bold("Career")}`);
+    for (const c of career.slice(0, SERIES_SHOWN)) {
+      const span = [c?.start, c?.end ?? "present"].filter(Boolean).join(" – ");
+      const role = [c?.title, c?.organization].filter(Boolean).join(" at ");
+      lines.push(`     ${role || "(role unknown)"}${span ? ` ${pc.dim(`(${span})`)}` : ""}`);
+    }
+    if (career.length > SERIES_SHOWN) out(lines, career.length - SERIES_SHOWN, "earlier roles");
+  }
+
   const people: any[] = e?.key_people ?? [];
   if (people.length) {
     lines.push(`   ${pc.bold("Key people")}`);
@@ -64,12 +79,28 @@ function formatEntity(e: any): string {
     }
   }
 
+  // Requested through --max-activities, so dropping them silently makes that
+  // flag do nothing the caller can see.
+  const activities: any[] = e?.activities ?? [];
+  if (activities.length) {
+    lines.push(`   ${pc.bold("Activity")}`);
+    for (const a of activities.slice(0, SERIES_SHOWN)) {
+      lines.push(`     • ${a?.title ?? "(untitled)"}`);
+      if (a?.time_published) lines.push(`       ${pc.dim(a.time_published)}`);
+      if (a?.url) lines.push(`       ${pc.dim(a.url)}`);
+      lines.push(...content(a, "       "));
+    }
+    if (activities.length > SERIES_SHOWN) out(lines, activities.length - SERIES_SHOWN, "more");
+  }
+
   const news: any[] = e?.news ?? [];
   if (news.length) {
     lines.push(`   ${pc.bold("Recent")}`);
     for (const n of news.slice(0, SERIES_SHOWN)) {
       lines.push(`     • ${n?.title ?? "(no title)"}`);
       if (n?.url) lines.push(`       ${pc.dim(n.url)}`);
+      // The caller enabled --highlight for these too, and paid for them.
+      lines.push(...content(n, "       "));
     }
   }
   return lines.join("\n");
@@ -111,4 +142,21 @@ function formatMetrics(m: any): string[] {
     if (bits) out.push(`   ${pc.bold("Stock")} ${bits}`);
   }
   return out;
+}
+
+/** `(+N more)`, so a truncated series says what was left out. */
+function out(lines: string[], n: number, label: string): void {
+  lines.push(pc.dim(`     (+${n} ${label})`));
+}
+
+/** Whatever content an item carries — the caller asked for it. */
+function content(item: any, indent: string): string[] {
+  const res: string[] = [];
+  for (const field of ["summary", "highlight", "full_content"] as const) {
+    const raw = item?.[field];
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    const text = raw.length > MAX_SUMMARY ? raw.slice(0, MAX_SUMMARY) + "…" : raw;
+    res.push(...text.split("\n").map((l: string) => `${indent}${l}`));
+  }
+  return res;
 }

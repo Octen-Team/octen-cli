@@ -51,6 +51,26 @@ function formatSubject(s: any, i: number): string {
   for (const a of articles) {
     lines.push(`   • ${a?.title ?? "(no title)"}`);
     if (a?.url) lines.push(`     ${pc.dim(a.url)}`);
+    lines.push(...articleContent(a, "     "));
   }
   return lines.join("\n");
+}
+
+/**
+ * Whatever content a storyline article carries, indented under it.
+ *
+ * These are not duplicates of the ranked results: a storyline's articles need
+ * not appear in `data.results` at all, so dropping their `summary`,
+ * `highlight` and `full_content` discards content the caller enabled and was
+ * billed for, with nowhere else to find it.
+ */
+function articleContent(a: any, indent: string): string[] {
+  const out: string[] = [];
+  for (const field of ["summary", "highlight", "full_content"] as const) {
+    const raw = a?.[field];
+    if (typeof raw !== "string" || !raw.trim()) continue;
+    const text = raw.length > MAX_SUMMARY ? raw.slice(0, MAX_SUMMARY) + "…" : raw;
+    out.push(...text.split("\n").map((l: string) => `${indent}${l}`));
+  }
+  return out;
 }
