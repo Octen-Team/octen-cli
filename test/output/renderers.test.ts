@@ -7,6 +7,15 @@ import { renderPulseSearch, withScheme } from "../../src/output/pretty/pulseSear
 const env = (data: unknown) => ({ code: 0, msg: "success", data });
 
 /**
+ * picocolors enables colour from the environment, not from the test, so CI and
+ * a local run disagree: an assertion spanning a `pc.dim()` boundary matches
+ * with colour off and fails with it on. Strip the escapes and the assertions
+ * mean the same thing either way.
+ */
+// eslint-disable-next-line no-control-regex
+const plain = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, "");
+
+/**
  * These all guard one rule: nothing the caller asked for, or was billed for,
  * may be dropped on the way to the terminal. Every field here was returned by
  * the live API and silently discarded by the first version of its renderer.
@@ -24,12 +33,12 @@ describe("news renderer", () => {
       }],
       results: [],
     }));
-    expect(out).toContain("the paid-for highlight");
-    expect(out).toContain("its summary");
+    expect(plain(out)).toContain("the paid-for highlight");
+    expect(plain(out)).toContain("its summary");
   });
 
   it("prints an API error instead of 'No results'", () => {
-    expect(renderNewsSearch({ code: 401, msg: "unauthorized", data: {} })).toContain("unauthorized");
+    expect(plain(renderNewsSearch({ code: 401, msg: "unauthorized", data: {} }))).toContain("unauthorized");
   });
 });
 
@@ -46,7 +55,7 @@ describe("business renderer", () => {
         career: [{ organization: "Previous Co", title: "VP Engineering", start: "2015", end: "2022" }],
       }],
     }));
-    expect(out).toContain("Chair & CEO at ACME");
+    expect(plain(out)).toContain("Chair & CEO at ACME");
   });
 
   it("renders career history, and does not call an ended role current", () => {
@@ -60,28 +69,28 @@ describe("business renderer", () => {
         ],
       }],
     }));
-    expect(out).toContain("Chair & CEO at ACME (February 2022 – present)");
-    expect(out).toContain("VP Engineering at Previous Co (2015 – 2022)");
-    expect(out).not.toContain("VP Engineering at Previous Co (2015 – present)");
+    expect(plain(out)).toContain("Chair & CEO at ACME (February 2022 – present)");
+    expect(plain(out)).toContain("VP Engineering at Previous Co (2015 – 2022)");
+    expect(plain(out)).not.toContain("VP Engineering at Previous Co (2015 – present)");
   });
 
   it("renders activities — otherwise --max-activities does nothing visible", () => {
     const out = renderBusinessSearch(env({
       entities: [{ name: "ACME", activities: [{ title: "An announcement", url: "https://a.test/x" }] }],
     }));
-    expect(out).toContain("An announcement");
+    expect(plain(out)).toContain("An announcement");
   });
 
   it("keeps the highlight on entity news", () => {
     const out = renderBusinessSearch(env({
       entities: [{ name: "ACME", news: [{ title: "A headline", highlight: "billed content" }] }],
     }));
-    expect(out).toContain("billed content");
+    expect(plain(out)).toContain("billed content");
   });
 
   it("says how many series entries were left out", () => {
     const funding = Array.from({ length: 10 }, (_, i) => ({ round: "Series A", amount: 1e9, date: `202${i}-01-01` }));
-    expect(renderBusinessSearch(env({ entities: [{ name: "ACME", metrics: { funding } }] })))
+    expect(plain(renderBusinessSearch(env({ entities: [{ name: "ACME", metrics: { funding } }] }))))
       .toContain("+6 earlier rounds");
   });
 });
@@ -90,7 +99,7 @@ describe("place renderer", () => {
   it("reads data.places, not data.results", () => {
     // `results` is where the optional web pages go; reading it concludes the
     // endpoint returned nothing.
-    expect(renderPlaceSearch(env({ places: [{ name: "A Cafe" }], results: [] }))).toContain("A Cafe");
+    expect(plain(renderPlaceSearch(env({ places: [{ name: "A Cafe" }], results: [] })))).toContain("A Cafe");
   });
 
   it("renders coordinates and attributes, including a false one", () => {
@@ -102,18 +111,18 @@ describe("place renderer", () => {
         attributes: { wifi: true, wheelchair_accessible: false },
       }],
     }));
-    expect(out).toContain("35.68, 139.76");
-    expect(out).toContain("wifi");
+    expect(plain(out)).toContain("35.68, 139.76");
+    expect(plain(out)).toContain("wifi");
     // A definite no must not read the same as an unknown.
-    expect(out).toContain("no wheelchair_accessible");
+    expect(plain(out)).toContain("no wheelchair_accessible");
   });
 
   it("renders review excerpts when they were asked for", () => {
     const out = renderPlaceSearch(env({
       places: [{ name: "A Cafe", reviews: [{ text: "Worth the queue.", rating: 5, time_published: "2 months ago" }] }],
     }));
-    expect(out).toContain("5/5");
-    expect(out).toContain("Worth the queue.");
+    expect(plain(out)).toContain("5/5");
+    expect(plain(out)).toContain("Worth the queue.");
   });
 });
 
@@ -138,7 +147,7 @@ describe("pulse renderer", () => {
   });
 
   it("renders results with the scheme applied", () => {
-    expect(renderPulseSearch(env({ results: [{ title: "uv", url: "docs.astral.sh/uv" }] })))
+    expect(plain(renderPulseSearch(env({ results: [{ title: "uv", url: "docs.astral.sh/uv" }] }))))
       .toContain("https://docs.astral.sh/uv");
   });
 });
