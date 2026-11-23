@@ -1082,8 +1082,12 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
         const standard = await call("broad standard");
         const dynamic = await call("broad dynamic", "dynamic");
 
-        if (JSON.stringify(standard.queries) !== JSON.stringify(dynamic.queries)) {
-          ctx.skip(`inconclusive: queries differ (${JSON.stringify(standard.queries)} vs ${JSON.stringify(dynamic.queries)})`);
+        // Two absent lists must not count as "the same".
+        const sameQueries =
+          Array.isArray(standard.queries) && standard.queries.length > 0 &&
+          JSON.stringify(standard.queries) === JSON.stringify(dynamic.queries);
+        if (!sameQueries) {
+          ctx.skip(`inconclusive: queries missing or differ (${JSON.stringify(standard.queries)} vs ${JSON.stringify(dynamic.queries)})`);
         }
         // Distinct, non-empty URLs only: a result without one is skipped, a repeated one counts once.
         const lengths = (d: BroadSearchResponse) => {
@@ -1105,7 +1109,8 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
         }
         expect(shorter.length).toBeGreaterThanOrEqual(2);
       },
-      TEST_TIMEOUT_MS,
+      // Two sequential calls, each allowed the client timeout, plus margin.
+      2 * CLIENT_TIMEOUT_MS + 40_000,
     );
   });
 

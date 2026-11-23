@@ -294,7 +294,7 @@ octen search "EU AI Act obligations for general-purpose models" -n 5 --result-ty
 
 Options: `-n` (result count 1–100), `--topic` (general|news), `--result-type` (standard|dynamic), `--highlight` (+`--highlight-max-tokens`, 100–20000), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content` (+`--full-content-max-tokens`, 100–100000), `--images`, `--format` (text|markdown), `--safesearch`.
 
-`--result-type standard` (the default) returns results as the flags specify: `-n` is the result count, and with `--highlight` the `--highlight-max-tokens` cap applies as you set it. With `dynamic`, only the relevant results come back, `-n` is a maximum, and Octen may adjust the highlight length per result. In the JSON output, `meta.result_type` echoes the value used.
+`--result-type standard` (the default) returns results as the flags specify, and with `--highlight` the `--highlight-max-tokens` cap applies as given. With `dynamic`, only the relevant results come back, so `-n` is a maximum (fewer, possibly none, can come back), and Octen may adjust the highlight length per result. In the JSON output of `octen search`, `meta.result_type` echoes the value used.
 
 ---
 
