@@ -379,13 +379,13 @@ Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5)
 
 ---
 
-### `octen premier`
+### `octen premier-search`
 
 Web Search Premier: the same search with deeper retrieval and more careful reranking behind it — for the exact page that holds an answer, a niche document, or a query `octen search` answered thinly.
 
 ```sh
-octen premier "kafka default topic retention period" -n 5
-octen premier "EU AI Act obligations for general-purpose models" --result-type dynamic --time-range year
+octen premier-search "kafka default topic retention period" -n 5
+octen premier-search "EU AI Act obligations for general-purpose models" --result-type dynamic --time-range year
 ```
 
 It posts to its own endpoint, `/search-premier`, which takes the request `/search` takes and returns the same response. So the flags, the output and the JSON are `octen search`'s.
@@ -507,15 +507,15 @@ Unlike `octen search` and `octen video-search`, this endpoint has no time filter
 
 ---
 
-### `octen design`
+### `octen design-search`
 
 Real designs to build from: screenshots of web pages, page sections, app screens and slides, each with the design values behind it — colours, fonts, sizes — and, for page sections, the HTML. Web results on the same query come back alongside.
 
 ```sh
-octen design "saas pricing page"
-octen design "landing page hero section" -n 10 --no-web
-octen design "startup pitch deck slide" --no-snippet
-octen design --group <group_id> -n 28
+octen design-search "saas pricing page"
+octen design-search "landing page hero section" -n 10 --no-web
+octen design-search "startup pitch deck slide" --no-snippet
+octen design-search --group <group_id> -n 28
 ```
 
 A page section or a slide carries the `group` it belongs to. `--group <group_id>` returns every image of that page or deck, in order, instead of searching — it needs no query, and a query given beside it drives the web results only; it does not search within the group. **It still returns five unless told otherwise**, so set `-n` to the group's `total` (the most one call returns is 100). In the terminal, each section or slide prints the command that does this.
@@ -728,7 +728,7 @@ Scripts must check the exit status, not just the output.
 | Status | When |
 |---|---|
 | `0` | The command completed and the response was complete. |
-| `2` | Bad input, caught before any request: a malformed number (`--count 1.5`, `--count 2junk`), an empty comma list (`--include-domains ""`), a blank query, an unknown `--scope`, flags that cannot be combined (`octen design --no-images --no-web`), or a missing API key. |
+| `2` | Bad input, caught before any request: a malformed number (`--count 1.5`, `--count 2junk`), an empty comma list (`--include-domains ""`), a blank query, an unknown `--scope`, flags that cannot be combined (`octen design-search --no-images --no-web`), or a missing API key. |
 | `1` | Everything else: HTTP errors, an API envelope with a non-zero `code`, a timeout, and stream failures. |
 
 Two consequences worth knowing:

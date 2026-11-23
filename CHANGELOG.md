@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`octen premier`** — wraps `POST /search-premier`, Web Search Premier: the
+- **`octen premier-search`** — wraps `POST /search-premier`, Web Search Premier: the
   same search with deeper retrieval and more careful reranking. The endpoint
   takes the request `/search` takes and returns the same response, so the
   command has `octen search`'s flags (less `--topic`), output and JSON, plus
@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `--highlight-max-tokens` works without `--highlight`, and
   `--full-content-max-tokens` without `--full-content` is refused rather than
   dropped.
-- **`octen design`** — wraps `POST /design-search`. Screenshots of real web
+- **`octen design-search`** — wraps `POST /design-search`. Screenshots of real web
   pages, page sections, app screens and slides, each with its design values
   and, for page sections, the HTML; web results on the same query come back
   alongside. `-n`, `--no-design-facts`, `--no-snippet` and
@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Web results print safely and survive a malformed entry.** The list that
-  `search`, `broad-search`, `place`, `premier` and `design` print their web
+  `search`, `broad-search`, `place`, `premier-search` and `design-search` print their web
   results through now shows a control character instead of sending it to the
   terminal — an escape sequence in a page title could clear the screen or
   rewrite a line already printed — and skips an entry that is not an object

@@ -90,17 +90,17 @@ describe("completion command", () => {
   it("completes premier and design with their own flags", async () => {
     const out = await run("bash");
     const branch = (sub: string) => out.match(new RegExp(`^    ${sub}\\)\\n      opts="([^"]*)"`, "m"))?.[1] ?? "";
-    expect(branch("premier")).toContain("--result-type");
-    expect(branch("premier")).not.toContain("--topic");
+    expect(branch("premier-search")).toContain("--result-type");
+    expect(branch("premier-search")).not.toContain("--topic");
     for (const flag of ["--group", "--no-images", "--no-web", "--no-design-facts", "--no-snippet", "--snippet-max-tokens", "--web-count"]) {
-      expect(branch("design")).toContain(flag);
+      expect(branch("design-search")).toContain(flag);
     }
     expect(branch("search")).not.toContain("--group");
 
     writeSpy.mockClear();
     const fish = await run("fish");
-    expect(fish).toMatch(/__fish_seen_subcommand_from design' .*-l group/);
-    expect(fish).toMatch(/__fish_seen_subcommand_from premier' .*-l result-type/);
+    expect(fish).toMatch(/__fish_seen_subcommand_from design-search' .*-l group/);
+    expect(fish).toMatch(/__fish_seen_subcommand_from premier-search' .*-l result-type/);
   });
 
   it("emits a non-empty zsh script containing subcommands", async () => {

@@ -47,32 +47,32 @@ describe("premier command", () => {
   const written = () => writeSpy.mock.calls.map((c) => String(c[0])).join("");
 
   it("posts to /search-premier, not /search", async () => {
-    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--json", "--api-key", "k"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--json", "--api-key", "k"]);
     expect(fetchSpy).toHaveBeenCalledOnce();
     expect(path()).toBe("/search-premier");
     expect(body()).toEqual({ query: "hi" });
   });
 
   it("joins an unquoted multi-word query", async () => {
-    await makeProgram().parseAsync(["node", "octen", "premier", "rust", "async", "runtime", "--json", "--api-key", "k"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "rust", "async", "runtime", "--json", "--api-key", "k"]);
     expect(body()).toEqual({ query: "rust async runtime" });
   });
 
   it("sends --result-type as result_type", async () => {
-    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--json", "--api-key", "k", "--result-type", "dynamic"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--json", "--api-key", "k", "--result-type", "dynamic"]);
     expect(body()).toEqual({ query: "hi", result_type: "dynamic" });
   });
 
   it("refuses an unknown --result-type before any request", async () => {
     await expect(
-      makeProgram().parseAsync(["node", "octen", "premier", "hi", "--api-key", "k", "--result-type", "deep"]),
+      makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--api-key", "k", "--result-type", "deep"]),
     ).rejects.toThrow(/--result-type must be one of: standard, dynamic/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("forwards the options it shares with search", async () => {
     await makeProgram().parseAsync([
-      "node", "octen", "premier", "hi", "--json", "--api-key", "k",
+      "node", "octen", "premier-search", "hi", "--json", "--api-key", "k",
       "-n", "7", "--include-domains", "a.com,b.com", "--exclude-text", "x", "--language", "en,ja",
       "--time-range", "week", "--format", "markdown", "--safesearch", "off",
       "--highlight", "--highlight-max-tokens", "300", "--full-content", "--images",
@@ -101,39 +101,39 @@ describe("premier command", () => {
     const search = flags(prog, "search");
     expect(search).toContain("--topic");
     expect(search.length).toBeGreaterThan(10);
-    expect(flags(prog, "premier")).toEqual(
+    expect(flags(prog, "premier-search")).toEqual(
       [...search.filter((f) => f !== "--topic"), "--result-type"].sort(),
     );
   });
 
   it("--highlight-max-tokens works without --highlight", async () => {
-    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--json", "--api-key", "k", "--highlight-max-tokens", "300"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--json", "--api-key", "k", "--highlight-max-tokens", "300"]);
     expect(body()).toEqual({ query: "hi", highlight: { enable: true, max_tokens: 300 } });
   });
 
   it("refuses --full-content-max-tokens without --full-content before any request", async () => {
     await expect(
-      makeProgram().parseAsync(["node", "octen", "premier", "hi", "--api-key", "k", "--full-content-max-tokens", "500"]),
+      makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--api-key", "k", "--full-content-max-tokens", "500"]),
     ).rejects.toThrow(/needs --full-content/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("does not accept --topic", async () => {
     await expect(
-      makeProgram().parseAsync(["node", "octen", "premier", "hi", "--api-key", "k", "--topic", "news"]),
+      makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--api-key", "k", "--topic", "news"]),
     ).rejects.toThrow(/unknown option '--topic'/);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("refuses a blank query before any request", async () => {
     await expect(
-      makeProgram().parseAsync(["node", "octen", "premier", "  ", "--api-key", "k"]),
+      makeProgram().parseAsync(["node", "octen", "premier-search", "  ", "--api-key", "k"]),
     ).rejects.toThrow("query is required");
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("prints the raw envelope with --json", async () => {
-    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--json", "--api-key", "k"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--json", "--api-key", "k"]);
     expect(JSON.parse(written())).toMatchObject({ request_id: "req-1", data: { results: [{ title: "A result" }] } });
   });
 
@@ -146,12 +146,12 @@ describe("premier command", () => {
         data: { results: [null, { title: "Still here", url: "https://a.test/y" }] },
       })) as any,
     );
-    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--pretty", "--api-key", "k"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--pretty", "--api-key", "k"]);
     expect(written()).toContain("Still here");
   });
 
   it("prints results the way search does with --pretty", async () => {
-    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--pretty", "--api-key", "k"]);
+    await makeProgram().parseAsync(["node", "octen", "premier-search", "hi", "--pretty", "--api-key", "k"]);
     expect(written()).toContain("A result");
     expect(written()).toContain("https://a.test/x");
     expect(written()).toContain("its highlight");

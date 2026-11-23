@@ -50,7 +50,7 @@ describe("design command", () => {
   const body = () => JSON.parse(String((fetchSpy.mock.calls[0]?.[1] as any)?.body));
   const written = () => writeSpy.mock.calls.map((c) => String(c[0])).join("");
   const run = (...argv: string[]) =>
-    makeProgram().parseAsync(["node", "octen", "design", ...argv, "--api-key", "k"]);
+    makeProgram().parseAsync(["node", "octen", "design-search", ...argv, "--api-key", "k"]);
 
   it("posts the query to /design-search and nothing else", async () => {
     await run("saas", "pricing", "page", "--json");
@@ -132,13 +132,13 @@ describe("design command", () => {
     it("passes --base-url on to the command it prints", async () => {
       reply = { code: 0, msg: "success", request_id: "r", data: { images: [slide(3, 28)] } };
       await run("pitch deck", "--pretty", "--base-url", "http://127.0.0.1:9");
-      expect(written()).toContain("octen design --group deck_abc -n 28 --base-url http://127.0.0.1:9");
+      expect(written()).toContain("octen design-search --group deck_abc -n 28 --base-url http://127.0.0.1:9");
     });
 
     it("an ordinary search prints how to fetch the whole group instead", async () => {
       reply = { code: 0, msg: "success", request_id: "r", data: { images: [slide(3, 28)] } };
       await run("pitch deck", "--pretty");
-      expect(written()).toContain("Whole deck: octen design --group deck_abc -n 28");
+      expect(written()).toContain("Whole deck: octen design-search --group deck_abc -n 28");
       expect(written()).not.toContain("Showing");
     });
 

@@ -128,7 +128,7 @@ function formatImage(im: Record<string, any>, i: number, ctx: DesignRenderContex
         lines.push(`   ${pc.dim(`The ${noun}'s group_id is in the --json output.`)}`);
       } else {
         const base = ctx.baseUrl ? ` --base-url ${quotePath(ctx.baseUrl)}` : "";
-        const command = `octen design --group ${quotePath(id)}`;
+        const command = `octen design-search --group ${quotePath(id)}`;
         // One call returns at most MAX_COUNT, so for a larger group the
         // command fetches a part and is labelled as one; and with no total the
         // count is unknown, so it is neither given nor claimed.

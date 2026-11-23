@@ -10,7 +10,7 @@ import { renderDesignSearch } from "../output/pretty/designSearch.js";
 import { makeClient, parseCsvOpt, parseIntOpt } from "./utils.js";
 
 export function registerDesignSearch(program: Command) {
-  program.command("design")
+  program.command("design-search")
     .argument("[query...]", "what to find, e.g. 'saas pricing page' (optional with --group)")
     .description("Real web pages, page sections, app screens and slides as design references — each a screenshot with its design values and, for page sections, the HTML. Web results on the same query come back alongside")
     .option("-n, --count <n>", "design references to return, 1-100", parseIntOpt("--count"))

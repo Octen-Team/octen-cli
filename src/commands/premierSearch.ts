@@ -13,7 +13,7 @@ import { makeClient, parseCsvOpt, parseIntOpt } from "./utils.js";
  * its own rate — not something a flag on `search` should switch on quietly.
  */
 export function registerPremierSearch(program: Command) {
-  program.command("premier")
+  program.command("premier-search")
     .argument("<query...>", "search query")
     .description("Search the live web with deeper retrieval and reranking — slower than `search` and billed at its own rate, so reach for it when `search` falls short")
     .option("--result-type <t>", "standard|dynamic")

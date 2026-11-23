@@ -187,27 +187,27 @@ async function withJsonServer(
   }
 }
 
-describe("premier and design, as a real process", () => {
+describe("premier-search and design-search, as a real process", () => {
   const envelope = (data: unknown) => ({ code: 0, msg: "success", request_id: "req-1", data });
 
   it("lists both commands in help", () => {
     const help = runCli(["--help"]);
-    expect(help).toMatch(/^\s+premier /m);
-    expect(help).toMatch(/^\s+design /m);
+    expect(help).toMatch(/^\s+premier-search /m);
+    expect(help).toMatch(/^\s+design-search /m);
   });
 
   // Completion is built by introspecting the program, so both commands should
   // appear in it with their own flags and no entry written by hand.
   it("completes both commands in the real program", () => {
     const script = runCli(["completion", "bash"]);
-    expect(script).toMatch(/^    premier\)\n      opts="[^"]*--result-type/m);
-    expect(script).toMatch(/^    design\)\n      opts="[^"]*--group/m);
+    expect(script).toMatch(/^    premier-search\)\n      opts="[^"]*--result-type/m);
+    expect(script).toMatch(/^    design-search\)\n      opts="[^"]*--group/m);
   });
 
-  it("premier posts to /search-premier with the key, and prints the envelope", async () => {
+  it("premier-search posts to /search-premier with the key, and prints the envelope", async () => {
     const reply = envelope({ results: [{ title: "A result", url: "https://a.test/x" }] });
     const { result, seen } = await withJsonServer(200, reply, (baseUrl) =>
-      runCliAsync(["premier", "rust", "async", "--result-type", "dynamic", "--api-key", "test-key", "--base-url", baseUrl]),
+      runCliAsync(["premier-search", "rust", "async", "--result-type", "dynamic", "--api-key", "test-key", "--base-url", baseUrl]),
     );
     expect(result.status).toBe(0);
     expect(seen).toEqual([{
@@ -220,10 +220,10 @@ describe("premier and design, as a real process", () => {
     expect(JSON.parse(result.stdout)).toEqual(reply);
   });
 
-  it("design fetches a group without a query", async () => {
+  it("design-search fetches a group without a query", async () => {
     const reply = envelope({ images: [{ type: "slide", title: "One" }], results: [] });
     const { result, seen } = await withJsonServer(200, reply, (baseUrl) =>
-      runCliAsync(["design", "--group", "deck_abc", "-n", "28", "--no-web", "--api-key", "test-key", "--base-url", baseUrl]),
+      runCliAsync(["design-search", "--group", "deck_abc", "-n", "28", "--no-web", "--api-key", "test-key", "--base-url", baseUrl]),
     );
     expect(result.status).toBe(0);
     expect(seen).toEqual([{
@@ -235,12 +235,12 @@ describe("premier and design, as a real process", () => {
     expect(JSON.parse(result.stdout)).toEqual(reply);
   });
 
-  it("design prints the references when asked for --pretty", async () => {
+  it("design-search prints the references when asked for --pretty", async () => {
     const reply = envelope({
       images: [{ type: "web_page", title: "A page design", url: "https://img.test/a.png", width: 1440, height: 900 }],
     });
     const { result } = await withJsonServer(200, reply, (baseUrl) =>
-      runCliAsync(["design", "pricing", "page", "--pretty", "--no-color", "--api-key", "test-key", "--base-url", baseUrl]),
+      runCliAsync(["design-search", "pricing", "page", "--pretty", "--no-color", "--api-key", "test-key", "--base-url", baseUrl]),
     );
     expect(result.status).toBe(0);
     expect(result.stdout).toContain("1. A page design");
@@ -250,7 +250,7 @@ describe("premier and design, as a real process", () => {
   // The API's own code and message, as it sent them, and a non-zero exit.
   it("exits 1 with the API's message when the request is rejected", async () => {
     const { result, seen } = await withJsonServer(400, { code: 40001, msg: "Invalid params.", request_id: "r" }, (baseUrl) =>
-      runCliAsync(["design", "hero", "--api-key", "test-key", "--base-url", baseUrl]),
+      runCliAsync(["design-search", "hero", "--api-key", "test-key", "--base-url", baseUrl]),
     );
     expect(seen).toHaveLength(1);
     expect(result.status).toBe(1);
@@ -262,7 +262,7 @@ describe("premier and design, as a real process", () => {
   // different road: the client throws, and the entry point prints it.
   it("shows control characters in an API error message instead of sending them", async () => {
     const ESC = "\u001b";
-    for (const command of ["design", "premier"]) {
+    for (const command of ["design-search", "premier-search"]) {
       const { result } = await withJsonServer(400, { code: 40001, msg: `Invalid${ESC}[2J params.\rhidden`, request_id: "r" }, (baseUrl) =>
         runCliAsync([command, "hero", "--no-color", "--api-key", "test-key", "--base-url", baseUrl]),
       );
@@ -274,11 +274,11 @@ describe("premier and design, as a real process", () => {
   });
 
   const refused: Array<[string, string[], string]> = [
-    ["design with neither a query nor a group", ["design"], "give a query, or --group"],
-    ["design with both result groups off", ["design", "hero", "--no-images", "--no-web"], "leave nothing to return"],
-    ["design with a group and --no-images", ["design", "--group", "deck_abc", "--no-images"], "cannot be combined with --no-images"],
-    ["design with a web option and --no-web", ["design", "hero", "--no-web", "--language", "en"], "--language applies to the web results"],
-    ["premier with an unknown result type", ["premier", "hi", "--result-type", "deep"], "--result-type must be one of"],
+    ["design-search with neither a query nor a group", ["design-search"], "give a query, or --group"],
+    ["design-search with both result groups off", ["design-search", "hero", "--no-images", "--no-web"], "leave nothing to return"],
+    ["design-search with a group and --no-images", ["design-search", "--group", "deck_abc", "--no-images"], "cannot be combined with --no-images"],
+    ["design-search with a web option and --no-web", ["design-search", "hero", "--no-web", "--language", "en"], "--language applies to the web results"],
+    ["premier-search with an unknown result type", ["premier-search", "hi", "--result-type", "deep"], "--result-type must be one of"],
   ];
   for (const [what, argv, message] of refused) {
     it(`exits 2 before any request: ${what}`, async () => {

@@ -210,13 +210,13 @@ describe("design renderer", () => {
     it("names the page a section belongs to and how to fetch all of it", () => {
       const out = render(env({ images: [section] }));
       expect(out).toContain("Acme home (web_page) — 2 of 12");
-      expect(out).toContain("Whole page: octen design --group page_123 -n 12");
+      expect(out).toContain("Whole page: octen design-search --group page_123 -n 12");
     });
 
     it("names the deck a slide belongs to and prints its theme", () => {
       const out = render(env({ images: [slide] }));
       expect(out).toContain("OptiWaste (deck) — 19 of 28");
-      expect(out).toContain("Whole deck: octen design --group deck_abc -n 28");
+      expect(out).toContain("Whole deck: octen design-search --group deck_abc -n 28");
       expect(out).toContain("Deck theme: majorFont Arial Black, minorFont Tahoma, palette (accent1 #00B0F0, dk1 #000000)");
     });
 
@@ -230,20 +230,20 @@ describe("design renderer", () => {
     it("asks for a hundred when the group is larger than one call returns, and says it is a part", () => {
       const big = { ...slide, group: { ...slide.group, total: 152 } };
       const out = render(env({ images: [big] }));
-      expect(out).toContain("First 100 of the deck: octen design --group deck_abc -n 100");
+      expect(out).toContain("First 100 of the deck: octen design-search --group deck_abc -n 100");
       expect(out).not.toContain("Whole deck");
     });
 
     it("still calls a group of exactly a hundred whole", () => {
       const exact = { ...slide, group: { ...slide.group, total: 100 } };
-      expect(render(env({ images: [exact] }))).toContain("Whole deck: octen design --group deck_abc -n 100");
+      expect(render(env({ images: [exact] }))).toContain("Whole deck: octen design-search --group deck_abc -n 100");
     });
 
     // The id is printed as part of a command to paste, so it is quoted when
     // pasting it bare would not give the shell one argument.
     it("quotes an id the shell would split", () => {
       const odd = { ...slide, group: { ...slide.group, group_id: "deck a'b" } };
-      expect(render(env({ images: [odd] }))).toContain("octen design --group 'deck a'\\''b' -n 28");
+      expect(render(env({ images: [odd] }))).toContain("octen design-search --group 'deck a'\\''b' -n 28");
     });
 
     // Without a total the command cannot be told how many to ask for, and
@@ -251,7 +251,7 @@ describe("design renderer", () => {
     it("does not call the command 'whole' when the API gave no total", () => {
       const out = render(env({ images: [{ title: "T", group: { group_id: "g1", name: "A deck", type: "deck" } }] }));
       expect(out).toContain("A deck (deck)");
-      expect(out).toContain("More of the deck: octen design --group g1 -n <count> (returns 5 without -n)");
+      expect(out).toContain("More of the deck: octen design-search --group g1 -n <count> (returns 5 without -n)");
       expect(out).not.toContain("Whole deck");
       expect(out).not.toContain("undefined");
     });
@@ -261,14 +261,14 @@ describe("design renderer", () => {
     it("prints no command for an id that would change on the way to the terminal", () => {
       for (const id of ["deck\tabc", "deck\u001b[2Jabc", "deck\nabc", "deck\u202eabc"]) {
         const out = render(env({ images: [{ ...slide, group: { ...slide.group, group_id: id } }] }));
-        expect(out).not.toContain("octen design --group");
+        expect(out).not.toContain("octen design-search --group");
         expect(out).toContain("group_id is in the --json output");
       }
     });
 
     it("keeps the --base-url of the search in the command it prints", () => {
       const out = render(env({ images: [slide] }), { baseUrl: "https://staging.example.test" });
-      expect(out).toContain("Whole deck: octen design --group deck_abc -n 28 --base-url https://staging.example.test");
+      expect(out).toContain("Whole deck: octen design-search --group deck_abc -n 28 --base-url https://staging.example.test");
       const odd = render(env({ images: [slide] }), { baseUrl: "http://localhost:8080/a b" });
       expect(odd).toContain("--base-url 'http://localhost:8080/a b'");
       expect(render(env({ images: [slide] }))).not.toContain("--base-url");
