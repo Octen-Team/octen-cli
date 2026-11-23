@@ -64,6 +64,14 @@ describe("renderSearch", () => {
 // all print their web results through it.
 describe("renderSearch with a malformed or hostile response", () => {
   const ESC = "\u001b";
+  // picocolors adds its own colour codes when colour is on (CI turns it on),
+  // and those are escape sequences too. Strip exactly what it adds — a colour
+  // code — before asserting that nothing from the response got through. The
+  // fixtures below also carry sequences that are not colour codes (clear
+  // screen, cursor moves), and the escaped form of each is asserted, so a
+  // colour code in the response cannot hide behind this.
+  // eslint-disable-next-line no-control-regex
+  const plain = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, "");
 
   it("skips an entry that is not an object and keeps the ones beside it", () => {
     const out = renderSearch({ code: 0, data: { results: [null, "x", { title: "Kept", url: "https://k.test" }, 7] } });
@@ -82,13 +90,15 @@ describe("renderSearch with a malformed or hostile response", () => {
   });
 
   it("shows an escape sequence in a result instead of sending it to the terminal", () => {
-    const out = renderSearch({
+    const out = plain(renderSearch({
       code: 0,
       data: { results: [{ title: `T${ESC}[2J`, url: `https://a.test/${ESC}[H`, time_published: `2024${ESC}[1A`, highlight: `one\rtwo${ESC}[31m` }] },
-    });
+    }));
     expect(out).not.toContain(ESC);
     expect(out).not.toContain("\r");
     expect(out).toContain("T\\x1b[2J");
+    expect(out).toContain("https://a.test/\\x1b[H");
+    expect(out).toContain("2024\\x1b[1A");
     expect(out).toContain("one\ntwo\\x1b[31m");
   });
 
@@ -100,7 +110,7 @@ describe("renderSearch with a malformed or hostile response", () => {
   });
 
   it("shows an escape sequence in an API error message instead of sending it", () => {
-    const out = renderSearch({ code: 401, msg: `Bad${ESC}[2J key`, data: {} });
+    const out = plain(renderSearch({ code: 401, msg: `Bad${ESC}[2J key`, data: {} }));
     expect(out).not.toContain(ESC);
     expect(out).toContain("Bad\\x1b[2J key");
   });
