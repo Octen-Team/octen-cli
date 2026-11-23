@@ -258,6 +258,21 @@ describe("premier and design, as a real process", () => {
     expect(result.stdout).toBe("");
   });
 
+  // An error message is response text too, and it reaches the terminal by a
+  // different road: the client throws, and the entry point prints it.
+  it("shows control characters in an API error message instead of sending them", async () => {
+    const ESC = "\u001b";
+    for (const command of ["design", "premier"]) {
+      const { result } = await withJsonServer(400, { code: 40001, msg: `Invalid${ESC}[2J params.\rhidden`, request_id: "r" }, (baseUrl) =>
+        runCliAsync([command, "hero", "--no-color", "--api-key", "test-key", "--base-url", baseUrl]),
+      );
+      expect(result.status).toBe(1);
+      expect(result.stderr).not.toContain(`${ESC}[2J`);
+      expect(result.stderr).not.toContain("\r");
+      expect(result.stderr).toContain("Invalid\\x1b[2J params.");
+    }
+  });
+
   const refused: Array<[string, string[], string]> = [
     ["design with neither a query nor a group", ["design"], "give a query, or --group"],
     ["design with both result groups off", ["design", "hero", "--no-images", "--no-web"], "leave nothing to return"],

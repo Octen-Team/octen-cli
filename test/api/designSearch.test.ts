@@ -235,6 +235,34 @@ describe("buildDesignSearchRequest", () => {
       expect(build).toThrow(/--no-snippet/);
     });
 
+    // A lookup with no query returns no web results — measured — so a web
+    // option beside it has nothing to apply to, and it does not reach the
+    // images either.
+    for (const [flag, opts] of webOnly) {
+      it(`${flag} is refused on a group lookup that has no query`, () => {
+        const build = () => buildDesignSearchRequest("", { group: "deck_abc", ...opts });
+        expect(build).toThrow(OctenValidationError);
+        expect(build).toThrow(flag);
+        expect(build).toThrow(/query/);
+      });
+    }
+
+    it("a web option passes on a group lookup once a query is given", () => {
+      expect(buildDesignSearchRequest("team slide", { group: "deck_abc", includeDomains: ["a.com"] })).toEqual({
+        query: "team slide",
+        images: { group_id: "deck_abc" },
+        web_search: { include_domains: ["a.com"] },
+      });
+    });
+
+    it("a group lookup with no query and no web option still passes, with or without --no-web", () => {
+      expect(buildDesignSearchRequest("", { group: "deck_abc" })).toEqual({ images: { group_id: "deck_abc" } });
+      expect(buildDesignSearchRequest("", { group: "deck_abc", noWeb: true })).toEqual({
+        images: { group_id: "deck_abc" },
+        web_search: { enable: false },
+      });
+    });
+
     it("the same options pass when their group is on", () => {
       expect(buildDesignSearchRequest("q", { noWeb: true, count: 3, noSnippet: true })).toEqual({
         query: "q",

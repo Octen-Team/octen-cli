@@ -340,6 +340,13 @@ describe("design renderer", () => {
       expect(out).toContain("Page\\x1b[2J");
     });
 
+    it("is shown in an API error message", () => {
+      const out = render({ code: 401, msg: `Bad${ESC}[2J key`+"\rhidden", data: {} });
+      expect(out).not.toContain(ESC);
+      expect(out).not.toContain("\r");
+      expect(out).toContain("error: Bad\\x1b[2J key hidden");
+    });
+
     it("is shown in the id of a group that has no images", () => {
       const out = render(env({ images: [] }), { group: `deck${ESC}[2J` });
       expect(out).not.toContain(ESC);

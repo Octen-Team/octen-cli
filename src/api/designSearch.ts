@@ -22,6 +22,8 @@
  *    that still counts as a search;
  *  - an option for a group that is switched off, which does nothing at the API
  *    and is usually typed in the belief that it applies to the other group;
+ *  - a web option on a lookup that has no query, which returns no web results
+ *    for it to apply to;
  *  - a full-content cap without `--full-content`, which returns no content.
  */
 import { LIMITS, TIME_BASIS_OPTIONS, TIME_RANGE_OPTIONS } from "./constants.js";
@@ -137,6 +139,13 @@ export function buildDesignSearchRequest(query: string, o: DesignSearchOpts): Re
   const strayWeb = o.noWeb ? firstGiven(webOnly) : undefined;
   if (strayWeb)
     throw new OctenValidationError(`${strayWeb} applies to the web results, which --no-web switches off`);
+  // A lookup with no query returns no web results, so a web option beside it
+  // has nothing to apply to — and it does not reach the images either.
+  const idleWeb = group && !hasQuery && !o.noWeb ? firstGiven(webOnly) : undefined;
+  if (idleWeb)
+    throw new OctenValidationError(
+      `${idleWeb} applies to the web results, which need a query — a group lookup alone returns none`,
+    );
   if (o.noSnippet && o.snippetMaxTokens != null)
     throw new OctenValidationError("--snippet-max-tokens has no effect with --no-snippet");
   if (o.fullContentMaxTokens != null && !o.fullContent)

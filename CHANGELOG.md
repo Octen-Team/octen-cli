@@ -31,8 +31,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Refused before any request, with exit status 2: neither a query nor a
   group; a group with `--no-images`; both parts switched off, which the API
   answers with an empty success that still counts as a search; a flag for a
-  part that is switched off; and `--full-content-max-tokens` without
-  `--full-content`, which returns no content.
+  part that is switched off; a web flag on a group lookup that has no query,
+  which returns no web results for it to apply to; and
+  `--full-content-max-tokens` without `--full-content`, which returns no
+  content.
 
   The terminal view prints each design's values on a line per kind, the head
   of its code, and — for a section or a slide — the command that fetches the
@@ -58,6 +60,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   instead of failing the whole command. It also prints the full content when a
   result's highlight is empty, which it used to print nothing for. `--json`
   output is unchanged.
+- **Error messages are escaped the same way.** The message of a failed
+  request is the server's own text; every command now prints it to stderr
+  with control characters shown rather than sent.
 
 ## [0.12.0] — 2026-11-03
 

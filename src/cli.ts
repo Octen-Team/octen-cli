@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { exitCodeFor } from "./api/errors.js";
+import { printable } from "./util/terminalText.js";
 import { registerSearch } from "./commands/search.js";
 import {
   registerBusinessSearch,
@@ -78,6 +79,9 @@ registerWhoami(program);
 registerCompletion(program);
 
 program.parseAsync().catch((err) => {
-  process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
+  // An API error carries the server's own message, which is response text
+  // like any other: shown, never sent, if it holds control characters.
+  const message = printable(String((err as Error | undefined)?.message ?? err));
+  process.stderr.write(pc.red(`error: ${message}\n`));
   process.exit(exitCodeFor(err));
 });

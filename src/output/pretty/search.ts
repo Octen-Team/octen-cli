@@ -23,7 +23,7 @@ export function renderSearch(data: any): string {
     const code = (data as any)?.code;
     const msg = (data as any)?.msg;
     if (code != null && code !== 0 && msg) {
-      return pc.red(`error: ${msg}`);
+      return pc.red(`error: ${printableLine(String(msg))}`);
     }
     return pc.dim("No results.");
   }

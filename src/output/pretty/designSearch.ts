@@ -168,7 +168,7 @@ export function renderDesignSearch(data: any, ctx: DesignRenderContext = {}): st
 
   if (!images.length && !web.length) {
     const err = envelopeError(data);
-    if (err) return pc.red(`error: ${err}`);
+    if (err) return pc.red(`error: ${printableLine(err)}`);
     return noGroup ?? pc.dim("No results.");
   }
 

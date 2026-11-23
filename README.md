@@ -525,7 +525,7 @@ The response has two parts, each with its own flags:
 - **Design references** (`data.images`): `-n` (1–100, default 5), `--no-design-facts` (leave out the design values), `--no-snippet` (leave out the code), `--snippet-max-tokens` (100–100000), `--group <id>`. `--no-images` returns web results only.
 - **Web results** (`data.results`): `--web-count` (1–100, default 5), `--include-domains`, `--exclude-domains`, `--language`, `--time-basis`, `--time-range`, `--start-time`, `--end-time`, `--highlight` (+`--highlight-max-tokens`), `--full-content` (+`--full-content-max-tokens`). `--no-web` returns design references only.
 
-**The web flags narrow the web results only — never the design references.** A flag for a part that is switched off is refused rather than ignored: `--no-web --include-domains stripe.com` exits 2, because the likeliest reason to type it is expecting the screenshots to be filtered. So is `--full-content-max-tokens` without `--full-content`, which would return no content.
+**The web flags narrow the web results only — never the design references.** A flag for a part that is switched off is refused rather than ignored: `--no-web --include-domains stripe.com` exits 2, because the likeliest reason to type it is expecting the screenshots to be filtered. So is a web flag on a `--group` lookup that has no query — a lookup alone returns no web results — and `--full-content-max-tokens` without `--full-content`, which would return no content.
 
 The design values are whatever the API returned for that image, and they differ by kind: design tokens for a web page, colour and font lists for a slide, component counts for an app screen. The terminal view shortens them and the code; `--json` (or a pipe) prints both in full.
 

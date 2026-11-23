@@ -156,6 +156,7 @@ describe("design command", () => {
       ["an image option with --no-images", ["hero", "--no-images", "-n", "3"], /--count applies to the design references/],
       ["a code cap with --no-snippet", ["hero", "--no-snippet", "--snippet-max-tokens", "800"], /--no-snippet/],
       ["a full-content cap alone", ["hero", "--full-content-max-tokens", "500"], /needs --full-content/],
+      ["a web option on a group lookup with no query", ["--group", "deck_abc", "--web-count", "3"], /--web-count applies to the web results, which need a query/],
       ["a count out of range", ["hero", "-n", "101"], /count must be 1-100/],
       ["a count that is not an integer", ["hero", "-n", "1.5"], /--count must be an integer/],
       ["an empty domain list", ["hero", "--include-domains", ""], /--include-domains must contain at least one/],

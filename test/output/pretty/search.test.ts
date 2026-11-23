@@ -99,6 +99,12 @@ describe("renderSearch with a malformed or hostile response", () => {
     expect(out).toContain("the paid-for body");
   });
 
+  it("shows an escape sequence in an API error message instead of sending it", () => {
+    const out = renderSearch({ code: 401, msg: `Bad${ESC}[2J key`, data: {} });
+    expect(out).not.toContain(ESC);
+    expect(out).toContain("Bad\\x1b[2J key");
+  });
+
   it("ignores a field of the wrong type instead of printing or crashing on it", () => {
     const out = renderSearch({ code: 0, data: { results: [{ title: { a: 1 }, url: 5, highlight: ["x"], time_published: {} }] } });
     expect(out).toContain("1. ");
