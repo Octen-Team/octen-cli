@@ -5,7 +5,7 @@ on:
 
 jobs:
   brew:
-    runs-on: macos-14
+    runs-on: macos-latest
     env:
       HOMEBREW_NO_AUTO_UPDATE: "1"
       # Skip the interactive third-party-tap trust prompt (Homebrew 6+).
