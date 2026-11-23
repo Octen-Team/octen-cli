@@ -106,6 +106,18 @@ describe("premier command", () => {
     );
   });
 
+  it("--highlight-max-tokens works without --highlight", async () => {
+    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--json", "--api-key", "k", "--highlight-max-tokens", "300"]);
+    expect(body()).toEqual({ query: "hi", highlight: { enable: true, max_tokens: 300 } });
+  });
+
+  it("refuses --full-content-max-tokens without --full-content before any request", async () => {
+    await expect(
+      makeProgram().parseAsync(["node", "octen", "premier", "hi", "--api-key", "k", "--full-content-max-tokens", "500"]),
+    ).rejects.toThrow(/needs --full-content/);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
   it("does not accept --topic", async () => {
     await expect(
       makeProgram().parseAsync(["node", "octen", "premier", "hi", "--api-key", "k", "--topic", "news"]),
@@ -123,6 +135,19 @@ describe("premier command", () => {
   it("prints the raw envelope with --json", async () => {
     await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--json", "--api-key", "k"]);
     expect(JSON.parse(written())).toMatchObject({ request_id: "req-1", data: { results: [{ title: "A result" }] } });
+  });
+
+  it("prints the valid results when one entry is malformed", async () => {
+    fetchSpy.mockImplementation(
+      () => Promise.resolve(jsonResponse({
+        code: 0,
+        msg: "success",
+        request_id: "req-1",
+        data: { results: [null, { title: "Still here", url: "https://a.test/y" }] },
+      })) as any,
+    );
+    await makeProgram().parseAsync(["node", "octen", "premier", "hi", "--pretty", "--api-key", "k"]);
+    expect(written()).toContain("Still here");
   });
 
   it("prints results the way search does with --pretty", async () => {

@@ -394,6 +394,8 @@ It posts to its own endpoint, `/search-premier`, which takes the request `/searc
 
 Options: every `octen search` flag except `--topic`, plus `--result-type` (`standard`|`dynamic`). `standard` returns results as the other flags specify; `dynamic` returns only the relevant results, up to `-n`, and adjusts the highlight length per result.
 
+A token cap given without its switch is not dropped here: `--highlight-max-tokens` alone caps the highlights, and `--full-content-max-tokens` without `--full-content` exits 2, since it would return no content.
+
 ---
 
 ### `octen extract`
@@ -516,14 +518,14 @@ octen design "startup pitch deck slide" --no-snippet
 octen design --group <group_id> -n 28
 ```
 
-A page section or a slide carries the `group` it belongs to. `--group <group_id>` returns every image of that page or deck, in order, instead of searching — it needs no query. **It still returns five unless told otherwise**, so set `-n` to the group's `total` (the most one call returns is 100). In the terminal each result prints the command that does this.
+A page section or a slide carries the `group` it belongs to. `--group <group_id>` returns every image of that page or deck, in order, instead of searching — it needs no query, and a query given beside it drives the web results only; it does not search within the group. **It still returns five unless told otherwise**, so set `-n` to the group's `total` (the most one call returns is 100). In the terminal, each section or slide prints the command that does this.
 
 The response has two parts, each with its own flags:
 
 - **Design references** (`data.images`): `-n` (1–100, default 5), `--no-design-facts` (leave out the design values), `--no-snippet` (leave out the code), `--snippet-max-tokens` (100–100000), `--group <id>`. `--no-images` returns web results only.
 - **Web results** (`data.results`): `--web-count` (1–100, default 5), `--include-domains`, `--exclude-domains`, `--language`, `--time-basis`, `--time-range`, `--start-time`, `--end-time`, `--highlight` (+`--highlight-max-tokens`), `--full-content` (+`--full-content-max-tokens`). `--no-web` returns design references only.
 
-**The web flags narrow the web results only — never the design references.** A flag for a part that is switched off is refused rather than ignored: `--no-web --include-domains stripe.com` exits 2, because the likeliest reason to type it is expecting the screenshots to be filtered.
+**The web flags narrow the web results only — never the design references.** A flag for a part that is switched off is refused rather than ignored: `--no-web --include-domains stripe.com` exits 2, because the likeliest reason to type it is expecting the screenshots to be filtered. So is `--full-content-max-tokens` without `--full-content`, which would return no content.
 
 The design values are whatever the API returned for that image, and they differ by kind: design tokens for a web page, colour and font lists for a slide, component counts for an app screen. The terminal view shortens them and the code; `--json` (or a pipe) prints both in full.
 

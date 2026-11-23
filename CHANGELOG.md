@@ -15,6 +15,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   command has `octen search`'s flags (less `--topic`), output and JSON, plus
   `--result-type` (`standard`|`dynamic`). It takes longer than `search` and is
   billed at its own per-call rate, which a Search Plan does not cover.
+  `--highlight-max-tokens` works without `--highlight`, and
+  `--full-content-max-tokens` without `--full-content` is refused rather than
+  dropped.
 - **`octen design`** — wraps `POST /design-search`. Screenshots of real web
   pages, page sections, app screens and slides, each with its design values
   and, for page sections, the HTML; web results on the same query come back
@@ -35,7 +38,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   of its code, and — for a section or a slide — the command that fetches the
   whole page or deck. A group lookup that shows part of a group says so, and
   an unknown group id reads as "No images in group …" rather than "No
-  results".
+  results". Text from the response is shown with its control characters
+  escaped, so a page's HTML cannot drive the terminal.
 
   0.11.0 removed `image-search --topic design`. Design search has an endpoint
   of its own now, and this is the command for it; `image-search` is unchanged
@@ -43,6 +47,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`octen-design-search` is bundled.** `configure-skills --offline` installs
   it with the rest, and the bundled `octen-search` and `octen-web-search`
   carry the Search Premier section and the routing for both new MCP tools.
+
+### Fixed
+
+- **Web results print safely and survive a malformed entry.** The list that
+  `search`, `broad-search`, `place`, `premier` and `design` print their web
+  results through now shows a control character instead of sending it to the
+  terminal — an escape sequence in a page title could clear the screen or
+  rewrite a line already printed — and skips an entry that is not an object
+  instead of failing the whole command. It also prints the full content when a
+  result's highlight is empty, which it used to print nothing for. `--json`
+  output is unchanged.
 
 ## [0.12.0] — 2026-11-03
 

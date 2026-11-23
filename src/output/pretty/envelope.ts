@@ -13,6 +13,11 @@ export interface Envelope {
   data?: unknown;
 }
 
+/** A JSON object — not null, not an array. */
+export function isRecord(v: unknown): v is Record<string, any> {
+  return v !== null && typeof v === "object" && !Array.isArray(v);
+}
+
 /** The inner body, or the input itself when it is not an envelope. */
 export function unwrap(data: unknown): any {
   const inner = (data as any)?.data;

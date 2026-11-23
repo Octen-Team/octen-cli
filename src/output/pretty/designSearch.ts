@@ -1,6 +1,7 @@
 import pc from "picocolors";
 import { quotePath } from "../../util/quotePath.js";
-import { envelopeError, unwrap } from "./envelope.js";
+import { printable, printableLine } from "../../util/terminalText.js";
+import { envelopeError, isRecord, unwrap } from "./envelope.js";
 import { formatResultList } from "./search.js";
 
 /** Where a description or a block of code is cut, as the other renderers cut a snippet. */
@@ -15,9 +16,12 @@ export interface DesignRenderContext {
   group?: string;
 }
 
-const isObject = (v: unknown): v is Record<string, any> =>
-  v !== null && typeof v === "object" && !Array.isArray(v);
-const text = (v: unknown): string => (typeof v === "string" ? v.trim() : "");
+/**
+ * A string field, as one line that is safe to print. Everything this renderer
+ * prints from the response goes through here or through `printable`: the text
+ * is somebody else's page, and must not be able to drive the terminal.
+ */
+const text = (v: unknown): string => (typeof v === "string" ? printableLine(v).trim() : "");
 const count = (v: unknown): number | undefined =>
   typeof v === "number" && Number.isFinite(v) ? v : undefined;
 
@@ -33,7 +37,7 @@ const count = (v: unknown): number | undefined =>
  */
 function inline(v: unknown): { text: string; composite: boolean } {
   if (v == null) return { text: "", composite: false };
-  if (typeof v !== "object") return { text: String(v), composite: false };
+  if (typeof v !== "object") return { text: printableLine(String(v)), composite: false };
   if (Array.isArray(v)) {
     const parts = v.map((x) => inline(x).text).filter(Boolean);
     return { text: parts.join(", "), composite: parts.length > 1 };
@@ -42,14 +46,15 @@ function inline(v: unknown): { text: string; composite: boolean } {
   if ("$value" in o) return inline(o.$value);
   if (typeof o.hex === "string") {
     const alpha = count(o.alpha);
-    return { text: alpha != null && alpha !== 1 ? `${o.hex} (alpha ${alpha})` : o.hex, composite: false };
+    const hex = text(o.hex);
+    return { text: alpha != null && alpha !== 1 ? `${hex} (alpha ${alpha})` : hex, composite: false };
   }
   if (typeof o.unit === "string" && typeof o.value === "number")
-    return { text: `${o.value}${o.unit}`, composite: false };
+    return { text: `${o.value}${text(o.unit)}`, composite: false };
   const parts = Object.entries(o)
     .map(([k, x]) => {
       const r = inline(x);
-      return r.text ? `${k} ${r.composite ? `(${r.text})` : r.text}` : "";
+      return r.text ? `${printableLine(k)} ${r.composite ? `(${r.text})` : r.text}` : "";
     })
     .filter(Boolean);
   return { text: parts.join(", "), composite: parts.length > 0 };
@@ -63,7 +68,10 @@ interface Shortened {
 function cut(s: string, max: number, shortened: Shortened): string {
   if (s.length <= max) return s;
   shortened.any = true;
-  return `${s.slice(0, max)}…`;
+  // Not through the middle of a character that takes two code units: half of
+  // one prints as a replacement mark.
+  const end = /[\uD800-\uDBFF]/.test(s[max - 1]) ? max - 1 : max;
+  return `${s.slice(0, end)}…`;
 }
 
 function groupNoun(type: unknown): string {
@@ -81,7 +89,7 @@ function formatImage(im: Record<string, any>, i: number, ctx: DesignRenderContex
   if (text(im.url)) lines.push(`   ${pc.dim(text(im.url))}`);
   if (text(im.source_page)) lines.push(`   ${pc.dim(`Source: ${text(im.source_page)}`)}`);
 
-  const group = isObject(im.group) ? im.group : undefined;
+  const group = isRecord(im.group) ? im.group : undefined;
   if (group) {
     const name = [text(group.name), text(group.type) ? `(${text(group.type)})` : ""].filter(Boolean).join(" ");
     const position = count(group.position);
@@ -96,31 +104,35 @@ function formatImage(im: Record<string, any>, i: number, ctx: DesignRenderContex
     const id = text(group.group_id);
     if (id && !ctx.group) {
       const n = total != null && total > 0 ? ` -n ${Math.min(total, MAX_COUNT)}` : "";
-      lines.push(`   ${pc.dim(`Whole ${groupNoun(group.type)}: octen design --group ${quotePath(id)}${n}`)}`);
+      // One call returns at most MAX_COUNT, so for a larger group the command
+      // fetches a part and is labelled as one.
+      const noun = groupNoun(group.type);
+      const label = total != null && total > MAX_COUNT ? `First ${MAX_COUNT} of the ${noun}` : `Whole ${noun}`;
+      lines.push(`   ${pc.dim(`${label}: octen design --group ${quotePath(id)}${n}`)}`);
     }
 
-    const theme = isObject(group.master) ? inline(group.master).text : "";
+    const theme = isRecord(group.master) ? inline(group.master).text : "";
     if (theme) lines.push(`   ${pc.dim(`Deck theme: ${cut(theme, MAX_VALUE_LINE, shortened)}`)}`);
   }
 
   if (text(im.description)) lines.push(`   ${cut(text(im.description), MAX_TEXT, shortened)}`);
 
-  if (isObject(im.design_facts)) {
+  if (isRecord(im.design_facts)) {
     const values = Object.entries(im.design_facts)
       .map(([k, v]) => [k, inline(v).text] as const)
       .filter(([, v]) => v);
     if (values.length) {
       lines.push(`   ${pc.bold("Design values")}`);
-      for (const [k, v] of values) lines.push(`     ${k}: ${cut(v, MAX_VALUE_LINE, shortened)}`);
+      for (const [k, v] of values) lines.push(`     ${printableLine(k)}: ${cut(v, MAX_VALUE_LINE, shortened)}`);
     }
   }
 
-  const code = isObject(im.snippet) && typeof im.snippet.code === "string" ? im.snippet.code : "";
+  const code = isRecord(im.snippet) && typeof im.snippet.code === "string" ? im.snippet.code : "";
   if (code) {
     const format = text(im.snippet.format);
     lines.push(`   ${pc.bold(`Code (${format ? `${format}, ` : ""}${code.length} chars)`)}`);
     // Each line indented, so a line of the code cannot read as a field.
-    lines.push(...cut(code, MAX_TEXT, shortened).split("\n").map((l) => `     ${pc.dim(l)}`));
+    lines.push(...printable(cut(code, MAX_TEXT, shortened)).split("\n").map((l) => `     ${pc.dim(l)}`));
   }
 
   return lines.join("\n");
@@ -148,11 +160,11 @@ export function renderDesignSearch(data: any, ctx: DesignRenderContext = {}): st
   const body = unwrap(data);
   // Entries that are not objects are skipped, so one of them cannot take the
   // entries beside it down with it.
-  const images: Array<Record<string, any>> = Array.isArray(body?.images) ? body.images.filter(isObject) : [];
-  const web: Array<Record<string, any>> = Array.isArray(body?.results) ? body.results.filter(isObject) : [];
+  const images: Array<Record<string, any>> = Array.isArray(body?.images) ? body.images.filter(isRecord) : [];
+  const web: Array<Record<string, any>> = Array.isArray(body?.results) ? body.results.filter(isRecord) : [];
   // An unknown group id is answered with an empty success, so "No results"
   // would hide the likeliest cause: the id.
-  const noGroup = ctx.group && !images.length ? pc.dim(`No images in group ${ctx.group}.`) : undefined;
+  const noGroup = ctx.group && !images.length ? pc.dim(`No images in group ${printableLine(ctx.group)}.`) : undefined;
 
   if (!images.length && !web.length) {
     const err = envelopeError(data);

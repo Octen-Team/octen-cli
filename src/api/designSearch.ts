@@ -10,6 +10,11 @@
  * `images.group_id` replaces the search with a lookup: every image of one page
  * or deck, in order. A lookup needs no query.
  *
+ * A token cap is a request for the thing it caps, so `--snippet-max-tokens`
+ * and `--highlight-max-tokens` are sent with `enable: true`. This endpoint
+ * honours a cap sent alone, but `/search` reads a block with no `enable` as
+ * switched off; saying it leaves nothing to interpretation.
+ *
  * Refused here rather than spent on a request:
  *  - nothing to search for and no group to fetch;
  *  - a group with the images switched off;
@@ -154,7 +159,12 @@ export function buildDesignSearchRequest(query: string, o: DesignSearchOpts): Re
     : block([
         ["count", o.count],
         ["design_facts", o.noDesignFacts ? false : undefined],
-        ["snippet", o.noSnippet ? { enable: false } : block([["max_tokens", o.snippetMaxTokens]])],
+        [
+          "snippet",
+          o.noSnippet
+            ? { enable: false }
+            : o.snippetMaxTokens != null ? { enable: true, max_tokens: o.snippetMaxTokens } : undefined,
+        ],
         ["group_id", group],
       ]);
   if (images) req.images = images;
@@ -170,8 +180,12 @@ export function buildDesignSearchRequest(query: string, o: DesignSearchOpts): Re
         ["time_range", o.timeRange],
         ["start_time", normalizeTimeBound("--start-time", o.startTime, false)],
         ["end_time", normalizeTimeBound("--end-time", o.endTime, true)],
-        // On unless switched off, so a cap alone is a complete request.
-        ["highlight", block([["enable", o.highlight ? true : undefined], ["max_tokens", o.highlightMaxTokens]])],
+        [
+          "highlight",
+          o.highlight || o.highlightMaxTokens != null
+            ? { enable: true, ...block([["max_tokens", o.highlightMaxTokens]]) }
+            : undefined,
+        ],
         ["full_content", o.fullContent ? { enable: true, ...block([["max_tokens", o.fullContentMaxTokens]]) } : undefined],
       ]);
   if (web) req.web_search = web;

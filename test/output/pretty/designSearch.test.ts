@@ -209,10 +209,18 @@ describe("design renderer", () => {
       expect(render(env({ images: [bare] }))).not.toContain("Deck theme");
     });
 
-    // One call returns at most a hundred images.
-    it("asks for a hundred when the group is larger than one call returns", () => {
+    // One call returns at most a hundred images, so the command for a larger
+    // group fetches part of it and must not be labelled as the whole.
+    it("asks for a hundred when the group is larger than one call returns, and says it is a part", () => {
       const big = { ...slide, group: { ...slide.group, total: 152 } };
-      expect(render(env({ images: [big] }))).toContain("octen design --group deck_abc -n 100");
+      const out = render(env({ images: [big] }));
+      expect(out).toContain("First 100 of the deck: octen design --group deck_abc -n 100");
+      expect(out).not.toContain("Whole deck");
+    });
+
+    it("still calls a group of exactly a hundred whole", () => {
+      const exact = { ...slide, group: { ...slide.group, total: 100 } };
+      expect(render(env({ images: [exact] }))).toContain("Whole deck: octen design --group deck_abc -n 100");
     });
 
     // The id is printed as part of a command to paste, so it is quoted when
@@ -286,6 +294,59 @@ describe("design renderer", () => {
     });
   });
 
+  // The text comes from somebody else's page. Written as it is, an escape
+  // sequence in it drives the terminal: clears the screen, rewrites a line
+  // already printed, retitles the window.
+  describe("text that would drive the terminal", () => {
+    const ESC = "\u001b";
+
+    it("is shown, not sent, wherever it appears in a reference", () => {
+      const out = render(env({
+        images: [{
+          type: `web${ESC}[2J`,
+          title: `Title${ESC}[31m`,
+          description: `Line one\rLine two${ESC}]0;x\u0007`,
+          url: `https://img.test/a.png${ESC}[H`,
+          source_page: `https://a.test/${ESC}[1A`,
+          group: { group_id: "g1", type: "deck", name: `Deck${ESC}[0m`, position: 1, total: 2 },
+          design_facts: { [`key${ESC}[5m`]: `value${ESC}[6n`, nested: { a: [`x${ESC}c`], [`inner${ESC}[8m`]: 1 } },
+          snippet: { format: `html${ESC}[7m`, code: `<p>one</p>\r<p>two</p>${ESC}[2K\u009b1A` },
+        }],
+      }));
+      expect(out).not.toContain(ESC);
+      expect(out).not.toContain("\r");
+      expect(out).not.toContain("\u0007");
+      expect(out).not.toContain("\u009b");
+      expect(out).toContain("Title\\x1b[31m");
+      expect(out).toContain("key\\x1b[5m: value\\x1b[6n");
+      expect(out).toContain("nested: a x\\x1bc, inner\\x1b[8m 1");
+      expect(out).toContain("Deck\\x1b[0m (deck)");
+    });
+
+    it("keeps a carriage return in the code from overwriting the line before it", () => {
+      const out = render(env({ images: [{ title: "T", snippet: { format: "html", code: "<p>one</p>\r<p>two</p>" } }] }));
+      expect(out).toContain("     <p>one</p>\n     <p>two</p>");
+    });
+
+    it("keeps a multi-line title or description on its own line", () => {
+      const out = render(env({ images: [{ title: "First\nSecond", description: "a\nb" }] }));
+      expect(out).toContain("1. First Second");
+      expect(out).toContain("   a b");
+    });
+
+    it("is shown in the web results beside the references", () => {
+      const out = render(env({ images: [appScreen], results: [{ title: `Page${ESC}[2J`, url: "https://w.test/a", highlight: `text${ESC}[H` }] }));
+      expect(out).not.toContain(ESC);
+      expect(out).toContain("Page\\x1b[2J");
+    });
+
+    it("is shown in the id of a group that has no images", () => {
+      const out = render(env({ images: [] }), { group: `deck${ESC}[2J` });
+      expect(out).not.toContain(ESC);
+      expect(out).toContain("No images in group deck\\x1b[2J.");
+    });
+  });
+
   describe("empty and malformed responses", () => {
     it("says there are no results", () => {
       expect(render(env({ images: [], results: [] }))).toContain("No results.");
@@ -310,6 +371,12 @@ describe("design renderer", () => {
       expect(out).not.toContain("2.");
     });
 
+    // Counted after the malformed entries are dropped: a response made only
+    // of them is no results, not an empty listing.
+    it("says there are no results when every web result was malformed", () => {
+      expect(render(env({ images: [], results: [null, 3] }))).toContain("No results.");
+    });
+
     it("treats a list that is not a list as empty", () => {
       expect(render(env({ images: "nope", results: { a: 1 } }))).toContain("No results.");
     });
@@ -331,6 +398,14 @@ describe("design renderer", () => {
       expect(out).not.toContain("wide");
       expect(out).not.toContain("Design values");
       expect(out).not.toContain("Code (");
+    });
+
+    it("does not cut through the middle of a character", () => {
+      // The 300th and 301st code units are the two halves of one emoji.
+      const out = render(env({ images: [{ title: "T", description: `${"d".repeat(299)}\u{1F600}${"d".repeat(50)}` }] }));
+      expect(out).toContain(`${"d".repeat(299)}…`);
+      // eslint-disable-next-line no-control-regex
+      expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
     });
 
     it("cuts a long description", () => {

@@ -932,6 +932,29 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
     );
 
     it(
+      "premier: a highlight cap given on its own shortens the highlights",
+      async () => {
+        const QUERY = "postgres vacuum tuning guide";
+        const lengths = (data: { results?: Array<Record<string, unknown>> }) =>
+          new Map((data.results ?? []).map((r) => [String(r.url), String(r.highlight ?? "").length]));
+
+        const plain = lengths(await envelopeData("premier default highlights", ENDPOINTS.searchPremier, buildPremierSearchRequest(QUERY, { count: 5 })));
+        const capped = lengths(await envelopeData("premier highlight cap", ENDPOINTS.searchPremier, buildPremierSearchRequest(QUERY, { count: 5, highlightMaxTokens: 100 })));
+
+        // The same page in both calls, with a default highlight long enough
+        // for the cap to bite. It must come back shorter, and not empty: a
+        // `highlight` block the API read as switched off returns nothing.
+        const long = [...plain].filter(([url, length]) => length >= 1000 && capped.has(url));
+        expect(long.length, "no result with a 1000+ character highlight appears in both calls").toBeGreaterThan(0);
+        for (const [url, length] of long) {
+          expect(capped.get(url), `${url}: empty highlight under the cap`).toBeGreaterThan(0);
+          expect(capped.get(url), `${url}: ${length} characters uncapped`).toBeLessThan(length);
+        }
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
       "premier: start_time + end_time (bare dates)",
       async () => {
         const req = buildPremierSearchRequest(BASE, {
@@ -1010,21 +1033,35 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       "design: snippet on by default for page sections, off with --no-snippet, capped by --snippet-max-tokens",
       async () => {
         const QUERY = "landing page hero section";
-        const codeLengths = (images: DesignImage[] | undefined) =>
-          (images ?? []).map((im) => im.snippet?.code?.length ?? 0).filter((n) => n > 0);
+        // A section is the same section in every call; its link is signed
+        // anew each time, so it is keyed by where it sits in its page.
+        const codeBySection = (images: DesignImage[] | undefined) =>
+          new Map(
+            (images ?? [])
+              .filter((im) => im.group?.group_id && im.snippet?.code)
+              .map((im) => [`${im.group!.group_id}#${im.group!.position}`, im.snippet!.code!.length]),
+          );
 
-        const on = await envelopeData("design snippet on", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 8 }));
-        const full = codeLengths(on.images);
-        expect(full.length, "control returned no code").toBeGreaterThan(0);
+        const on = await envelopeData("design snippet on", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 10 }));
+        const full = codeBySection(on.images);
+        expect(full.size, "control returned no code").toBeGreaterThan(0);
 
-        const off = await envelopeData("design snippet off", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 8, noSnippet: true }));
+        const off = await envelopeData("design snippet off", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 10, noSnippet: true }));
         expect(off.images?.length, "no design references").toBeGreaterThan(0);
-        expect(codeLengths(off.images)).toEqual([]);
+        expect((off.images ?? []).filter((im) => im.snippet != null)).toEqual([]);
 
-        const capped = await envelopeData("design snippet cap", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 8, snippetMaxTokens: 100 }));
-        const short = codeLengths(capped.images);
-        expect(short.length, "capped call returned no code").toBeGreaterThan(0);
-        expect(Math.max(...short)).toBeLessThanOrEqual(Math.max(...full));
+        // The cap is the smallest the API takes. Only sections whose uncapped
+        // code is well past it can show the cap working, and each of those
+        // must come back strictly shorter — `<=` would pass on a cap the API
+        // ignored.
+        const capped = codeBySection(
+          (await envelopeData("design snippet cap", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 10, snippetMaxTokens: 100 }))).images,
+        );
+        const long = [...full].filter(([key, length]) => length >= 500 && capped.has(key));
+        expect(long.length, "no section with 500+ characters of code appears in both calls").toBeGreaterThan(0);
+        for (const [key, length] of long) {
+          expect(capped.get(key), `section ${key}: ${length} characters uncapped`).toBeLessThan(length);
+        }
       },
       TEST_TIMEOUT_MS,
     );
@@ -1076,6 +1113,25 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
         const hosts = (data.results ?? []).map((r) => new URL(String(r.url)).hostname);
         expect(hosts.length, "no web results to check the domain filter against").toBeGreaterThan(0);
         expect(hosts.filter((h) => !/(^|\.)(stripe\.com|github\.com|notion\.so)$/.test(h))).toEqual([]);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: a web highlight cap given on its own shortens the highlights",
+      async () => {
+        const lengths = (data: { results?: Array<Record<string, unknown>> }) =>
+          new Map((data.results ?? []).map((r) => [String(r.url), String(r.highlight ?? "").length]));
+
+        const plain = lengths(await envelopeData("design default highlights", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { noImages: true })));
+        const capped = lengths(await envelopeData("design highlight cap", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { noImages: true, highlightMaxTokens: 100 })));
+
+        const long = [...plain].filter(([url, length]) => length >= 1000 && capped.has(url));
+        expect(long.length, "no result with a 1000+ character highlight appears in both calls").toBeGreaterThan(0);
+        for (const [url, length] of long) {
+          expect(capped.get(url), `${url}: empty highlight under the cap`).toBeGreaterThan(0);
+          expect(capped.get(url), `${url}: ${length} characters uncapped`).toBeLessThan(length);
+        }
       },
       TEST_TIMEOUT_MS,
     );

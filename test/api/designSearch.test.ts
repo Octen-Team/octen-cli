@@ -30,12 +30,13 @@ describe("buildDesignSearchRequest", () => {
       });
     });
 
-    // Measured against the API: a cap sent on its own is honoured, so the
-    // builder does not have to pin `enable` to send it.
-    it("sends a code cap on its own", () => {
+    // A cap is a request for the thing it caps, so it is sent with `enable`.
+    // This endpoint honours a cap sent alone, but /search reads a block with
+    // no `enable` as switched off; saying it leaves nothing to interpretation.
+    it("sends a code cap given on its own, with the code switched on", () => {
       expect(buildDesignSearchRequest("q", { snippetMaxTokens: 800 })).toEqual({
         query: "q",
-        images: { snippet: { max_tokens: 800 } },
+        images: { snippet: { enable: true, max_tokens: 800 } },
       });
     });
 
@@ -153,12 +154,17 @@ describe("buildDesignSearchRequest", () => {
       expect(buildDesignSearchRequest("q", { noWeb: true })).toEqual({ query: "q", web_search: { enable: false } });
     });
 
-    // Highlights are on unless switched off, so a cap alone is a complete
-    // request — measured: the API honours it without `enable`.
-    it("sends a highlight cap on its own", () => {
+    it("sends a highlight cap given on its own, with highlights switched on", () => {
       expect(buildDesignSearchRequest("q", { highlightMaxTokens: 200 })).toEqual({
         query: "q",
-        web_search: { highlight: { max_tokens: 200 } },
+        web_search: { highlight: { enable: true, max_tokens: 200 } },
+      });
+    });
+
+    it("sends --highlight alone as a plain switch", () => {
+      expect(buildDesignSearchRequest("q", { highlight: true })).toEqual({
+        query: "q",
+        web_search: { highlight: { enable: true } },
       });
     });
 

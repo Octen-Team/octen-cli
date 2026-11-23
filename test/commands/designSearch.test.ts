@@ -65,7 +65,7 @@ describe("design command", () => {
     await run("hero", "--json", "-n", "12", "--no-design-facts", "--snippet-max-tokens", "800");
     expect(body()).toEqual({
       query: "hero",
-      images: { count: 12, design_facts: false, snippet: { max_tokens: 800 } },
+      images: { count: 12, design_facts: false, snippet: { enable: true, max_tokens: 800 } },
     });
   });
 
@@ -100,7 +100,7 @@ describe("design command", () => {
         language: ["en", "ja"],
         time_basis: "published",
         time_range: "month",
-        highlight: { max_tokens: 200 },
+        highlight: { enable: true, max_tokens: 200 },
         full_content: { enable: true, max_tokens: 1000 },
       },
     });
