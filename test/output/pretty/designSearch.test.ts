@@ -138,6 +138,22 @@ describe("design renderer", () => {
       expect(out).toContain("flag: false");
     });
 
+    // One pathological field must not take the whole listing down.
+    it("survives design values nested far deeper than any real response", () => {
+      let deep: any = "bottom";
+      for (let i = 0; i < 50_000; i++) deep = { k: deep };
+      const out = render(env({
+        images: [{ title: "Deep", design_facts: { deep }, group: { ...slide.group, master: deep } }, appScreen],
+        results: [{ title: "A page", url: "https://w.test/a" }],
+      }));
+      expect(out).toContain("1. Deep");
+      expect(out).toContain("deep: k (k (k");
+      expect(out).toContain("…");
+      expect(out).not.toContain("bottom");
+      expect(out).toContain("2. Bank onboarding");
+      expect(out).toContain("A page");
+    });
+
     it("prints nothing for values that are absent or empty", () => {
       expect(render(env({ images: [{ title: "T" }] }))).not.toContain("Design values");
       expect(render(env({ images: [{ title: "T", design_facts: {} }] }))).not.toContain("Design values");
@@ -230,12 +246,32 @@ describe("design renderer", () => {
       expect(render(env({ images: [odd] }))).toContain("octen design --group 'deck a'\\''b' -n 28");
     });
 
-    it("prints the group without a count when the API gave none", () => {
+    // Without a total the command cannot be told how many to ask for, and
+    // the API returns five unless told — so it must not claim the whole.
+    it("does not call the command 'whole' when the API gave no total", () => {
       const out = render(env({ images: [{ title: "T", group: { group_id: "g1", name: "A deck", type: "deck" } }] }));
       expect(out).toContain("A deck (deck)");
-      expect(out).toContain("Whole deck: octen design --group g1");
-      expect(out).not.toContain("-n ");
+      expect(out).toContain("More of the deck: octen design --group g1 -n <count> (returns 5 without -n)");
+      expect(out).not.toContain("Whole deck");
       expect(out).not.toContain("undefined");
+    });
+
+    // The command is meant to be pasted, so the id in it has to be the id the
+    // API sent. One that cannot be shown unchanged gets no command.
+    it("prints no command for an id that would change on the way to the terminal", () => {
+      for (const id of ["deck\tabc", "deck\u001b[2Jabc", "deck\nabc", "deck\u202eabc"]) {
+        const out = render(env({ images: [{ ...slide, group: { ...slide.group, group_id: id } }] }));
+        expect(out).not.toContain("octen design --group");
+        expect(out).toContain("group_id is in the --json output");
+      }
+    });
+
+    it("keeps the --base-url of the search in the command it prints", () => {
+      const out = render(env({ images: [slide] }), { baseUrl: "https://staging.example.test" });
+      expect(out).toContain("Whole deck: octen design --group deck_abc -n 28 --base-url https://staging.example.test");
+      const odd = render(env({ images: [slide] }), { baseUrl: "http://localhost:8080/a b" });
+      expect(odd).toContain("--base-url 'http://localhost:8080/a b'");
+      expect(render(env({ images: [slide] }))).not.toContain("--base-url");
     });
   });
 

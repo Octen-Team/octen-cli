@@ -10,10 +10,22 @@ const MAX_TEXT = 300;
 const MAX_VALUE_LINE = 200;
 /** The most images one call returns, so the most a group lookup can ask for. */
 const MAX_COUNT = 100;
+/**
+ * How deep a design value is walked. Real ones are three or four levels deep;
+ * the bound is there so one pathological value is cut short instead of
+ * exhausting the stack and taking the whole listing down.
+ */
+const MAX_DEPTH = 12;
 
 export interface DesignRenderContext {
   /** Set when the request was a group lookup, to the id that was asked for. */
   group?: string;
+  /**
+   * Set when the search was sent to a base URL given on the command line, so
+   * the command printed for a follow-up lookup goes to the same place. A base
+   * URL from the environment needs nothing: it carries over by itself.
+   */
+  baseUrl?: string;
 }
 
 /**
@@ -35,15 +47,16 @@ const count = (v: unknown): number | undefined =>
  * `hex`, a `{value, unit}` dimension — and anything else prints as `key value`
  * pairs, so a shape never seen before still reaches the terminal.
  */
-function inline(v: unknown): { text: string; composite: boolean } {
+function inline(v: unknown, depth = 0): { text: string; composite: boolean } {
   if (v == null) return { text: "", composite: false };
+  if (depth >= MAX_DEPTH && typeof v === "object") return { text: "…", composite: false };
   if (typeof v !== "object") return { text: printableLine(String(v)), composite: false };
   if (Array.isArray(v)) {
-    const parts = v.map((x) => inline(x).text).filter(Boolean);
+    const parts = v.map((x) => inline(x, depth + 1).text).filter(Boolean);
     return { text: parts.join(", "), composite: parts.length > 1 };
   }
   const o = v as Record<string, unknown>;
-  if ("$value" in o) return inline(o.$value);
+  if ("$value" in o) return inline(o.$value, depth + 1);
   if (typeof o.hex === "string") {
     const alpha = count(o.alpha);
     const hex = text(o.hex);
@@ -53,7 +66,7 @@ function inline(v: unknown): { text: string; composite: boolean } {
     return { text: `${o.value}${text(o.unit)}`, composite: false };
   const parts = Object.entries(o)
     .map(([k, x]) => {
-      const r = inline(x);
+      const r = inline(x, depth + 1);
       return r.text ? `${printableLine(k)} ${r.composite ? `(${r.text})` : r.text}` : "";
     })
     .filter(Boolean);
@@ -73,6 +86,9 @@ function cut(s: string, max: number, shortened: Shortened): string {
   const end = /[\uD800-\uDBFF]/.test(s[max - 1]) ? max - 1 : max;
   return `${s.slice(0, end)}…`;
 }
+
+/** An id that prints unchanged: printable ASCII. Anything else is left to --json. */
+const PASTEABLE_ID = /^[\x20-\x7e]+$/;
 
 function groupNoun(type: unknown): string {
   return type === "deck" ? "deck" : type === "web_page" ? "page" : "group";
@@ -101,14 +117,28 @@ function formatImage(im: Record<string, any>, i: number, ctx: DesignRenderContex
     // The id is only useful as the argument that fetches the rest, so it is
     // printed as that command. Skipped during a lookup: it is the command that
     // was just run.
-    const id = text(group.group_id);
+    // Taken as sent, not through `text()`: the command is meant to be pasted,
+    // so the id in it has to be the id the API returned. One that cannot be
+    // shown unchanged — a control character, a tab, a line break — gets no
+    // command, rather than one that looks up a different id.
+    const id = typeof group.group_id === "string" ? group.group_id : "";
     if (id && !ctx.group) {
-      const n = total != null && total > 0 ? ` -n ${Math.min(total, MAX_COUNT)}` : "";
-      // One call returns at most MAX_COUNT, so for a larger group the command
-      // fetches a part and is labelled as one.
       const noun = groupNoun(group.type);
-      const label = total != null && total > MAX_COUNT ? `First ${MAX_COUNT} of the ${noun}` : `Whole ${noun}`;
-      lines.push(`   ${pc.dim(`${label}: octen design --group ${quotePath(id)}${n}`)}`);
+      if (!PASTEABLE_ID.test(id)) {
+        lines.push(`   ${pc.dim(`The ${noun}'s group_id is in the --json output.`)}`);
+      } else {
+        const base = ctx.baseUrl ? ` --base-url ${quotePath(ctx.baseUrl)}` : "";
+        const command = `octen design --group ${quotePath(id)}`;
+        // One call returns at most MAX_COUNT, so for a larger group the
+        // command fetches a part and is labelled as one; and with no total the
+        // count is unknown, so it is neither given nor claimed.
+        const hint = total == null || total < 1
+          ? `More of the ${noun}: ${command} -n <count>${base} (returns 5 without -n)`
+          : total > MAX_COUNT
+            ? `First ${MAX_COUNT} of the ${noun}: ${command} -n ${MAX_COUNT}${base}`
+            : `Whole ${noun}: ${command} -n ${total}${base}`;
+        lines.push(`   ${pc.dim(hint)}`);
+      }
     }
 
     const theme = isRecord(group.master) ? inline(group.master).text : "";

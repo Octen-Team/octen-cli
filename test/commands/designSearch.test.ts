@@ -129,6 +129,12 @@ describe("design command", () => {
       expect(written()).not.toContain("Whole deck:");
     });
 
+    it("passes --base-url on to the command it prints", async () => {
+      reply = { code: 0, msg: "success", request_id: "r", data: { images: [slide(3, 28)] } };
+      await run("pitch deck", "--pretty", "--base-url", "http://127.0.0.1:9");
+      expect(written()).toContain("octen design --group deck_abc -n 28 --base-url http://127.0.0.1:9");
+    });
+
     it("an ordinary search prints how to fetch the whole group instead", async () => {
       reply = { code: 0, msg: "success", request_id: "r", data: { images: [slide(3, 28)] } };
       await run("pitch deck", "--pretty");

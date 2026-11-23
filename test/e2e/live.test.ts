@@ -160,30 +160,40 @@ async function envelopeData(
   return resp.data as { images?: DesignImage[]; results?: Array<Record<string, unknown>> };
 }
 
-/** The highlight length of every result in a response. */
-function highlightLengths(data: { results?: Array<Record<string, unknown>> }): number[] {
-  return (data.results ?? []).map((r) => String(r.highlight ?? "").length);
+/** The highlight length of every result in a response, by URL. */
+function highlightLengths(data: { results?: Array<Record<string, unknown>> }): Map<string, number> {
+  return new Map((data.results ?? []).map((r) => [String(r.url), String(r.highlight ?? "").length]));
 }
 
 /**
- * Assert that a highlight cap was applied, given the highlight lengths of an
- * uncapped call and of the same call with the smallest cap the API takes.
+ * Assert that a highlight cap was applied, given the highlights of an uncapped
+ * call and of the same call with the smallest cap the API takes.
  *
- * The two calls are not required to return the same pages: rankings are the
- * API's, and a page dropping out of one list would fail a page-by-page
- * comparison for a reason that has nothing to do with the cap. Nor is a
- * length in characters compared with the cap in tokens. What is asserted is
- * relative: without the cap some highlight is long, and under it none is as
- * long as that — while at least one is still there, since a `highlight` block
- * the API read as switched off returns none at all.
+ * Each page is compared with itself: a page whose uncapped highlight is long
+ * must come back shorter under the cap, and not empty — a `highlight` block
+ * the API reads as switched off returns none. Comparing the longest of each
+ * list instead would pass on an ignored cap whenever the longest page dropped
+ * out of the second list. The two calls are ranked separately, so they may
+ * share no long page; that is reported as skipped, not as passed.
  */
-function expectHighlightsCapped(label: string, plain: number[], capped: number[]): void {
-  expect(plain.length, `[${label}] the uncapped call returned no results`).toBeGreaterThan(0);
-  expect(capped.length, `[${label}] the capped call returned no results`).toBeGreaterThan(0);
-  const longest = Math.max(...plain);
-  expect(longest, `[${label}] no uncapped highlight is long enough for a cap to show`).toBeGreaterThanOrEqual(1000);
-  expect(Math.max(...capped), `[${label}] every highlight is empty under the cap`).toBeGreaterThan(0);
-  expect(Math.max(...capped), `[${label}] longest uncapped highlight: ${longest} characters`).toBeLessThan(longest);
+function expectHighlightsCapped(
+  label: string,
+  plain: Map<string, number>,
+  capped: Map<string, number>,
+  skip: (note: string) => void,
+): void {
+  expect(plain.size, `[${label}] the uncapped call returned no results`).toBeGreaterThan(0);
+  expect(capped.size, `[${label}] the capped call returned no results`).toBeGreaterThan(0);
+  expect(Math.max(...capped.values()), `[${label}] every highlight is empty under the cap`).toBeGreaterThan(0);
+  const long = [...plain].filter(([url, length]) => length >= 1000 && capped.has(url));
+  if (long.length === 0) {
+    skip(`[${label}] inconclusive: no page with a 1000+ character highlight came back in both calls`);
+    return;
+  }
+  for (const [url, length] of long) {
+    expect(capped.get(url), `[${label}] ${url}: empty highlight under the cap`).toBeGreaterThan(0);
+    expect(capped.get(url), `[${label}] ${url}: ${length} characters uncapped`).toBeLessThan(length);
+  }
 }
 
 // ISO timestamps for search start/end time coverage (last 30 days).
@@ -959,13 +969,13 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
 
     it(
       "premier: a highlight cap given on its own shortens the highlights",
-      async () => {
+      async (ctx) => {
         // One query, one domain, two calls that differ only in the cap.
         const QUERY = "PostgreSQL";
         const shared = { count: 5, includeDomains: ["en.wikipedia.org"] };
         const plain = highlightLengths(await envelopeData("premier default highlights", ENDPOINTS.searchPremier, buildPremierSearchRequest(QUERY, shared)));
         const capped = highlightLengths(await envelopeData("premier highlight cap", ENDPOINTS.searchPremier, buildPremierSearchRequest(QUERY, { ...shared, highlightMaxTokens: 100 })));
-        expectHighlightsCapped("premier", plain, capped);
+        expectHighlightsCapped("premier", plain, capped, (note) => ctx.skip(note));
       },
       TEST_TIMEOUT_MS,
     );
@@ -1150,13 +1160,13 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
 
     it(
       "design: a web highlight cap given on its own shortens the highlights",
-      async () => {
+      async (ctx) => {
         // One query, one domain, two calls that differ only in the cap.
         const QUERY = "Typography";
         const shared = { noImages: true, includeDomains: ["en.wikipedia.org"] };
         const plain = highlightLengths(await envelopeData("design default highlights", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, shared)));
         const capped = highlightLengths(await envelopeData("design highlight cap", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { ...shared, highlightMaxTokens: 100 })));
-        expectHighlightsCapped("design", plain, capped);
+        expectHighlightsCapped("design", plain, capped, (note) => ctx.skip(note));
       },
       TEST_TIMEOUT_MS,
     );

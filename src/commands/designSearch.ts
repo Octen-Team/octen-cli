@@ -64,6 +64,6 @@ export function registerDesignSearch(program: Command) {
       // The renderer is told when this was a lookup: it prints different hints
       // for a group that was asked for than for one a search happened to hit.
       const group = (req.images as { group_id?: string } | undefined)?.group_id;
-      emit(res, chooseMode(g, process.stdout.isTTY ?? false), (d) => renderDesignSearch(d, { group }));
+      emit(res, chooseMode(g, process.stdout.isTTY ?? false), (d) => renderDesignSearch(d, { group, baseUrl: g.baseUrl }));
     });
 }
