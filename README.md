@@ -289,9 +289,12 @@ Search the live web.
 
 ```sh
 octen search "latest LLM benchmarks" -n 10 --topic news --highlight --time-range week
+octen search "EU AI Act obligations for general-purpose models" -n 5 --result-type dynamic --highlight
 ```
 
-Options: `-n` (result count 1–100), `--topic` (general|news), `--highlight` (+`--highlight-max-tokens`, 100–20000), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content` (+`--full-content-max-tokens`, 100–100000), `--images`, `--format` (text|markdown), `--safesearch`.
+Options: `-n` (result count 1–100), `--topic` (general|news), `--result-type` (standard|dynamic), `--highlight` (+`--highlight-max-tokens`, 100–20000), `--time-range` (day|week|month|year or d|w|m|y), `--start-time`/`--end-time` (YYYY-MM-DD or ISO datetime), `--include-domains`, `--exclude-domains`, `--language` (comma-separated ISO 639-1 codes, e.g. `en,ja` — one of `ar de en es fr hi id it ja ko nl pl pt ru th tr vi zh`), `--full-content` (+`--full-content-max-tokens`, 100–100000), `--images`, `--format` (text|markdown), `--safesearch`.
+
+`--result-type standard` (the default) returns results as the flags specify. `dynamic` returns only the relevant results, up to `-n`, and adjusts the highlight length per result, so `--highlight-max-tokens` may be adjusted per result. For a fixed number or length of results, use `standard`. The response's `meta.result_type` echoes the value used.
 
 ---
 
@@ -373,9 +376,10 @@ Use it for comparisons across many sources (pricing, products, vendors), surveys
 
 ```sh
 octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 10
+octen broad-search "compare cloud GPU pricing across providers" --max-queries 5 -n 5 --result-type dynamic --highlight
 ```
 
-Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--language`, `--images`, `--format`, `--safesearch`).
+Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5), plus all `octen search` flags (`-n/--count` per sub-query, `--topic`, `--result-type` (standard|dynamic, applied to every sub-query; the response does not echo it), `--highlight`, `--full-content`, `--time-range`, `--start-time`/`--end-time`, `--include-domains`/`--exclude-domains`, `--include-text`/`--exclude-text`, `--language`, `--images`, `--format`, `--safesearch`).
 
 ---
 
@@ -392,7 +396,7 @@ It posts to its own endpoint, `/search-premier`, which takes the request `/searc
 
 **Use `octen search` by default.** Premier takes longer, and it is billed at its own per-call rate, which a Search Plan's unlimited searches do not cover.
 
-Options: every `octen search` flag except `--topic`, plus `--result-type` (`standard`|`dynamic`). `standard` returns results as the other flags specify; `dynamic` returns only the relevant results, up to `-n`, and adjusts the highlight length per result.
+Options: every `octen search` flag except `--topic`. That includes `--result-type` (`standard`|`dynamic`), which works as it does on `octen search`; the two commands differ in endpoint, retrieval depth and billing, not in flags.
 
 A token cap given without its switch is not dropped here: `--highlight-max-tokens` alone caps the highlights, and `--full-content-max-tokens` without `--full-content` exits 2, since it would return no content.
 

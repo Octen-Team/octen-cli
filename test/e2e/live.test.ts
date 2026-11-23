@@ -18,7 +18,7 @@ import { describe, it, expect } from "vitest";
 
 import { OctenClient } from "../../src/api/client.js";
 import { ENDPOINTS } from "../../src/api/constants.js";
-import { buildSearchRequest } from "../../src/api/search.js";
+import { buildBroadSearchRequest, buildSearchRequest, type BroadSearchResponse } from "../../src/api/search.js";
 import { buildPremierSearchRequest } from "../../src/api/premierSearch.js";
 import { buildDesignSearchRequest, type DesignImage } from "../../src/api/designSearch.js";
 import { buildExtractRequest } from "../../src/api/extract.js";
@@ -62,6 +62,7 @@ const client = new OctenClient({
 
 type EnvelopeResponse = {
   data?: unknown;
+  meta?: { result_type?: string };
   code?: number;
   msg?: string;
   error?: unknown;
@@ -428,6 +429,24 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       async () => {
         const req = buildSearchRequest(BASE, { count: 3, images: true });
         await expectEnvelopeOk("search images=true", ENDPOINTS.search, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "search: result_type=dynamic is echoed in meta.result_type",
+      async () => {
+        // /search echoes the type it used: a dropped or misplaced field comes back as "standard".
+        const dynamicReq = buildSearchRequest(BASE, { count: 3, resultType: "dynamic" });
+        const dynamic = await client.request<EnvelopeResponse>(ENDPOINTS.search, dynamicReq);
+        expect(dynamic.meta?.result_type, "dynamic request").toBe("dynamic");
+        const n = ((dynamic.data as { results?: unknown[] }).results ?? []).length;
+        expect(n, "dynamic result count").toBeGreaterThanOrEqual(1);
+        expect(n, "dynamic result count").toBeLessThanOrEqual(3);
+
+        // Control: the same request without the flag is served as standard.
+        const standard = await client.request<EnvelopeResponse>(ENDPOINTS.search, buildSearchRequest(BASE, { count: 3 }));
+        expect(standard.meta?.result_type, "request without --result-type").toBe("standard");
       },
       TEST_TIMEOUT_MS,
     );
@@ -989,6 +1008,54 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
           endTime: END_TIME.slice(0, 10),
         });
         await expectEnvelopeOk("premier start/end", ENDPOINTS.searchPremier, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // broad-search
+  // -------------------------------------------------------------------------
+  describe("broad-search", () => {
+    // No echo on /broad-search, so compare against a control with the flag unset. Observed
+    // 2026-11-23: same data.queries, highlights 696/696/698 vs 2819/1866/2649 chars by url;
+    // query-dependent (other queries matched exactly), and an empirical signal, not a documented ratio.
+    const QUERY = "EU AI Act enforcement timeline";
+    const base = { maxQueries: 1, count: 3, highlight: true } as const;
+
+    async function pair(): Promise<{ standard: BroadSearchResponse; dynamic: BroadSearchResponse }> {
+      const call = async (label: string, resultType?: "dynamic") => {
+        const req = buildBroadSearchRequest(QUERY, { ...base, ...(resultType ? { resultType } : {}) });
+        const resp = await client.request<EnvelopeResponse>(ENDPOINTS.broadSearch, req);
+        expect(resp.code, `[${label}] code=${resp.code} msg=${resp.msg ?? "(none)"}`).toBe(0);
+        return resp.data as BroadSearchResponse;
+      };
+      let last = "";
+      // The sub-queries are generated per call; retry once if the two differ.
+      for (let attempt = 0; attempt < 2; attempt++) {
+        const standard = await call("broad standard");
+        const dynamic = await call("broad dynamic", "dynamic");
+        last = `${JSON.stringify(standard.queries)} vs ${JSON.stringify(dynamic.queries)}`;
+        if (JSON.stringify(standard.queries) === JSON.stringify(dynamic.queries)) return { standard, dynamic };
+      }
+      throw new Error(`cannot compare: the two calls generated different sub-queries (${last})`);
+    }
+
+    const byUrl = (d: BroadSearchResponse) =>
+      new Map((d.search_results ?? []).flatMap((g) => g.results ?? []).map((r) => [String(r.url), String(r.highlight ?? "").length]));
+
+    it(
+      "broad-search: result_type=dynamic shortens highlights against the standard control",
+      async () => {
+        const { standard, dynamic } = await pair();
+        const s = byUrl(standard);
+        const d = byUrl(dynamic);
+        const matched = [...d].filter(([url]) => s.has(url)).map(([url, len]) => ({ url, dynamic: len, standard: s.get(url)! }));
+        expect(matched.length, `matched results: ${JSON.stringify(matched)}`).toBeGreaterThanOrEqual(2);
+        expect(
+          matched.some((m) => m.standard > 0 && m.dynamic < m.standard / 2),
+          `no matched result has a dynamic highlight under half of its standard one: ${JSON.stringify(matched)}`,
+        ).toBe(true);
       },
       TEST_TIMEOUT_MS,
     );
