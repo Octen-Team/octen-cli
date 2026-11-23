@@ -1,7 +1,12 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Command } from "commander";
 import { registerSearch } from "../../src/commands/search.js";
-import { registerNewsSearch } from "../../src/commands/verticalSearch.js";
+import {
+  registerBusinessSearch,
+  registerNewsSearch,
+  registerPulseSearch,
+} from "../../src/commands/verticalSearch.js";
+import { registerPlaceSearch } from "../../src/commands/placeSearch.js";
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -21,6 +26,9 @@ function makeProgram() {
     .exitOverride(); // prevent process.exit in tests
   registerSearch(prog);
   registerNewsSearch(prog);
+  registerBusinessSearch(prog);
+  registerPulseSearch(prog);
+  registerPlaceSearch(prog);
   return prog;
 }
 
@@ -29,12 +37,12 @@ describe("search command", () => {
   let writeSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(() => {
-    fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
-      jsonResponse({
+    fetchSpy = vi.spyOn(globalThis, "fetch").mockImplementation(() =>
+      Promise.resolve(jsonResponse({
         data: { results: [{ title: "T", url: "https://x.com" }] },
         code: 0,
         msg: "success",
-      }),
+      })),
     );
     writeSpy = vi.spyOn(process.stdout, "write").mockImplementation(() => true);
   });
@@ -122,6 +130,32 @@ describe("search command", () => {
     const [, init] = fetchSpy.mock.calls[0];
     const body = JSON.parse((init as RequestInit).body as string);
     expect(body).toMatchObject({ query: "breaking", language: ["ja"] });
+  });
+
+  // Command output carries no meta, so the request body is the only place to see the wiring.
+  it("sends --result-type at the top level of the body, and nothing when it is not passed", async () => {
+    await makeProgram().parseAsync(["node", "octen", "search", "hi", "--json", "--api-key", "k", "--result-type", "dynamic"]);
+    const body = JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string);
+    expect(body).toEqual({ query: "hi", result_type: "dynamic" });
+
+    fetchSpy.mockClear();
+    await makeProgram().parseAsync(["node", "octen", "search", "hi", "--json", "--api-key", "k"]);
+    expect(JSON.parse((fetchSpy.mock.calls[0][1] as RequestInit).body as string)).not.toHaveProperty("result_type");
+  });
+
+  it("rejects an invalid --result-type before any request", async () => {
+    await expect(
+      makeProgram().parseAsync(["node", "octen", "search", "hi", "--api-key", "k", "--result-type", "fast"]),
+    ).rejects.toThrow("--result-type must be one of: standard, dynamic");
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // The vertical commands build their options separately, so --result-type must stay unknown there.
+  it.each(["news", "business", "pulse", "place"])("octen %s does not accept --result-type", async (cmd) => {
+    await expect(
+      makeProgram().parseAsync(["node", "octen", cmd, "hi", "--api-key", "k", "--result-type", "dynamic"]),
+    ).rejects.toThrow(/unknown option '--result-type'/);
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it("rejects non-integer --count", async () => {

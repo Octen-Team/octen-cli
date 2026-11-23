@@ -5,7 +5,6 @@
  * shared options go through the search builder rather than a second copy of
  * it. Kept here are the places where this command differs from `search`:
  *
- *  - `result_type`, which the reference documents and `search` does not offer;
  *  - `topic`, which is `search`'s own and is never forwarded;
  *  - a token cap given without its switch. The search builder sends a cap only
  *    beside `--highlight` / `--full-content` and drops it otherwise. Here a
@@ -30,7 +29,8 @@ export function buildPremierSearchRequest(query: string, o: PremierSearchOpts): 
     throw new OctenValidationError("--full-content-max-tokens needs --full-content — full content is off unless asked for");
 
   // Dropped by name, not by type: an options object built for `search` would
-  // otherwise carry its `topic` straight through.
+  // otherwise carry its `topic` straight through. `resultType` is appended
+  // after the shared options so the body's key order stays as it was.
   const { topic: _topic, resultType, ...shared } = o as PremierSearchOpts & Pick<SearchOpts, "topic">;
 
   // A highlight cap is a request for highlights of that length, so it is sent

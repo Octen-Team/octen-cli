@@ -1,5 +1,6 @@
 import {
   LIMITS,
+  RESULT_TYPE_OPTIONS,
   TOPIC_OPTIONS,
   TIME_BASIS_OPTIONS,
   TIME_RANGE_OPTIONS,
@@ -80,6 +81,7 @@ export interface BroadSearchResponse {
 
 export interface SearchOpts {
   topic?: "general" | "news";
+  resultType?: (typeof RESULT_TYPE_OPTIONS)[number];
   count?: number;
   includeDomains?: string[];
   excludeDomains?: string[];
@@ -115,6 +117,7 @@ export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
   assertRange("highlight-max-tokens", o.highlightMaxTokens, LIMITS.highlightMaxTokens);
   assertRange("full-content-max-tokens", o.fullContentMaxTokens, LIMITS.fullContentMaxTokens);
   validateEnum("--topic", o.topic, TOPIC_OPTIONS);
+  validateEnum("--result-type", o.resultType, RESULT_TYPE_OPTIONS);
   validateEnum("--time-basis", o.timeBasis, TIME_BASIS_OPTIONS);
   validateEnum("--time-range", o.timeRange, TIME_RANGE_OPTIONS);
   validateEnum("--safesearch", o.safesearch, SAFESEARCH_OPTIONS);
@@ -122,7 +125,7 @@ export function buildSearchOptions(o: SearchOpts): Record<string, unknown> {
 
   const opts: Record<string, unknown> = {};
   const put = (k: string, v: unknown) => { if (v != null) opts[k] = v; };
-  put("topic", o.topic); put("count", o.count);
+  put("topic", o.topic); put("result_type", o.resultType); put("count", o.count);
   put("include_domains", o.includeDomains); put("exclude_domains", o.excludeDomains);
   put("include_text", o.includeText); put("exclude_text", o.excludeText);
   put("time_basis", o.timeBasis); put("time_range", o.timeRange);

@@ -49,4 +49,21 @@ describe("buildBroadSearchRequest", () => {
     expect(req).not.toHaveProperty("language");
     expect(req.search_options).not.toHaveProperty("language");
   });
+
+  it("nests result_type under search_options, never at the top level", () => {
+    const req = buildBroadSearchRequest("hi", { resultType: "dynamic" });
+    expect(req).toEqual({ query: "hi", search_options: { result_type: "dynamic" } });
+    expect(req).not.toHaveProperty("result_type");
+  });
+  it("omits result_type, and search_options with it, when unset", () => {
+    expect(buildBroadSearchRequest("hi", {})).toEqual({ query: "hi" });
+    expect(buildBroadSearchRequest("hi", { count: 3 })).toEqual({ query: "hi", search_options: { count: 3 } });
+  });
+  it("rejects a result-type outside standard|dynamic, with no normalisation", () => {
+    for (const bad of ["fast", "Dynamic", "", " "]) {
+      expect(() => buildBroadSearchRequest("hi", { resultType: bad as never })).toThrow(
+        "--result-type must be one of: standard, dynamic",
+      );
+    }
+  });
 });
