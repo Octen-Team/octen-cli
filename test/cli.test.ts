@@ -145,3 +145,134 @@ describe("cli exit codes", () => {
     expect(result.stdout).toContain("crlf-ok");
   });
 });
+
+interface SeenRequest {
+  method?: string;
+  url?: string;
+  apiKey?: string;
+  body: unknown;
+}
+
+/**
+ * A loopback JSON server that answers every request with one fixed reply and
+ * records what it was sent, so a test can check both ends of a real process:
+ * the request the CLI made and the status it exited with.
+ */
+async function withJsonServer(
+  status: number,
+  reply: unknown,
+  run: (baseUrl: string) => Promise<CliResult>,
+): Promise<{ result: CliResult; seen: SeenRequest[] }> {
+  const seen: SeenRequest[] = [];
+  const server: Server = createServer((req, res) => {
+    let raw = "";
+    req.on("data", (c) => (raw += String(c)));
+    req.on("end", () => {
+      seen.push({
+        method: req.method,
+        url: req.url,
+        apiKey: String(req.headers["x-api-key"] ?? ""),
+        body: raw ? JSON.parse(raw) : undefined,
+      });
+      res.writeHead(status, { "content-type": "application/json" });
+      res.end(JSON.stringify(reply));
+    });
+  });
+  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const { port } = server.address() as AddressInfo;
+  try {
+    return { result: await run(`http://127.0.0.1:${port}`), seen };
+  } finally {
+    await new Promise<void>((resolve) => server.close(() => resolve()));
+  }
+}
+
+describe("premier and design, as a real process", () => {
+  const envelope = (data: unknown) => ({ code: 0, msg: "success", request_id: "req-1", data });
+
+  it("lists both commands in help", () => {
+    const help = runCli(["--help"]);
+    expect(help).toMatch(/^\s+premier /m);
+    expect(help).toMatch(/^\s+design /m);
+  });
+
+  // Completion is built by introspecting the program, so both commands should
+  // appear in it with their own flags and no entry written by hand.
+  it("completes both commands in the real program", () => {
+    const script = runCli(["completion", "bash"]);
+    expect(script).toMatch(/^    premier\)\n      opts="[^"]*--result-type/m);
+    expect(script).toMatch(/^    design\)\n      opts="[^"]*--group/m);
+  });
+
+  it("premier posts to /search-premier with the key, and prints the envelope", async () => {
+    const reply = envelope({ results: [{ title: "A result", url: "https://a.test/x" }] });
+    const { result, seen } = await withJsonServer(200, reply, (baseUrl) =>
+      runCliAsync(["premier", "rust", "async", "--result-type", "dynamic", "--api-key", "test-key", "--base-url", baseUrl]),
+    );
+    expect(result.status).toBe(0);
+    expect(seen).toEqual([{
+      method: "POST",
+      url: "/search-premier",
+      apiKey: "test-key",
+      body: { query: "rust async", result_type: "dynamic" },
+    }]);
+    // stdout is a pipe here, so the output is the raw JSON.
+    expect(JSON.parse(result.stdout)).toEqual(reply);
+  });
+
+  it("design fetches a group without a query", async () => {
+    const reply = envelope({ images: [{ type: "slide", title: "One" }], results: [] });
+    const { result, seen } = await withJsonServer(200, reply, (baseUrl) =>
+      runCliAsync(["design", "--group", "deck_abc", "-n", "28", "--no-web", "--api-key", "test-key", "--base-url", baseUrl]),
+    );
+    expect(result.status).toBe(0);
+    expect(seen).toEqual([{
+      method: "POST",
+      url: "/design-search",
+      apiKey: "test-key",
+      body: { images: { count: 28, group_id: "deck_abc" }, web_search: { enable: false } },
+    }]);
+    expect(JSON.parse(result.stdout)).toEqual(reply);
+  });
+
+  it("design prints the references when asked for --pretty", async () => {
+    const reply = envelope({
+      images: [{ type: "web_page", title: "A page design", url: "https://img.test/a.png", width: 1440, height: 900 }],
+    });
+    const { result } = await withJsonServer(200, reply, (baseUrl) =>
+      runCliAsync(["design", "pricing", "page", "--pretty", "--no-color", "--api-key", "test-key", "--base-url", baseUrl]),
+    );
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("1. A page design");
+    expect(result.stdout).toContain("web_page · 1440x900");
+  });
+
+  // The API's own code and message, as it sent them, and a non-zero exit.
+  it("exits 1 with the API's message when the request is rejected", async () => {
+    const { result, seen } = await withJsonServer(400, { code: 40001, msg: "Invalid params.", request_id: "r" }, (baseUrl) =>
+      runCliAsync(["design", "hero", "--api-key", "test-key", "--base-url", baseUrl]),
+    );
+    expect(seen).toHaveLength(1);
+    expect(result.status).toBe(1);
+    expect(result.stderr).toContain("Invalid params.");
+    expect(result.stdout).toBe("");
+  });
+
+  const refused: Array<[string, string[], string]> = [
+    ["design with neither a query nor a group", ["design"], "give a query, or --group"],
+    ["design with both result groups off", ["design", "hero", "--no-images", "--no-web"], "leave nothing to return"],
+    ["design with a group and --no-images", ["design", "--group", "deck_abc", "--no-images"], "cannot be combined with --no-images"],
+    ["design with a web option and --no-web", ["design", "hero", "--no-web", "--language", "en"], "--language applies to the web results"],
+    ["premier with an unknown result type", ["premier", "hi", "--result-type", "deep"], "--result-type must be one of"],
+  ];
+  for (const [what, argv, message] of refused) {
+    it(`exits 2 before any request: ${what}`, async () => {
+      const { result, seen } = await withJsonServer(200, envelope({}), (baseUrl) =>
+        runCliAsync([...argv, "--api-key", "test-key", "--base-url", baseUrl]),
+      );
+      expect(result.status).toBe(2);
+      expect(result.stderr).toContain(message);
+      expect(seen).toEqual([]);
+    });
+  }
+});

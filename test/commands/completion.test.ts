@@ -11,6 +11,8 @@ import {
   registerPulseSearch,
 } from "../../src/commands/verticalSearch.js";
 import { registerPlaceSearch } from "../../src/commands/placeSearch.js";
+import { registerPremierSearch } from "../../src/commands/premierSearch.js";
+import { registerDesignSearch } from "../../src/commands/designSearch.js";
 import { registerExtract } from "../../src/commands/extract.js";
 import { registerChat } from "../../src/commands/chat.js";
 import { registerEmbed } from "../../src/commands/embed.js";
@@ -39,6 +41,8 @@ function makeProgram(internal: { home?: string } = {}) {
   registerBusinessSearch(prog);
   registerPlaceSearch(prog);
   registerPulseSearch(prog);
+  registerPremierSearch(prog);
+  registerDesignSearch(prog);
   registerExtract(prog);
   registerChat(prog);
   registerEmbed(prog);
@@ -79,6 +83,24 @@ describe("completion command", () => {
     expect(out).toContain("--mode"); // from extract
     expect(out).toContain("--links"); // from extract
     expect(out).toContain("--max-links"); // from extract
+  });
+
+  // Completion is built by introspection, so a new command needs no entry of
+  // its own — this holds that true for the two added last.
+  it("completes premier and design with their own flags", async () => {
+    const out = await run("bash");
+    const branch = (sub: string) => out.match(new RegExp(`^    ${sub}\\)\\n      opts="([^"]*)"`, "m"))?.[1] ?? "";
+    expect(branch("premier")).toContain("--result-type");
+    expect(branch("premier")).not.toContain("--topic");
+    for (const flag of ["--group", "--no-images", "--no-web", "--no-design-facts", "--no-snippet", "--snippet-max-tokens", "--web-count"]) {
+      expect(branch("design")).toContain(flag);
+    }
+    expect(branch("search")).not.toContain("--group");
+
+    writeSpy.mockClear();
+    const fish = await run("fish");
+    expect(fish).toMatch(/__fish_seen_subcommand_from design' .*-l group/);
+    expect(fish).toMatch(/__fish_seen_subcommand_from premier' .*-l result-type/);
   });
 
   it("emits a non-empty zsh script containing subcommands", async () => {
