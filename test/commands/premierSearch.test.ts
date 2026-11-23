@@ -93,17 +93,15 @@ describe("premier command", () => {
   });
 
   // The reference gives the two endpoints one request body. `--topic` is
-  // search's own and `--result-type` is offered here only, so those two are
-  // the whole of the difference — a flag added to one and not the other shows
-  // up here.
-  it("takes search's flags, less --topic, plus --result-type", () => {
+  // search's own and the only difference — a flag added to one and not the
+  // other shows up here.
+  it("takes search's flags, less --topic", () => {
     const prog = makeProgram();
     const search = flags(prog, "search");
     expect(search).toContain("--topic");
+    expect(search).toContain("--result-type");
     expect(search.length).toBeGreaterThan(10);
-    expect(flags(prog, "premier-search")).toEqual(
-      [...search.filter((f) => f !== "--topic"), "--result-type"].sort(),
-    );
+    expect(flags(prog, "premier-search")).toEqual(search.filter((f) => f !== "--topic"));
   });
 
   it("--highlight-max-tokens works without --highlight", async () => {

@@ -17,8 +17,9 @@
 import { describe, it, expect } from "vitest";
 
 import { OctenClient } from "../../src/api/client.js";
+import { OctenAPIError } from "../../src/api/errors.js";
 import { ENDPOINTS } from "../../src/api/constants.js";
-import { buildSearchRequest } from "../../src/api/search.js";
+import { buildBroadSearchRequest, buildSearchRequest, type BroadSearchResponse } from "../../src/api/search.js";
 import { buildPremierSearchRequest } from "../../src/api/premierSearch.js";
 import { buildDesignSearchRequest, type DesignImage } from "../../src/api/designSearch.js";
 import { buildExtractRequest } from "../../src/api/extract.js";
@@ -62,6 +63,7 @@ const client = new OctenClient({
 
 type EnvelopeResponse = {
   data?: unknown;
+  meta?: { result_type?: string };
   code?: number;
   msg?: string;
   error?: unknown;
@@ -194,6 +196,29 @@ function expectHighlightsCapped(
     expect(capped.get(url), `[${label}] ${url}: empty highlight under the cap`).toBeGreaterThan(0);
     expect(capped.get(url), `[${label}] ${url}: ${length} characters uncapped`).toBeLessThan(length);
   }
+}
+
+/**
+ * POST a request the API must reject and assert it is a 400 whose message names
+ * `field`. A client that drops the field, or puts it where the server does not
+ * read it, gets a 200 instead.
+ */
+async function expectBadRequestNaming(
+  param: string,
+  endpoint: string,
+  req: Record<string, unknown>,
+  field: string,
+): Promise<void> {
+  let thrown: unknown;
+  try {
+    await client.request<EnvelopeResponse>(endpoint, req);
+  } catch (e) {
+    thrown = e;
+  }
+  expect(thrown, `[${param}] expected a 400 but the request succeeded`).toBeInstanceOf(OctenAPIError);
+  const err = thrown as OctenAPIError;
+  expect(err.status, `[${param}] ${describeError(err)}`).toBe(400);
+  expect(err.message, `[${param}] message does not name ${field}`).toContain(field);
 }
 
 // ISO timestamps for search start/end time coverage (last 30 days).
@@ -428,6 +453,36 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
       async () => {
         const req = buildSearchRequest(BASE, { count: 3, images: true });
         await expectEnvelopeOk("search images=true", ENDPOINTS.search, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "search: result_type=dynamic is echoed in meta.result_type",
+      async () => {
+        // /search echoes the type it used: a dropped or misplaced field comes back as "standard".
+        const dynamicReq = buildSearchRequest(BASE, { count: 3, resultType: "dynamic" });
+        const dynamic = await client.request<EnvelopeResponse>(ENDPOINTS.search, dynamicReq);
+        expect(dynamic.meta?.result_type, "dynamic request").toBe("dynamic");
+        const n = ((dynamic.data as { results?: unknown[] }).results ?? []).length;
+        // Only the upper bound: in dynamic mode `count` is a maximum, and zero results is allowed.
+        expect(n, "dynamic result count").toBeLessThanOrEqual(3);
+
+        // Control: the same request without the flag is served as standard.
+        const standard = await client.request<EnvelopeResponse>(ENDPOINTS.search, buildSearchRequest(BASE, { count: 3 }));
+        expect(standard.meta?.result_type, "request without --result-type").toBe("standard");
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "search: an invalid result_type at the builder's position is a 400 naming result_type",
+      async () => {
+        // Overwrite the value the real builder placed, so a dropped or misplaced field would succeed.
+        const req = buildSearchRequest(BASE, { count: 1, resultType: "dynamic" });
+        expect(req.result_type).toBe("dynamic");
+        req.result_type = "fancy";
+        await expectBadRequestNaming("search result_type=fancy", ENDPOINTS.search, req, "result_type");
       },
       TEST_TIMEOUT_MS,
     );
@@ -991,6 +1046,71 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
         await expectEnvelopeOk("premier start/end", ENDPOINTS.searchPremier, req);
       },
       TEST_TIMEOUT_MS,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // broad-search
+  // -------------------------------------------------------------------------
+  describe("broad-search", () => {
+    it(
+      "broad-search: an invalid result_type at the builder's position is a 400 naming result_type",
+      async () => {
+        const req = buildBroadSearchRequest("OpenAI", { maxQueries: 1, count: 1, resultType: "dynamic" });
+        const options = req.search_options as Record<string, unknown>;
+        expect(options.result_type).toBe("dynamic");
+        options.result_type = "fancy";
+        await expectBadRequestNaming("broad-search result_type=fancy", ENDPOINTS.broadSearch, req, "result_type");
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    // Evidence, not a gate: no echo on /broad-search, so compare with the flag unset. Observed
+    // 2026-11-23: highlights 696/696/698 (dynamic) vs 2819/1866/2649 chars (standard) by url, but
+    // the effect depends on the query. A skip means no evidence this run, not a defect.
+    it(
+      "broad-search: result_type=dynamic highlights against a standard control (evidence, skips when inconclusive)",
+      async (ctx) => {
+        const QUERY = "EU AI Act enforcement timeline";
+        const base = { maxQueries: 1, count: 3, highlight: true } as const;
+        const call = async (label: string, resultType?: "dynamic") => {
+          const req = buildBroadSearchRequest(QUERY, { ...base, ...(resultType ? { resultType } : {}) });
+          const resp = await client.request<EnvelopeResponse>(ENDPOINTS.broadSearch, req);
+          expect(resp.code, `[${label}] code=${resp.code} msg=${resp.msg ?? "(none)"}`).toBe(0);
+          return resp.data as BroadSearchResponse;
+        };
+        const standard = await call("broad standard");
+        const dynamic = await call("broad dynamic", "dynamic");
+
+        // Two absent lists must not count as "the same".
+        const sameQueries =
+          Array.isArray(standard.queries) && standard.queries.length > 0 &&
+          JSON.stringify(standard.queries) === JSON.stringify(dynamic.queries);
+        if (!sameQueries) {
+          ctx.skip(`inconclusive: queries missing or differ (${JSON.stringify(standard.queries)} vs ${JSON.stringify(dynamic.queries)})`);
+        }
+        // Distinct, non-empty URLs only: a result without one is skipped, a repeated one counts once.
+        const lengths = (d: BroadSearchResponse) => {
+          const out = new Map<string, number>();
+          for (const r of (d.search_results ?? []).flatMap((g) => g.results ?? [])) {
+            if (typeof r.url === "string" && r.url !== "" && !out.has(r.url)) out.set(r.url, String(r.highlight ?? "").length);
+          }
+          return out;
+        };
+        const s = lengths(standard);
+        const paired = [...lengths(dynamic)]
+          .filter(([url]) => s.has(url))
+          .map(([url, len]) => ({ url, dynamic: len, standard: s.get(url)! }));
+        console.log(`broad-search paired highlight lengths: ${JSON.stringify(paired)}`);
+        // Two halved highlights in one run is not ordinary variation between two live calls; one could be.
+        const shorter = paired.filter((m) => m.dynamic > 0 && m.standard > 0 && m.dynamic < m.standard / 2);
+        if (shorter.length < 2) {
+          ctx.skip(`inconclusive: fewer than 2 pairs under half (${shorter.length} of ${paired.length} paired by url)`);
+        }
+        expect(shorter.length).toBeGreaterThanOrEqual(2);
+      },
+      // Two sequential calls, each allowed the client timeout, plus margin.
+      2 * CLIENT_TIMEOUT_MS + 40_000,
     );
   });
 

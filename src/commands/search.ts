@@ -23,6 +23,7 @@ export function registerSearch(program: Command) {
     .option("--full-content").option("--full-content-max-tokens <n>", "max tokens per result", parseIntOpt("--full-content-max-tokens"))
     .option("--images");
   cmd.option("--topic <t>", "general|news");
+  cmd.option("--result-type <t>", "standard|dynamic");
 
   cmd.action(async (queryArg: string[] | string, opts: SearchOpts, command: Command) => {
     const g = command.optsWithGlobals();

@@ -5,6 +5,18 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.13.1] — 2026-11-23
+
+### Added
+
+- **`--result-type <standard|dynamic>`** on `octen search` and `octen broad-search`.
+  `standard` returns results as the flags specify; `dynamic` returns only the
+  relevant results, up to `-n`, and adjusts the highlight length per result.
+  On `broad-search` the value applies to every sub-query. Any other value,
+  including a different case or an empty string, is refused before any
+  request, with exit status 2. When the flag is not passed the request body is
+  unchanged, and `octen premier-search` sends the same requests as before.
+
 ## [0.13.0] — 2026-11-23
 
 ### Added

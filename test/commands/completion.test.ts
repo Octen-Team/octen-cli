@@ -11,6 +11,7 @@ import {
   registerPulseSearch,
 } from "../../src/commands/verticalSearch.js";
 import { registerPlaceSearch } from "../../src/commands/placeSearch.js";
+import { registerBroadSearch } from "../../src/commands/broadSearch.js";
 import { registerPremierSearch } from "../../src/commands/premierSearch.js";
 import { registerDesignSearch } from "../../src/commands/designSearch.js";
 import { registerExtract } from "../../src/commands/extract.js";
@@ -41,6 +42,7 @@ function makeProgram(internal: { home?: string } = {}) {
   registerBusinessSearch(prog);
   registerPlaceSearch(prog);
   registerPulseSearch(prog);
+  registerBroadSearch(prog);
   registerPremierSearch(prog);
   registerDesignSearch(prog);
   registerExtract(prog);
@@ -96,11 +98,20 @@ describe("completion command", () => {
       expect(branch("design-search")).toContain(flag);
     }
     expect(branch("search")).not.toContain("--group");
+    expect(branch("search")).toContain("--result-type");
+    expect(branch("broad-search")).toContain("--result-type");
+    // An empty branch would pass the negative check, so each must be non-empty first.
+    for (const sub of ["news", "business", "pulse", "place"]) {
+      expect(branch(sub)).toContain("--count");
+      expect(branch(sub)).not.toContain("--result-type");
+    }
 
     writeSpy.mockClear();
     const fish = await run("fish");
     expect(fish).toMatch(/__fish_seen_subcommand_from design-search' .*-l group/);
     expect(fish).toMatch(/__fish_seen_subcommand_from premier-search' .*-l result-type/);
+    expect(fish).toMatch(/__fish_seen_subcommand_from search' .*-l result-type/);
+    expect(fish).toMatch(/__fish_seen_subcommand_from broad-search' .*-l result-type/);
   });
 
   it("emits a non-empty zsh script containing subcommands", async () => {

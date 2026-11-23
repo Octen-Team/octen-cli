@@ -16,6 +16,7 @@ export function registerBroadSearch(program: Command) {
     .description("Broad multi-angle web search — expands the query into sub-queries searched concurrently. Best for comparisons, surveys/research, and multi-angle questions; pass the query as-is and raise --max-queries for broader coverage (use `search` for a single focused query)")
     .option("--max-queries <n>", "decompose into up to N sub-queries (1-30; default 5, raise toward 30 for surveys/research)", parseIntOpt("--max-queries"))
     .option("--topic <t>", "general|news")
+    .option("--result-type <t>", "standard|dynamic")
     .option("-n, --count <n>", "results per sub-query 1-100", parseIntOpt("--count"))
     .option("--include-domains <list>", "comma list", parseCsvOpt("--include-domains"))
     .option("--exclude-domains <list>", "comma list", parseCsvOpt("--exclude-domains"))

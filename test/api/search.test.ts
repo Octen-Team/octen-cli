@@ -87,4 +87,17 @@ describe("buildSearchRequest", () => {
   it("omits language when not provided (server default = no filter)", () => {
     expect(buildSearchRequest("hi", { count: 5 })).not.toHaveProperty("language");
   });
+
+  it("sends result_type at the top level when set, and omits it otherwise", () => {
+    expect(buildSearchRequest("hi", { resultType: "dynamic" })).toEqual({ query: "hi", result_type: "dynamic" });
+    expect(buildSearchRequest("hi", { resultType: "standard" })).toEqual({ query: "hi", result_type: "standard" });
+    expect(buildSearchRequest("hi", { count: 5 })).not.toHaveProperty("result_type");
+  });
+  it("rejects a result-type outside standard|dynamic, with no normalisation", () => {
+    for (const bad of ["fast", "Dynamic", "", " ", " dynamic"]) {
+      expect(() => buildSearchRequest("hi", { resultType: bad as never })).toThrow(
+        "--result-type must be one of: standard, dynamic",
+      );
+    }
+  });
 });
