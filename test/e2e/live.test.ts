@@ -1085,8 +1085,14 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
         if (JSON.stringify(standard.queries) !== JSON.stringify(dynamic.queries)) {
           ctx.skip(`inconclusive: queries differ (${JSON.stringify(standard.queries)} vs ${JSON.stringify(dynamic.queries)})`);
         }
-        const lengths = (d: BroadSearchResponse) =>
-          new Map((d.search_results ?? []).flatMap((g) => g.results ?? []).map((r) => [String(r.url), String(r.highlight ?? "").length]));
+        // Distinct, non-empty URLs only: a result without one is skipped, a repeated one counts once.
+        const lengths = (d: BroadSearchResponse) => {
+          const out = new Map<string, number>();
+          for (const r of (d.search_results ?? []).flatMap((g) => g.results ?? [])) {
+            if (typeof r.url === "string" && r.url !== "" && !out.has(r.url)) out.set(r.url, String(r.highlight ?? "").length);
+          }
+          return out;
+        };
         const s = lengths(standard);
         const paired = [...lengths(dynamic)]
           .filter(([url]) => s.has(url))
