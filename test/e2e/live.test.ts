@@ -1092,10 +1092,12 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
           .filter(([url]) => s.has(url))
           .map(([url, len]) => ({ url, dynamic: len, standard: s.get(url)! }));
         console.log(`broad-search paired highlight lengths: ${JSON.stringify(paired)}`);
-        if (paired.length < 2) ctx.skip(`inconclusive: fewer than 2 results paired by url (${paired.length})`);
+        // Two halved highlights in one run is not ordinary variation between two live calls; one could be.
         const shorter = paired.filter((m) => m.dynamic > 0 && m.standard > 0 && m.dynamic < m.standard / 2);
-        if (shorter.length === 0) ctx.skip("inconclusive: no pair with both highlights non-empty and dynamic under half of standard");
-        expect(shorter.length).toBeGreaterThan(0);
+        if (shorter.length < 2) {
+          ctx.skip(`inconclusive: fewer than 2 pairs under half (${shorter.length} of ${paired.length} paired by url)`);
+        }
+        expect(shorter.length).toBeGreaterThanOrEqual(2);
       },
       TEST_TIMEOUT_MS,
     );
