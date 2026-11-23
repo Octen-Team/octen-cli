@@ -139,10 +139,21 @@ jobs:
           fi
           VERSION="${TAG#v}"
 
-          sha() { awk -v n="$1" '$2 == n { print $1 }' dist-bin/SHA256SUMS.txt; }
-          for asset in octen-darwin-arm64 octen-darwin-x64 octen-linux-arm64 octen-linux-x64; do
-            [ -n "$(sha "$asset")" ] || { echo "::error::no checksum for $asset"; exit 1; }
-          done
+          # Read every checksum into a variable before leaving this directory.
+          # v0.13.0 wrote a formula with four empty sha256 values: the lookup
+          # ran inside `$(...)` after `cd tap`, by a relative path that no
+          # longer existed, and a failure inside `$(...)` does not stop
+          # `set -e`. Values read up front, and checked, cannot go missing.
+          sha() {
+            local v
+            v=$(awk -v n="$1" '$2 == n { print $1 }' dist-bin/SHA256SUMS.txt)
+            [[ "$v" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::no valid checksum for $1" >&2; return 1; }
+            echo "$v"
+          }
+          SHA_DARWIN_ARM64=$(sha octen-darwin-arm64)
+          SHA_DARWIN_X64=$(sha octen-darwin-x64)
+          SHA_LINUX_ARM64=$(sha octen-linux-arm64)
+          SHA_LINUX_X64=$(sha octen-linux-x64)
 
           git clone --depth 1 \
             "https://x-access-token:${TAP_TOKEN}@github.com/Octen-Team/homebrew-tap.git" tap
@@ -158,22 +169,22 @@ jobs:
             on_macos do
               on_arm do
                 url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-darwin-arm64"
-                sha256 "$(sha octen-darwin-arm64)"
+                sha256 "${SHA_DARWIN_ARM64}"
               end
               on_intel do
                 url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-darwin-x64"
-                sha256 "$(sha octen-darwin-x64)"
+                sha256 "${SHA_DARWIN_X64}"
               end
             end
 
             on_linux do
               on_arm do
                 url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-linux-arm64"
-                sha256 "$(sha octen-linux-arm64)"
+                sha256 "${SHA_LINUX_ARM64}"
               end
               on_intel do
                 url "https://github.com/Octen-Team/octen-cli/releases/download/v${VERSION}/octen-linux-x64"
-                sha256 "$(sha octen-linux-x64)"
+                sha256 "${SHA_LINUX_X64}"
               end
             end
 
@@ -186,6 +197,15 @@ jobs:
             end
           end
           EOF
+
+          # The same check the tap's own sync runs before it pushes: the
+          # formula parses, and carries four distinct checksums.
+          ruby -c Formula/octen.rb
+          n=$(grep -oE 'sha256 "[0-9a-f]{64}"' Formula/octen.rb | sort -u | wc -l)
+          if [ "$n" -ne 4 ]; then
+            echo "::error::expected 4 distinct sha256 values in the formula, found $n"
+            exit 1
+          fi
 
           if git diff --quiet; then
             echo "formula already at ${VERSION}"
