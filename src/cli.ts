@@ -5,6 +5,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import pc from "picocolors";
 import { exitCodeFor } from "./api/errors.js";
+import { printable } from "./util/terminalText.js";
 import { registerSearch } from "./commands/search.js";
 import {
   registerBusinessSearch,
@@ -13,11 +14,13 @@ import {
 } from "./commands/verticalSearch.js";
 import { registerPlaceSearch } from "./commands/placeSearch.js";
 import { registerBroadSearch } from "./commands/broadSearch.js";
+import { registerPremierSearch } from "./commands/premierSearch.js";
 import { registerExtract } from "./commands/extract.js";
 import { registerChat } from "./commands/chat.js";
 import { registerEmbed } from "./commands/embed.js";
 import { registerVlEmbed } from "./commands/vlEmbed.js";
 import { registerImageSearch } from "./commands/imageSearch.js";
+import { registerDesignSearch } from "./commands/designSearch.js";
 import { registerVideoSearch } from "./commands/videoSearch.js";
 import { registerConfigureMcp } from "./commands/configureMcp.js";
 import { registerConfigureSkills } from "./commands/configureSkills.js";
@@ -60,11 +63,13 @@ registerBusinessSearch(program);
 registerPlaceSearch(program);
 registerPulseSearch(program);
 registerBroadSearch(program);
+registerPremierSearch(program);
 registerExtract(program);
 registerChat(program);
 registerEmbed(program);
 registerVlEmbed(program);
 registerImageSearch(program);
+registerDesignSearch(program);
 registerVideoSearch(program);
 registerLogin(program);
 registerLogout(program);
@@ -74,6 +79,9 @@ registerWhoami(program);
 registerCompletion(program);
 
 program.parseAsync().catch((err) => {
-  process.stderr.write(pc.red(`error: ${(err as Error).message}\n`));
+  // An API error carries the server's own message, which is response text
+  // like any other: shown, never sent, if it holds control characters.
+  const message = printable(String((err as Error | undefined)?.message ?? err));
+  process.stderr.write(pc.red(`error: ${message}\n`));
   process.exit(exitCodeFor(err));
 });

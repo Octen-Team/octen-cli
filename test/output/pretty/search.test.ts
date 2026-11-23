@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { renderSearch } from "../../../src/output/pretty/search.js";
+import { formatResultList, renderSearch } from "../../../src/output/pretty/search.js";
 
 // Primary fixture mirrors the REAL Octen API envelope: payload lives at data.data.
 const fixture = {
@@ -57,5 +57,87 @@ describe("renderSearch", () => {
     const out = renderSearch({ data: {}, code: 40001, msg: "invalid params" });
     expect(out).toContain("error");
     expect(out).toContain("invalid params");
+  });
+});
+
+// formatResultList is shared: search, broad-search, premier, place and design
+// all print their web results through it.
+describe("renderSearch with a malformed or hostile response", () => {
+  const ESC = "\u001b";
+  // picocolors adds its own colour codes when colour is on (CI turns it on),
+  // and those are escape sequences too. Strip exactly what it adds — a colour
+  // code — before asserting that nothing from the response got through. The
+  // fixtures below also carry sequences that are not colour codes (clear
+  // screen, cursor moves), and the escaped form of each is asserted, so a
+  // colour code in the response cannot hide behind this.
+  // eslint-disable-next-line no-control-regex
+  const plain = (s: string) => s.replace(/\u001b\[[0-9;]*m/g, "");
+
+  it("skips an entry that is not an object and keeps the ones beside it", () => {
+    const out = renderSearch({ code: 0, data: { results: [null, "x", { title: "Kept", url: "https://k.test" }, 7] } });
+    expect(out).toContain("1. ");
+    expect(out).toContain("Kept");
+    expect(out).not.toContain("2. ");
+  });
+
+  it("treats results that are not a list as no results", () => {
+    expect(renderSearch({ code: 0, data: { results: "nope" } })).toContain("No results");
+    expect(renderSearch({ code: 0, data: { results: { a: 1 } } })).toContain("No results");
+  });
+
+  it("says no results when every entry was malformed", () => {
+    expect(renderSearch({ code: 0, data: { results: [null, 3] } })).toContain("No results");
+  });
+
+  it("shows an escape sequence in a result instead of sending it to the terminal", () => {
+    const out = plain(renderSearch({
+      code: 0,
+      data: { results: [{ title: `T${ESC}[2J`, url: `https://a.test/${ESC}[H`, time_published: `2024${ESC}[1A`, highlight: `one\rtwo${ESC}[31m` }] },
+    }));
+    expect(out).not.toContain(ESC);
+    expect(out).not.toContain("\r");
+    expect(out).toContain("T\\x1b[2J");
+    expect(out).toContain("https://a.test/\\x1b[H");
+    expect(out).toContain("2024\\x1b[1A");
+    expect(out).toContain("one\ntwo\\x1b[31m");
+  });
+
+  // The API sends an empty string for a field that is switched off, so "no
+  // highlight" arrives as "" rather than as a missing key.
+  it("falls back to the full content when the highlight is empty", () => {
+    const out = renderSearch({ code: 0, data: { results: [{ title: "T", highlight: "", full_content: "the paid-for body" }] } });
+    expect(out).toContain("the paid-for body");
+  });
+
+  it("shows an escape sequence in an API error message instead of sending it", () => {
+    const out = plain(renderSearch({ code: 401, msg: `Bad${ESC}[2J key`, data: {} }));
+    expect(out).not.toContain(ESC);
+    expect(out).toContain("Bad\\x1b[2J key");
+  });
+
+  it("ignores a field of the wrong type instead of printing or crashing on it", () => {
+    const out = renderSearch({ code: 0, data: { results: [{ title: { a: 1 }, url: 5, highlight: ["x"], time_published: {} }] } });
+    expect(out).toContain("1. ");
+    expect(out).toContain("(no title)");
+    expect(out).not.toContain("[object Object]");
+  });
+});
+
+// Called directly by the renderers that do not filter their own list first
+// (broad-search, place), so it has to cope on its own.
+describe("formatResultList", () => {
+  it("skips entries that are not objects and numbers the rest from one", () => {
+    const out = formatResultList([null, "x", { title: "Kept" }, 7, { title: "Also kept" }]);
+    expect(out).toContain("1. ");
+    expect(out).toContain("Kept");
+    expect(out).toContain("2. ");
+    expect(out).toContain("Also kept");
+    expect(out).not.toContain("3. ");
+  });
+
+  it("returns nothing for a value that is not a list", () => {
+    expect(formatResultList("nope")).toBe("");
+    expect(formatResultList(undefined)).toBe("");
+    expect(formatResultList({ 0: { title: "T" }, length: 1 })).toBe("");
   });
 });

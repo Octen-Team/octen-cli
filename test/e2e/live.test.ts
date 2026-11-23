@@ -19,6 +19,8 @@ import { describe, it, expect } from "vitest";
 import { OctenClient } from "../../src/api/client.js";
 import { ENDPOINTS } from "../../src/api/constants.js";
 import { buildSearchRequest } from "../../src/api/search.js";
+import { buildPremierSearchRequest } from "../../src/api/premierSearch.js";
+import { buildDesignSearchRequest, type DesignImage } from "../../src/api/designSearch.js";
 import { buildExtractRequest } from "../../src/api/extract.js";
 import { buildChatRequest } from "../../src/api/chat.js";
 import { buildEmbeddingRequest } from "../../src/api/embedding.js";
@@ -136,6 +138,62 @@ async function expectChatOk(
       resp,
     ).slice(0, 300)}`,
   ).toBe(true);
+}
+
+/**
+ * POST a request, assert the envelope is a success, and hand back its `data`
+ * so a test can check what came back, not only that something did.
+ */
+async function envelopeData(
+  param: string,
+  endpoint: string,
+  req: Record<string, unknown>,
+): Promise<{ images?: DesignImage[]; results?: Array<Record<string, unknown>> }> {
+  let resp: EnvelopeResponse;
+  try {
+    resp = await client.request<EnvelopeResponse>(endpoint, req);
+  } catch (e) {
+    throw new Error(`[${param}] request failed -> ${describeError(e)}`);
+  }
+  expect(resp.code, `[${param}] code=${resp.code} msg=${resp.msg ?? "(none)"}`).toBe(0);
+  expect(resp.data !== null && typeof resp.data === "object", `[${param}] no data object`).toBe(true);
+  return resp.data as { images?: DesignImage[]; results?: Array<Record<string, unknown>> };
+}
+
+/** The highlight length of every result in a response, by URL. */
+function highlightLengths(data: { results?: Array<Record<string, unknown>> }): Map<string, number> {
+  return new Map((data.results ?? []).map((r) => [String(r.url), String(r.highlight ?? "").length]));
+}
+
+/**
+ * Assert that a highlight cap was applied, given the highlights of an uncapped
+ * call and of the same call with the smallest cap the API takes.
+ *
+ * Each page is compared with itself: a page whose uncapped highlight is long
+ * must come back shorter under the cap, and not empty — a `highlight` block
+ * the API reads as switched off returns none. Comparing the longest of each
+ * list instead would pass on an ignored cap whenever the longest page dropped
+ * out of the second list. The two calls are ranked separately, so they may
+ * share no long page; that is reported as skipped, not as passed.
+ */
+function expectHighlightsCapped(
+  label: string,
+  plain: Map<string, number>,
+  capped: Map<string, number>,
+  skip: (note: string) => void,
+): void {
+  expect(plain.size, `[${label}] the uncapped call returned no results`).toBeGreaterThan(0);
+  expect(capped.size, `[${label}] the capped call returned no results`).toBeGreaterThan(0);
+  expect(Math.max(...capped.values()), `[${label}] every highlight is empty under the cap`).toBeGreaterThan(0);
+  const long = [...plain].filter(([url, length]) => length >= 1000 && capped.has(url));
+  if (long.length === 0) {
+    skip(`[${label}] inconclusive: no page with a 1000+ character highlight came back in both calls`);
+    return;
+  }
+  for (const [url, length] of long) {
+    expect(capped.get(url), `[${label}] ${url}: empty highlight under the cap`).toBeGreaterThan(0);
+    expect(capped.get(url), `[${label}] ${url}: ${length} characters uncapped`).toBeLessThan(length);
+  }
 }
 
 // ISO timestamps for search start/end time coverage (last 30 days).
@@ -854,6 +912,275 @@ describe.skipIf(!API_KEY)("LIVE Octen API parameter matrix", () => {
           ENDPOINTS.vlEmbedding,
           req,
         );
+      },
+      TEST_TIMEOUT_MS,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // premier
+  // -------------------------------------------------------------------------
+  describe("premier", () => {
+    const BASE = "OpenAI";
+
+    it(
+      "premier: base count=3 returns results",
+      async () => {
+        const req = buildPremierSearchRequest(BASE, { count: 3 });
+        const data = await envelopeData("premier base count=3", ENDPOINTS.searchPremier, req);
+        expect(data.results?.length, "premier returned no results").toBeGreaterThan(0);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    for (const resultType of ["standard", "dynamic"] as const) {
+      it(
+        `premier: result_type=${resultType}`,
+        async () => {
+          const req = buildPremierSearchRequest(BASE, { count: 3, resultType });
+          await expectEnvelopeOk(`premier result_type=${resultType}`, ENDPOINTS.searchPremier, req);
+        },
+        TEST_TIMEOUT_MS,
+      );
+    }
+
+    it(
+      "premier: the options it shares with search",
+      async () => {
+        const req = buildPremierSearchRequest(BASE, {
+          count: 3,
+          includeDomains: ["openai.com", "wikipedia.org"],
+          excludeText: ["lawsuit"],
+          language: ["en"],
+          timeBasis: "published",
+          timeRange: "year",
+          format: "markdown",
+          safesearch: "strict",
+          highlight: true,
+          highlightMaxTokens: 300,
+          fullContent: true,
+          fullContentMaxTokens: 500,
+          images: true,
+        });
+        await expectEnvelopeOk("premier shared options", ENDPOINTS.searchPremier, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "premier: a highlight cap given on its own shortens the highlights",
+      async (ctx) => {
+        // One query, one domain, two calls that differ only in the cap.
+        const QUERY = "PostgreSQL";
+        const shared = { count: 5, includeDomains: ["en.wikipedia.org"] };
+        const plain = highlightLengths(await envelopeData("premier default highlights", ENDPOINTS.searchPremier, buildPremierSearchRequest(QUERY, shared)));
+        const capped = highlightLengths(await envelopeData("premier highlight cap", ENDPOINTS.searchPremier, buildPremierSearchRequest(QUERY, { ...shared, highlightMaxTokens: 100 })));
+        expectHighlightsCapped("premier", plain, capped, (note) => ctx.skip(note));
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "premier: start_time + end_time (bare dates)",
+      async () => {
+        const req = buildPremierSearchRequest(BASE, {
+          count: 3,
+          startTime: START_TIME.slice(0, 10),
+          endTime: END_TIME.slice(0, 10),
+        });
+        await expectEnvelopeOk("premier start/end", ENDPOINTS.searchPremier, req);
+      },
+      TEST_TIMEOUT_MS,
+    );
+  });
+
+  // -------------------------------------------------------------------------
+  // design
+  // -------------------------------------------------------------------------
+  describe("design", () => {
+    const BASE = "saas pricing page";
+
+    it(
+      "design: default returns design references and web results",
+      async () => {
+        const data = await envelopeData("design default", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, {}));
+        expect(data.images?.length, "no design references").toBeGreaterThan(0);
+        expect(data.results?.length, "no web results").toBeGreaterThan(0);
+        expect(typeof data.images?.[0]?.url, "image has no url").toBe("string");
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: count=7",
+      async () => {
+        const data = await envelopeData("design count=7", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { count: 7, noWeb: true }));
+        expect(data.images?.length).toBe(7);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: --no-web returns no web results",
+      async () => {
+        const data = await envelopeData("design no-web", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { noWeb: true }));
+        expect(data.images?.length, "no design references").toBeGreaterThan(0);
+        expect(data.results ?? []).toEqual([]);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: --no-images returns web results only",
+      async () => {
+        const data = await envelopeData("design no-images", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { noImages: true, webCount: 3 }));
+        expect(data.results?.length).toBe(3);
+        expect(data.images ?? []).toEqual([]);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: --no-design-facts leaves the values out",
+      async () => {
+        const on = await envelopeData("design facts on", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { noWeb: true }));
+        // The control: without it, "no design_facts" would pass on a response
+        // that never carries them.
+        expect(on.images?.some((im) => im.design_facts != null), "control returned no design_facts").toBe(true);
+
+        const off = await envelopeData("design facts off", ENDPOINTS.designSearch, buildDesignSearchRequest(BASE, { noWeb: true, noDesignFacts: true }));
+        expect(off.images?.length, "no design references").toBeGreaterThan(0);
+        expect(off.images?.filter((im) => im.design_facts != null)).toEqual([]);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: snippet on by default for page sections, off with --no-snippet, capped by --snippet-max-tokens",
+      async () => {
+        const QUERY = "landing page hero section";
+        // A section is the same section in every call; its link is signed
+        // anew each time, so it is keyed by where it sits in its page.
+        const codeBySection = (images: DesignImage[] | undefined) =>
+          new Map(
+            (images ?? [])
+              .filter((im) => im.group?.group_id && im.snippet?.code)
+              .map((im) => [`${im.group!.group_id}#${im.group!.position}`, im.snippet!.code!.length]),
+          );
+
+        const on = await envelopeData("design snippet on", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 10 }));
+        const full = codeBySection(on.images);
+        expect(full.size, "control returned no code").toBeGreaterThan(0);
+
+        const off = await envelopeData("design snippet off", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { noWeb: true, count: 10, noSnippet: true }));
+        expect(off.images?.length, "no design references").toBeGreaterThan(0);
+        expect((off.images ?? []).filter((im) => im.snippet != null)).toEqual([]);
+
+        // The cap is checked on one page fetched twice by its group id: a
+        // lookup returns the same sections in the same order every time, so
+        // the comparison does not depend on two searches ranking alike.
+        const page = (on.images ?? []).find(
+          (im) => im.group?.group_id && (im.group.total ?? 0) <= 100 && (im.snippet?.code?.length ?? 0) >= 500,
+        );
+        expect(page, "search returned no section with 500+ characters of code").toBeTruthy();
+        const { group_id: groupId, total } = page!.group!;
+        const wholePage = async (label: string, extra: { snippetMaxTokens?: number }) =>
+          codeBySection(
+            (await envelopeData(label, ENDPOINTS.designSearch, buildDesignSearchRequest("", { group: groupId, count: total, noWeb: true, ...extra }))).images,
+          );
+        const uncapped = await wholePage("design snippet uncapped (group)", {});
+        // The cap is the smallest the API takes, and it is in tokens — so no
+        // length in characters says which sections are over it. What has to
+        // hold whatever the tokenizer: under the cap every section still has
+        // its code, none has more of it, and at least one has less. `<=`
+        // alone would pass on a cap the API ignored.
+        const capped = await wholePage("design snippet capped (group)", { snippetMaxTokens: 100 });
+        expect(uncapped.size, "the page has no section with code").toBeGreaterThan(0);
+        let shorter = 0;
+        for (const [key, length] of uncapped) {
+          expect(capped.get(key), `section ${key}: missing or empty under the cap`).toBeGreaterThan(0);
+          expect(capped.get(key), `section ${key}: ${length} characters uncapped`).toBeLessThanOrEqual(length);
+          if (capped.get(key)! < length) shorter++;
+        }
+        expect(shorter, `no section came back shorter under the cap (${uncapped.size} compared)`).toBeGreaterThan(0);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: --group returns one deck in order, and needs no query",
+      async () => {
+        const found = await envelopeData("design slide search", ENDPOINTS.designSearch, buildDesignSearchRequest("startup pitch deck slide", { noWeb: true, count: 10 }));
+        const grouped = (found.images ?? []).find((im) => im.group?.group_id && (im.group.total ?? 0) > 5 && (im.group.total ?? 0) <= 100);
+        expect(grouped, "search returned no slide from a deck of 6 to 100 slides").toBeTruthy();
+        const { group_id: groupId, total } = grouped!.group!;
+
+        // The API returns five of a group unless told otherwise.
+        const part = await envelopeData("design group default count", ENDPOINTS.designSearch, buildDesignSearchRequest("", { group: groupId, noWeb: true }));
+        expect(part.images?.length).toBe(5);
+
+        const whole = await envelopeData("design group whole", ENDPOINTS.designSearch, buildDesignSearchRequest("", { group: groupId, count: total, noWeb: true }));
+        expect(whole.images?.length).toBe(total);
+        expect(whole.images?.map((im) => im.group?.group_id)).toEqual(Array(total).fill(groupId));
+        expect(whole.images?.map((im) => im.group?.position)).toEqual(Array.from({ length: total! }, (_, i) => i + 1));
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: an unknown --group is an empty success",
+      async () => {
+        const data = await envelopeData("design unknown group", ENDPOINTS.designSearch, buildDesignSearchRequest("", { group: "deck_0000000000000000000000000000000000000000000000000000000000000000" }));
+        expect(data.images ?? []).toEqual([]);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: the web options",
+      async () => {
+        const req = buildDesignSearchRequest(BASE, {
+          noImages: true,
+          webCount: 3,
+          includeDomains: ["stripe.com", "github.com", "notion.so"],
+          language: ["en"],
+          timeBasis: "crawled",
+          timeRange: "year",
+          highlightMaxTokens: 200,
+          fullContent: true,
+          fullContentMaxTokens: 500,
+        });
+        const data = await envelopeData("design web options", ENDPOINTS.designSearch, req);
+        const hosts = (data.results ?? []).map((r) => new URL(String(r.url)).hostname);
+        expect(hosts.length, "no web results to check the domain filter against").toBeGreaterThan(0);
+        expect(hosts.filter((h) => !/(^|\.)(stripe\.com|github\.com|notion\.so)$/.test(h))).toEqual([]);
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: a web highlight cap given on its own shortens the highlights",
+      async (ctx) => {
+        // One query, one domain, two calls that differ only in the cap.
+        const QUERY = "Typography";
+        const shared = { noImages: true, includeDomains: ["en.wikipedia.org"] };
+        const plain = highlightLengths(await envelopeData("design default highlights", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, shared)));
+        const capped = highlightLengths(await envelopeData("design highlight cap", ENDPOINTS.designSearch, buildDesignSearchRequest(QUERY, { ...shared, highlightMaxTokens: 100 })));
+        expectHighlightsCapped("design", plain, capped, (note) => ctx.skip(note));
+      },
+      TEST_TIMEOUT_MS,
+    );
+
+    it(
+      "design: start_time + end_time (bare dates) and exclude_domains",
+      async () => {
+        const req = buildDesignSearchRequest(BASE, {
+          noImages: true,
+          excludeDomains: ["pinterest.com"],
+          startTime: START_TIME.slice(0, 10),
+          endTime: END_TIME.slice(0, 10),
+        });
+        await expectEnvelopeOk("design start/end + exclude_domains", ENDPOINTS.designSearch, req);
       },
       TEST_TIMEOUT_MS,
     );

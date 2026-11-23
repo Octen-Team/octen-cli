@@ -379,6 +379,25 @@ Options: `--max-queries` (decompose into up to N sub-queries, 1–30, default 5)
 
 ---
 
+### `octen premier-search`
+
+Web Search Premier: the same search with deeper retrieval and more careful reranking behind it — for the exact page that holds an answer, a niche document, or a query `octen search` answered thinly.
+
+```sh
+octen premier-search "kafka default topic retention period" -n 5
+octen premier-search "EU AI Act obligations for general-purpose models" --result-type dynamic --time-range year
+```
+
+It posts to its own endpoint, `/search-premier`, which takes the request `/search` takes and returns the same response. So the flags, the output and the JSON are `octen search`'s.
+
+**Use `octen search` by default.** Premier takes longer, and it is billed at its own per-call rate, which a Search Plan's unlimited searches do not cover.
+
+Options: every `octen search` flag except `--topic`, plus `--result-type` (`standard`|`dynamic`). `standard` returns results as the other flags specify; `dynamic` returns only the relevant results, up to `-n`, and adjusts the highlight length per result.
+
+A token cap given without its switch is not dropped here: `--highlight-max-tokens` alone caps the highlights, and `--full-content-max-tokens` without `--full-content` exits 2, since it would return no content.
+
+---
+
 ### `octen extract`
 
 Extract content from one or more URLs (1–20).
@@ -485,6 +504,34 @@ The endpoint takes exactly one input, so pass a query **or** `--image`, not both
 Options: `--image <url|path>`, `-n` (result count 1–10), `--include-domains`, `--exclude-domains`, `--safesearch` (off|strict).
 
 Unlike `octen search` and `octen video-search`, this endpoint has no time filters.
+
+---
+
+### `octen design-search`
+
+Real designs to build from: screenshots of web pages, page sections, app screens and slides, each with the design values behind it — colours, fonts, sizes — and, for page sections, the HTML. Web results on the same query come back alongside.
+
+```sh
+octen design-search "saas pricing page"
+octen design-search "landing page hero section" -n 10 --no-web
+octen design-search "startup pitch deck slide" --no-snippet
+octen design-search --group <group_id> -n 28
+```
+
+A page section or a slide carries the `group` it belongs to. `--group <group_id>` returns every image of that page or deck, in order, instead of searching — it needs no query, and a query given beside it drives the web results only; it does not search within the group. **It still returns five unless told otherwise**, so set `-n` to the group's `total` (the most one call returns is 100). In the terminal, each section or slide prints the command that does this.
+
+The response has two parts, each with its own flags:
+
+- **Design references** (`data.images`): `-n` (1–100, default 5), `--no-design-facts` (leave out the design values), `--no-snippet` (leave out the code), `--snippet-max-tokens` (100–100000), `--group <id>`. `--no-images` returns web results only.
+- **Web results** (`data.results`): `--web-count` (1–100, default 5), `--include-domains`, `--exclude-domains`, `--language`, `--time-basis`, `--time-range`, `--start-time`, `--end-time`, `--highlight` (+`--highlight-max-tokens`), `--full-content` (+`--full-content-max-tokens`). `--no-web` returns design references only.
+
+**The web flags narrow the web results only — never the design references.** A flag for a part that is switched off is refused rather than ignored: `--no-web --include-domains stripe.com` exits 2, because the likeliest reason to type it is expecting the screenshots to be filtered. So is a web flag on a `--group` lookup that has no query — a lookup alone returns no web results — and `--full-content-max-tokens` without `--full-content`, which would return no content.
+
+The design values are whatever the API returned for that image, and they differ by kind: design tokens for a web page, colour and font lists for a slide, component counts for an app screen. The terminal view shortens them and the code; `--json` (or a pipe) prints both in full.
+
+Image links are signed and expire, so download a screenshot when you get it rather than keeping its link.
+
+`octen image-search --topic design` was removed in 0.11.0. Design search has an endpoint of its own now, and this is the command for it; `image-search` is unchanged and still takes no `--topic`.
 
 ---
 
@@ -681,7 +728,7 @@ Scripts must check the exit status, not just the output.
 | Status | When |
 |---|---|
 | `0` | The command completed and the response was complete. |
-| `2` | Bad input, caught before any request: a malformed number (`--count 1.5`, `--count 2junk`), an empty comma list (`--include-domains ""`), a blank query, an unknown `--scope`, or a missing API key. |
+| `2` | Bad input, caught before any request: a malformed number (`--count 1.5`, `--count 2junk`), an empty comma list (`--include-domains ""`), a blank query, an unknown `--scope`, flags that cannot be combined (`octen design-search --no-images --no-web`), or a missing API key. |
 | `1` | Everything else: HTTP errors, an API envelope with a non-zero `code`, a timeout, and stream failures. |
 
 Two consequences worth knowing:

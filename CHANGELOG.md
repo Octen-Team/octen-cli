@@ -5,6 +5,65 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- **`octen premier-search`** — wraps `POST /search-premier`, Web Search Premier: the
+  same search with deeper retrieval and more careful reranking. The endpoint
+  takes the request `/search` takes and returns the same response, so the
+  command has `octen search`'s flags (less `--topic`), output and JSON, plus
+  `--result-type` (`standard`|`dynamic`). It takes longer than `search` and is
+  billed at its own per-call rate, which a Search Plan does not cover.
+  `--highlight-max-tokens` works without `--highlight`, and
+  `--full-content-max-tokens` without `--full-content` is refused rather than
+  dropped.
+- **`octen design-search`** — wraps `POST /design-search`. Screenshots of real web
+  pages, page sections, app screens and slides, each with its design values
+  and, for page sections, the HTML; web results on the same query come back
+  alongside. `-n`, `--no-design-facts`, `--no-snippet` and
+  `--snippet-max-tokens` shape the design references; `--web-count` and the
+  domain, language, time, highlight and full-content flags shape the web
+  results, and only those. `--no-images` and `--no-web` switch a part off.
+  `--group <id>` returns every image of one page or deck, in order, and needs
+  no query.
+
+  Refused before any request, with exit status 2: neither a query nor a
+  group; a group with `--no-images`; both parts switched off, which the API
+  answers with an empty success that still counts as a search; a flag for a
+  part that is switched off; a web flag on a group lookup that has no query,
+  which returns no web results for it to apply to; and
+  `--full-content-max-tokens` without `--full-content`, which returns no
+  content.
+
+  The terminal view prints each design's values on a line per kind, the head
+  of its code, and — for a section or a slide — the command that fetches the
+  whole page or deck. A group lookup that shows part of a group says so, and
+  an unknown group id reads as "No images in group …" rather than "No
+  results". Text from the response is shown with its control characters
+  escaped, so a page's HTML cannot drive the terminal.
+
+  0.11.0 removed `image-search --topic design`. Design search has an endpoint
+  of its own now, and this is the command for it; `image-search` is unchanged
+  and still takes no `--topic` and no `--html-snippet`.
+- **`octen-design-search` is bundled.** `configure-skills --offline` installs
+  it with the rest, and the bundled `octen-search` and `octen-web-search`
+  carry the Search Premier section and the routing for both new MCP tools.
+
+### Fixed
+
+- **Web results print safely and survive a malformed entry.** The list that
+  `search`, `broad-search`, `place`, `premier-search` and `design-search` print their web
+  results through now shows a control character instead of sending it to the
+  terminal — an escape sequence in a page title could clear the screen or
+  rewrite a line already printed — and skips an entry that is not an object
+  instead of failing the whole command. It also prints the full content when a
+  result's highlight is empty, which it used to print nothing for. `--json`
+  output is unchanged.
+- **Error messages are escaped the same way.** The message of a failed
+  request is the server's own text; every command now prints it to stderr
+  with control characters shown rather than sent.
+
 ## [0.12.0] — 2026-11-03
 
 ### Added

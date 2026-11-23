@@ -15,6 +15,8 @@ export const ENDPOINTS = {
   businessSearch: "/business-search",
   placeSearch: "/place-search",
   pulseSearch: "/pulse-search",
+  searchPremier: "/search-premier",
+  designSearch: "/design-search",
 } as const;
 
 export const EMBEDDING_MODELS: Record<string, string> = {
@@ -55,6 +57,8 @@ export const LIMITS = {
   placeRadius: { min: 1, max: 50_000 },
   latitude: { min: -90, max: 90 },
   longitude: { min: -180, max: 180 },
+  designCount: { min: 1, max: 100 },
+  snippetMaxTokens: { min: 100, max: 100_000 },
 } as const;
 
 export const TOPIC_OPTIONS = ["general", "news"] as const;
@@ -65,6 +69,7 @@ export const FORMAT_OPTIONS = ["text", "markdown"] as const;
 export const EXTRACT_MODE_OPTIONS = ["standard", "advanced", "auto"] as const;
 export const LINK_SCOPE_OPTIONS = ["prefer_internal", "prefer_external"] as const;
 export const PULSE_MODE_OPTIONS = ["lite", "standard"] as const;
+export const RESULT_TYPE_OPTIONS = ["standard", "dynamic"] as const;
 
 export const SKILLS_REPO = "Octen-Team/octen-skills";
 export const SKILLS_REPO_TARBALL = (ref: string) =>

@@ -1,5 +1,6 @@
 import pc from "picocolors";
-import type { SearchResult } from "../../api/search.js";
+import { printable, printableLine } from "../../util/terminalText.js";
+import { isRecord } from "./envelope.js";
 
 const MAX_SNIPPET = 300;
 
@@ -13,14 +14,16 @@ export function renderSearch(data: any): string {
       ? inner
       : data;
 
-  const res: SearchResult[] = body?.results ?? [];
+  // Entries that are not objects are dropped here, so a response made only of
+  // them reads as no results rather than as an empty listing.
+  const res: Array<Record<string, any>> = Array.isArray(body?.results) ? body.results.filter(isRecord) : [];
 
   if (!res.length) {
     // Surface app-level API errors (non-zero code) instead of a bland "No results."
     const code = (data as any)?.code;
     const msg = (data as any)?.msg;
     if (code != null && code !== 0 && msg) {
-      return pc.red(`error: ${msg}`);
+      return pc.red(`error: ${printableLine(String(msg))}`);
     }
     return pc.dim("No results.");
   }
@@ -28,27 +31,39 @@ export function renderSearch(data: any): string {
   return formatResultList(res);
 }
 
-/** Render a list of search results as numbered, titled blocks. */
-export function formatResultList(results: SearchResult[]): string {
-  return results
+const str = (v: unknown): string => (typeof v === "string" ? v : "");
+
+/**
+ * Render a list of search results as numbered, titled blocks.
+ *
+ * Shared by every command that prints web results, so it takes whatever the
+ * response held: an entry that is not an object is skipped rather than taking
+ * the entries beside it down, a field of the wrong type is ignored, and the
+ * text — which is somebody else's page — is made safe for a terminal.
+ */
+export function formatResultList(results: unknown): string {
+  const list: Array<Record<string, any>> = Array.isArray(results) ? results.filter(isRecord) : [];
+  return list
     .map((r, i) => {
       const lines: string[] = [];
 
       // Numbered + bold title
-      const title = r.title ?? "(no title)";
+      const title = printableLine(str(r.title)) || "(no title)";
       lines.push(`${i + 1}. ${pc.bold(title)}`);
 
       // Dim URL
-      if (r.url) lines.push(`   ${pc.dim(r.url)}`);
+      const url = printableLine(str(r.url));
+      if (url) lines.push(`   ${pc.dim(url)}`);
 
       // Dim publication time
-      if (r.time_published) lines.push(`   ${pc.dim(r.time_published)}`);
+      const published = printableLine(str(r.time_published));
+      if (published) lines.push(`   ${pc.dim(published)}`);
 
       // Snippet from highlight or full_content (truncated)
-      const raw = r.highlight ?? r.full_content ?? "";
+      const raw = str(r.highlight) || str(r.full_content);
       if (raw) {
         const snippet = raw.length > MAX_SNIPPET ? raw.slice(0, MAX_SNIPPET) + "…" : raw;
-        lines.push(`   ${snippet}`);
+        lines.push(`   ${printable(snippet)}`);
       }
 
       return lines.join("\n");
