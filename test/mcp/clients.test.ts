@@ -30,6 +30,13 @@ describe("MCP_CLIENTS registry", () => {
     );
   });
 
+  // Devin CLI 3000.14 writes user config under $XDG_CONFIG_HOME/devin when it is set (checked 2026-11-25).
+  it("devin: user scope follows XDG_CONFIG_HOME, and ignores a relative one", () => {
+    const client = MCP_CLIENTS.find((c) => c.id === "devin")!;
+    expect(client.pathFor("user", HOME, CWD, "linux", { XDG_CONFIG_HOME: "/x/cfg" })).toBe("/x/cfg/devin/mcp_config.json");
+    expect(client.pathFor("user", HOME, CWD, "darwin", { XDG_CONFIG_HOME: "rel" })).toBe("/tmp/h/.config/devin/mcp_config.json");
+  });
+
   it("claude-code: user → ~/.claude.json", () => {
     const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
     expect(client).toBeDefined();

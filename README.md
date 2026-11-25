@@ -586,7 +586,7 @@ than a silent fall back to `user`:
 | Codex | `$HOME/.codex/config.toml` | `<project>/.codex/config.toml` |
 | Cursor | `$HOME/.cursor/mcp.json` | `<project>/.cursor/mcp.json` |
 | VS Code | `<project>/.vscode/mcp.json` | `<project>/.vscode/mcp.json` |
-| Devin | `$HOME/.config/devin/mcp_config.json` (Windows: `%APPDATA%\devin\mcp_config.json`) | `<project>/.devin/mcp_config.local.json` |
+| Devin | `$HOME/.config/devin/mcp_config.json` (`$XDG_CONFIG_HOME/devin/` when set; Windows: `%APPDATA%\devin\`) | `<project>/.devin/mcp_config.local.json` |
 | Claude Code, Claude Desktop, Windsurf | user config only | same as user |
 
 Codex reads a project-level `.codex/config.toml` only in a repository it has

@@ -11,8 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **`octen configure-mcp --devin`** adds Octen's hosted MCP server
   (`https://mcp.octen.ai/mcp`, key in the `x-api-key` header) to
-  `~/.config/devin/mcp_config.json` (`%APPDATA%\devin\mcp_config.json` on
-  Windows), which Devin CLI and Devin Local in Devin Desktop both read; no
+  `~/.config/devin/mcp_config.json` (under `$XDG_CONFIG_HOME` when set, and
+  `%APPDATA%\devin\mcp_config.json` on Windows), which Devin CLI and Devin Local in Devin Desktop both read; no
   local Node.js is needed and `--pin` does not apply. Without a key it writes
   `${env:OCTEN_API_KEY}`, which Devin reads from its environment. With
   `--scope project` it writes `.devin/mcp_config.local.json`, always with

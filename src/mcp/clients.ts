@@ -1,4 +1,4 @@
-import { join, win32 } from "node:path";
+import { isAbsolute, join, win32 } from "node:path";
 
 export type McpFormat = "json-mcpServers" | "json-servers" | "toml" | "claude-code";
 
@@ -21,14 +21,15 @@ export interface McpClient {
   ): string;
 }
 
-/** Devin's user config directory: %APPDATA%\devin on Windows, ~/.config/devin elsewhere. */
+/** Devin's user config directory: %APPDATA%\devin on Windows, else $XDG_CONFIG_HOME/devin or ~/.config/devin. */
 export function devinConfigDir(
   home: string,
   platform: NodeJS.Platform = process.platform,
   env: NodeJS.ProcessEnv = process.env,
 ): string {
   if (platform === "win32") return win32.join(env.APPDATA ?? win32.join(home, "AppData", "Roaming"), "devin");
-  return join(home, ".config/devin");
+  const xdg = env.XDG_CONFIG_HOME;
+  return xdg && isAbsolute(xdg) ? join(xdg, "devin") : join(home, ".config/devin");
 }
 
 export const MCP_CLIENTS: McpClient[] = [
