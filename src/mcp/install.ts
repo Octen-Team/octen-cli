@@ -2,6 +2,9 @@ import { execFileSync } from "node:child_process";
 import { upsertMcpServer, removeMcpServer } from "./write.js";
 import type { McpClient } from "./clients.js";
 
+export type StdioEntry = { command: string; args: string[]; env: Record<string, string> };
+export type HostedEntry = { url: string; headers: Record<string, string> };
+
 export interface InstallOpts {
   /** Override claude-CLI availability detection for testing */
   hasClaudeCli?: boolean;
@@ -31,12 +34,12 @@ function claudeAvailable(override?: boolean): boolean {
 export function installMcp(
   client: McpClient,
   scope: "user" | "project",
-  entry: { command: string; args: string[]; env: Record<string, string> },
+  entry: StdioEntry | HostedEntry,
   home: string,
   cwd: string,
   opts: InstallOpts = {},
 ): InstallResult {
-  if (client.id === "claude-code") {
+  if (client.id === "claude-code" && "command" in entry) {
     const apiKey = entry.env["OCTEN_API_KEY"] ?? "";
     // A real key must never reach another process's argv: `ps -ww` and
     // /proc/<pid>/cmdline expose it to every local user for the child's

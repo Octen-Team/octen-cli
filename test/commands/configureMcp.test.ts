@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
@@ -482,5 +482,117 @@ describe("configure-mcp --scope validation", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe("configure-mcp --devin", () => {
+  // Devin gets the hosted server, so it needs no local Node.js.
+  it("writes the hosted server with the key header to ~/.config/devin/mcp_config.json, readable only by the owner", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "configure-mcp", "--devin", "--api-key", "k"]);
+
+    const filePath = join(home, ".config/devin/mcp_config.json");
+    const obj = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(obj.mcpServers.octen).toEqual({
+      url: "https://mcp.octen.ai/mcp",
+      headers: { "x-api-key": "k" },
+    });
+    expect(statSync(filePath).mode & 0o777).toBe(0o600);
+  });
+
+  // Devin expands ${env:VAR} in headers (checked with Devin CLI 3000.14, 2026-11-25).
+  it("without a key, writes Devin's environment-variable reference instead", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    vi.spyOn(process.stderr, "write").mockImplementation(() => true);
+    const saved = process.env.OCTEN_API_KEY;
+    delete process.env.OCTEN_API_KEY;
+    try {
+      await prog.parseAsync(["node", "octen", "configure-mcp", "--devin"]);
+    } finally {
+      if (saved !== undefined) process.env.OCTEN_API_KEY = saved;
+    }
+    const obj = JSON.parse(readFileSync(join(home, ".config/devin/mcp_config.json"), "utf8"));
+    expect(obj.mcpServers.octen.headers).toEqual({ "x-api-key": "${env:OCTEN_API_KEY}" });
+  });
+
+  it("does not change the npx entry written for other clients", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "configure-mcp", "--devin", "--cursor", "--api-key", "k"]);
+    const cursor = JSON.parse(readFileSync(join(home, ".cursor/mcp.json"), "utf8"));
+    expect(cursor.mcpServers.octen.command).toBe("npx");
+    expect(cursor.mcpServers.octen.env.OCTEN_API_KEY).toBe("k");
+  });
+
+  it("keeps the other servers already in the file", async () => {
+    const home = makeTmp();
+    mkdirSync(join(home, ".config/devin"), { recursive: true });
+    writeFileSync(
+      join(home, ".config/devin/mcp_config.json"),
+      JSON.stringify({ mcpServers: { other: { url: "https://example.com/mcp" } } }),
+      "utf8",
+    );
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "configure-mcp", "--devin", "--api-key", "k"]);
+
+    const obj = JSON.parse(readFileSync(join(home, ".config/devin/mcp_config.json"), "utf8"));
+    expect(obj.mcpServers.other).toEqual({ url: "https://example.com/mcp" });
+    expect(obj.mcpServers.octen).toBeDefined();
+  });
+
+  // Devin keeps the local file out of git through .git/info/exclude, which it only writes itself:
+  // https://docs.devin.ai/cli/reference/configuration/global-vs-local
+  it("--scope project writes .devin/mcp_config.local.json with the environment reference, never the key", async () => {
+    const home = makeTmp();
+    const cwd = mkdtempSync(join(tmpdir(), "octen-cwd-"));
+    const err: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      err.push(String(chunk));
+      return true;
+    });
+    try {
+      const prog = makeProgram(home, cwd);
+      await prog.parseAsync([
+        "node", "octen", "configure-mcp", "--devin", "--scope", "project", "--api-key", "k",
+      ]);
+      const raw = readFileSync(join(cwd, ".devin/mcp_config.local.json"), "utf8");
+      expect(JSON.parse(raw).mcpServers.octen.headers).toEqual({ "x-api-key": "${env:OCTEN_API_KEY}" });
+      expect(raw).not.toContain('"k"');
+      expect(err.join("")).toMatch(/export OCTEN_API_KEY/);
+      expect(existsSync(join(cwd, ".devin/mcp_config.json"))).toBe(false);
+      expect(existsSync(join(home, ".config/devin/mcp_config.json"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is listed in status mode", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    const out: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      out.push(String(chunk));
+      return true;
+    });
+    await prog.parseAsync(["node", "octen", "configure-mcp"]);
+    expect(out.join("")).toMatch(/^Devin: /m);
+  });
+});
+
+describe("configure-mcp --devin --pin", () => {
+  it("notes that --pin does not apply to the hosted server", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    const err: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      err.push(String(chunk));
+      return true;
+    });
+    await prog.parseAsync(["node", "octen", "configure-mcp", "--devin", "--pin", "0.8.1", "--api-key", "k"]);
+    expect(err.join("")).toMatch(/--pin does not apply to Devin/);
+    const obj = JSON.parse(readFileSync(join(home, ".config/devin/mcp_config.json"), "utf8"));
+    expect(obj.mcpServers.octen.url).toBe("https://mcp.octen.ai/mcp");
   });
 });

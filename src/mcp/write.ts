@@ -13,9 +13,13 @@ type JsonObj = Record<string, unknown>;
  * becomes a secret-bearing file.
  */
 function carriesLiteralSecret(entry: object): boolean {
-  const env = (entry as { env?: Record<string, unknown> }).env;
-  const value = env?.["OCTEN_API_KEY"];
-  return typeof value === "string" && value !== "" && !value.startsWith("${");
+  const { env, headers } = entry as {
+    env?: Record<string, unknown>;
+    headers?: Record<string, unknown>;
+  };
+  return [env?.["OCTEN_API_KEY"], headers?.["x-api-key"]].some(
+    (value) => typeof value === "string" && value !== "" && !value.startsWith("${"),
+  );
 }
 
 function assertNever(x: never): never {

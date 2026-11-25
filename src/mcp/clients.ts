@@ -1,13 +1,35 @@
-import { join } from "node:path";
+import { isAbsolute, join, win32 } from "node:path";
 
 export type McpFormat = "json-mcpServers" | "json-servers" | "toml" | "claude-code";
 
+/** Octen's hosted MCP server, for clients configured with it instead of a local npx server. */
+export const HOSTED_MCP_URL = "https://mcp.octen.ai/mcp";
+
 export interface McpClient {
-  id: "claude-code" | "claude-desktop" | "cursor" | "windsurf" | "vscode" | "codex";
+  id: "claude-code" | "claude-desktop" | "cursor" | "windsurf" | "vscode" | "codex" | "devin";
   label: string;
   format: McpFormat;
   supportsProject: boolean;
-  pathFor(scope: "user" | "project", home: string, cwd: string): string;
+  /** Configure the hosted server (url + x-api-key header) rather than `npx octen-mcp`. */
+  hosted?: boolean;
+  pathFor(
+    scope: "user" | "project",
+    home: string,
+    cwd: string,
+    platform?: NodeJS.Platform,
+    env?: NodeJS.ProcessEnv,
+  ): string;
+}
+
+/** Devin's user config directory: %APPDATA%\devin on Windows, else $XDG_CONFIG_HOME/devin or ~/.config/devin. */
+export function devinConfigDir(
+  home: string,
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (platform === "win32") return win32.join(env.APPDATA ?? win32.join(home, "AppData", "Roaming"), "devin");
+  const xdg = env.XDG_CONFIG_HOME;
+  return xdg && isAbsolute(xdg) ? join(xdg, "devin") : join(home, ".config/devin");
 }
 
 export const MCP_CLIENTS: McpClient[] = [
@@ -68,6 +90,21 @@ export const MCP_CLIENTS: McpClient[] = [
       return scope === "project"
         ? join(cwd, ".codex/config.toml")
         : join(home, ".codex/config.toml");
+    },
+  },
+  {
+    id: "devin",
+    label: "Devin",
+    format: "json-mcpServers",
+    // Devin CLI and Devin Local (in Devin Desktop) read the same files:
+    // https://docs.devin.ai/cli/extensibility/mcp/configuration
+    // Project scope uses the personal local file; configure-mcp puts only an env reference there.
+    supportsProject: true,
+    hosted: true,
+    pathFor(scope, home, cwd, platform, env) {
+      if (scope === "project") return join(cwd, ".devin/mcp_config.local.json");
+      const dir = devinConfigDir(home, platform, env);
+      return (platform ?? process.platform) === "win32" ? win32.join(dir, "mcp_config.json") : join(dir, "mcp_config.json");
     },
   },
 ];

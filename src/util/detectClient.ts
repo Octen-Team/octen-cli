@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import os from "node:os";
 import { join } from "node:path";
+import { devinConfigDir } from "../mcp/clients.js";
 
 export interface DetectOpts {
   /** Test injection: explicit installed map keyed by client id */
@@ -72,6 +73,13 @@ export function isClientInstalled(id: string, opts?: DetectOpts): boolean {
       );
     case "vscode":
       return binOnPath("code") || appExists("Visual Studio Code");
+    case "devin":
+      // Only files Devin creates; configure-mcp --force itself writes mcp_config.json there.
+      return (
+        binOnPath("devin") ||
+        existsSync(join(devinConfigDir(home), "config.json")) ||
+        existsSync(join(home, ".local/share/devin"))
+      );
     default:
       // Unknown id — don't block.
       return true;

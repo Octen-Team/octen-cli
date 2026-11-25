@@ -568,11 +568,11 @@ octen configure-mcp --claude-code --cursor
 octen configure-mcp --all --pin 0.2.1
 ```
 
-Supported clients: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex.
+Supported clients: Claude Code, Claude Desktop, Cursor, Windsurf, VS Code, Codex, Devin (Devin CLI and Devin Desktop).
 
 Only clients detected as installed are configured; `--all` skips the rest, and an explicitly-named client that isn't detected is skipped unless you pass `--force`.
 
-Options: `--all`, `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--scope` (user|project), `--pin <version>`, `--force` (configure even if the client is not detected).
+Options: `--all`, `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--devin`, `--scope` (user|project), `--pin <version>`, `--force` (configure even if the client is not detected).
 
 Run without flags to print current status for each client.
 
@@ -586,12 +586,25 @@ than a silent fall back to `user`:
 | Codex | `$HOME/.codex/config.toml` | `<project>/.codex/config.toml` |
 | Cursor | `$HOME/.cursor/mcp.json` | `<project>/.cursor/mcp.json` |
 | VS Code | `<project>/.vscode/mcp.json` | `<project>/.vscode/mcp.json` |
+| Devin | `$HOME/.config/devin/mcp_config.json` (`$XDG_CONFIG_HOME/devin/` when set; Windows: `%APPDATA%\devin\`) | `<project>/.devin/mcp_config.local.json` |
 | Claude Code, Claude Desktop, Windsurf | user config only | same as user |
 
 Codex reads a project-level `.codex/config.toml` only in a repository it has
 been told to trust, so a project-scoped entry stays inert until you trust the
 directory in Codex. `--scope status` and `reset --scope project` read and remove
 from the same project file.
+
+Devin CLI and Devin Local in Devin Desktop read the same files; Devin CLI v3000.3
+(Devin Local 3.6) or later is required, since earlier versions read MCP servers
+from `config.json` instead. For Devin the
+entry points at the hosted server (`https://mcp.octen.ai/mcp` with an `x-api-key`
+header), so it needs no local Node.js, and `--pin` does not apply. Without a key
+it writes `${env:OCTEN_API_KEY}`, which Devin reads from its environment. The
+project scope writes Devin's personal `.devin/mcp_config.local.json` rather than
+the shared `.devin/mcp_config.json`, and always with `${env:OCTEN_API_KEY}` instead
+of the key, because the file can be committed until Devin has excluded it from
+git; export `OCTEN_API_KEY` in the shell you start Devin from. For Devin Cloud,
+add the server in the web app instead (Customize → MCPs).
 
 #### Codex cold start
 
@@ -683,7 +696,7 @@ octen reset --skills --claude-code
 octen reset --credentials
 ```
 
-Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, `--credentials`, plus per-client flags: `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--openclaw`, `--hermes`, `--scope` (user|project).
+Options: `--all` (both surfaces, all clients), `--mcp`, `--skills`, `--credentials`, plus per-client flags: `--claude-code`, `--cursor`, `--claude-desktop`, `--windsurf`, `--vscode`, `--codex`, `--devin`, `--openclaw`, `--hermes`, `--scope` (user|project).
 
 `--credentials` is **not** included in `--all` — `--all`'s existing meaning is "both
 surfaces (MCP + skills) across all clients", and folding in the login credential would mean

@@ -5,6 +5,23 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-11-25
+
+### Added
+
+- **`octen configure-mcp --devin`** adds Octen's hosted MCP server
+  (`https://mcp.octen.ai/mcp`, key in the `x-api-key` header) to
+  `~/.config/devin/mcp_config.json` (under `$XDG_CONFIG_HOME` when set, and
+  `%APPDATA%\devin\mcp_config.json` on Windows), which Devin CLI and Devin Local in Devin Desktop both read; no
+  local Node.js is needed and `--pin` does not apply. Without a key it writes
+  `${env:OCTEN_API_KEY}`, which Devin reads from its environment. With
+  `--scope project` it writes `.devin/mcp_config.local.json`, always with
+  `${env:OCTEN_API_KEY}` rather than the key, since that file can be committed
+  until Devin excludes it from git. Devin is detected from a `devin` binary on
+  `PATH`, its `config.json` or its `~/.local/share/devin` data directory;
+  `--all` includes it when detected.
+- **`octen reset --mcp --devin`** removes that entry.
+
 ## [0.13.1] — 2026-11-23
 
 ### Added
