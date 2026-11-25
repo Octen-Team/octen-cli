@@ -36,6 +36,7 @@ export function registerConfigureMcp(
     .option("--windsurf", "configure Windsurf")
     .option("--vscode", "configure VS Code")
     .option("--codex", "configure Codex")
+    .option("--devin", "configure Devin (CLI and Devin Desktop)")
     .option(
       "--scope <s>",
       "config scope: user | project (default: user)",
@@ -54,6 +55,7 @@ export function registerConfigureMcp(
         windsurf?: boolean;
         vscode?: boolean;
         codex?: boolean;
+        devin?: boolean;
         scope: ConfigScope;
         pin?: string;
         force?: boolean;
@@ -83,6 +85,7 @@ export function registerConfigureMcp(
         windsurf: "windsurf",
         vscode: "vscode",
         codex: "codex",
+        devin: "devin",
       };
 
       const anySelected =
@@ -92,7 +95,8 @@ export function registerConfigureMcp(
         opts.claudeDesktop ||
         opts.windsurf ||
         opts.vscode ||
-        opts.codex;
+        opts.codex ||
+        opts.devin;
 
       if (!anySelected) {
         // STATUS MODE: print status for each client

@@ -1,5 +1,5 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync, existsSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { Command } from "commander";
@@ -482,5 +482,65 @@ describe("configure-mcp --scope validation", () => {
     } finally {
       rmSync(cwd, { recursive: true, force: true });
     }
+  });
+});
+
+describe("configure-mcp --devin", () => {
+  it("writes ~/.config/devin/mcp_config.json with the octen entry, readable only by the owner", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "configure-mcp", "--devin", "--api-key", "k"]);
+
+    const filePath = join(home, ".config/devin/mcp_config.json");
+    const obj = JSON.parse(readFileSync(filePath, "utf8"));
+    expect(obj.mcpServers.octen.command).toBe("npx");
+    expect(obj.mcpServers.octen.args).toContain("octen-mcp");
+    expect(obj.mcpServers.octen.env.OCTEN_API_KEY).toBe("k");
+    expect(statSync(filePath).mode & 0o777).toBe(0o600);
+  });
+
+  it("keeps the other servers already in the file", async () => {
+    const home = makeTmp();
+    mkdirSync(join(home, ".config/devin"), { recursive: true });
+    writeFileSync(
+      join(home, ".config/devin/mcp_config.json"),
+      JSON.stringify({ mcpServers: { other: { url: "https://example.com/mcp" } } }),
+      "utf8",
+    );
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "configure-mcp", "--devin", "--api-key", "k"]);
+
+    const obj = JSON.parse(readFileSync(join(home, ".config/devin/mcp_config.json"), "utf8"));
+    expect(obj.mcpServers.other).toEqual({ url: "https://example.com/mcp" });
+    expect(obj.mcpServers.octen).toBeDefined();
+  });
+
+  it("--scope project writes the gitignored .devin/mcp_config.local.json and not the user file", async () => {
+    const home = makeTmp();
+    const cwd = mkdtempSync(join(tmpdir(), "octen-cwd-"));
+    try {
+      const prog = makeProgram(home, cwd);
+      await prog.parseAsync([
+        "node", "octen", "configure-mcp", "--devin", "--scope", "project", "--api-key", "k",
+      ]);
+      const obj = JSON.parse(readFileSync(join(cwd, ".devin/mcp_config.local.json"), "utf8"));
+      expect(obj.mcpServers.octen.env.OCTEN_API_KEY).toBe("k");
+      expect(existsSync(join(cwd, ".devin/mcp_config.json"))).toBe(false);
+      expect(existsSync(join(home, ".config/devin/mcp_config.json"))).toBe(false);
+    } finally {
+      rmSync(cwd, { recursive: true, force: true });
+    }
+  });
+
+  it("is listed in status mode", async () => {
+    const home = makeTmp();
+    const prog = makeProgram(home, home);
+    const out: string[] = [];
+    vi.spyOn(process.stdout, "write").mockImplementation((chunk) => {
+      out.push(String(chunk));
+      return true;
+    });
+    await prog.parseAsync(["node", "octen", "configure-mcp"]);
+    expect(out.join("")).toMatch(/^Devin: /m);
   });
 });

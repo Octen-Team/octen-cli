@@ -5,8 +5,20 @@ const HOME = "/tmp/h";
 const CWD = "/tmp/c";
 
 describe("MCP_CLIENTS registry", () => {
-  it("has exactly 6 clients", () => {
-    expect(MCP_CLIENTS).toHaveLength(6);
+  it("has exactly 7 clients", () => {
+    expect(MCP_CLIENTS).toHaveLength(7);
+  });
+
+  // Paths from Devin's MCP configuration docs (Devin CLI and Devin Local in Devin Desktop share them):
+  // https://docs.devin.ai/cli/extensibility/mcp/configuration
+  it("devin: user → ~/.config/devin/mcp_config.json, project → cwd/.devin/mcp_config.local.json", () => {
+    const client = MCP_CLIENTS.find((c) => c.id === "devin")!;
+    expect(client).toBeDefined();
+    expect(client.format).toBe("json-mcpServers");
+    expect(client.supportsProject).toBe(true);
+    expect(client.pathFor("user", HOME, CWD)).toBe("/tmp/h/.config/devin/mcp_config.json");
+    // The entry carries the API key, so project scope uses Devin's gitignored local file.
+    expect(client.pathFor("project", HOME, CWD)).toBe("/tmp/c/.devin/mcp_config.local.json");
   });
 
   it("claude-code: user → ~/.claude.json", () => {

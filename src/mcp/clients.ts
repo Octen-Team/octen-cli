@@ -3,7 +3,7 @@ import { join } from "node:path";
 export type McpFormat = "json-mcpServers" | "json-servers" | "toml" | "claude-code";
 
 export interface McpClient {
-  id: "claude-code" | "claude-desktop" | "cursor" | "windsurf" | "vscode" | "codex";
+  id: "claude-code" | "claude-desktop" | "cursor" | "windsurf" | "vscode" | "codex" | "devin";
   label: string;
   format: McpFormat;
   supportsProject: boolean;
@@ -68,6 +68,20 @@ export const MCP_CLIENTS: McpClient[] = [
       return scope === "project"
         ? join(cwd, ".codex/config.toml")
         : join(home, ".codex/config.toml");
+    },
+  },
+  {
+    id: "devin",
+    label: "Devin",
+    format: "json-mcpServers",
+    // Devin CLI and Devin Local (in Devin Desktop) read the same files:
+    // https://docs.devin.ai/cli/extensibility/mcp/configuration
+    // The entry carries the API key, so project scope uses the gitignored local file.
+    supportsProject: true,
+    pathFor(scope, home, cwd) {
+      return scope === "project"
+        ? join(cwd, ".devin/mcp_config.local.json")
+        : join(home, ".config/devin/mcp_config.json");
     },
   },
 ];

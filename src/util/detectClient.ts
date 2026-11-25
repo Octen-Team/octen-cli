@@ -72,6 +72,9 @@ export function isClientInstalled(id: string, opts?: DetectOpts): boolean {
       );
     case "vscode":
       return binOnPath("code") || appExists("Visual Studio Code");
+    case "devin":
+      // Devin CLI and Devin Desktop keep their settings under ~/.config/devin.
+      return binOnPath("devin") || existsSync(join(home, ".config/devin"));
     default:
       // Unknown id — don't block.
       return true;

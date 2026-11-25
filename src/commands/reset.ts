@@ -26,6 +26,7 @@ const CLIENT_FLAG_MAP: Record<string, string> = {
   windsurf: "windsurf",
   vscode: "vscode",
   codex: "codex",
+  devin: "devin",
   openclaw: "openclaw",
   hermes: "hermes",
 };
@@ -47,6 +48,7 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
     .option("--windsurf", "target Windsurf")
     .option("--vscode", "target VS Code")
     .option("--codex", "target Codex")
+    .option("--devin", "target Devin")
     .option("--openclaw", "target OpenClaw")
     .option("--hermes", "target Hermes")
     .option(
@@ -67,6 +69,7 @@ export function registerReset(program: Command, internal: ResetInternalOpts = {}
         windsurf?: boolean;
         vscode?: boolean;
         codex?: boolean;
+        devin?: boolean;
         openclaw?: boolean;
         hermes?: boolean;
         scope: ConfigScope;

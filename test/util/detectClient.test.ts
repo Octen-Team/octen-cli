@@ -1,5 +1,18 @@
 import { describe, it, expect } from "vitest";
+import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { execFileSync } from "node:child_process";
 import { isClientInstalled } from "../../src/util/detectClient.js";
+
+function hasBinary(bin: string): boolean {
+  try {
+    execFileSync("which", [bin], { stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 describe("isClientInstalled", () => {
   it("honors the injected installed override map", () => {
@@ -26,5 +39,27 @@ describe("isClientInstalled", () => {
     expect(
       isClientInstalled("bogus-client", { home: "/nonexistent-home" }),
     ).toBe(true);
+  });
+});
+
+describe("isClientInstalled: devin", () => {
+  // Devin CLI and Devin Desktop create ~/.config/devin for their own settings.
+  it("detects Devin from its config directory under the injected home", () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-detect-"));
+    try {
+      mkdirSync(join(home, ".config/devin"), { recursive: true });
+      expect(isClientInstalled("devin", { home })).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+  // Skipped where a devin binary is on PATH, since that alone counts as installed.
+  it.skipIf(hasBinary("devin"))("is not detected without the config directory or a devin binary", () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-detect-"));
+    try {
+      expect(isClientInstalled("devin", { home })).toBe(false);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
   });
 });

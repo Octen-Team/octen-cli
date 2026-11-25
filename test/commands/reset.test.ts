@@ -417,3 +417,23 @@ describe("reset --credentials", () => {
     expect(output).toMatch(/no (local )?credentials/i);
   });
 });
+
+describe("reset --devin --mcp", () => {
+  it("removes the octen entry from ~/.config/devin/mcp_config.json and keeps the others", async () => {
+    const home = makeTmp();
+    mkdirSync(join(home, ".config/devin"), { recursive: true });
+    writeFileSync(
+      join(home, ".config/devin/mcp_config.json"),
+      JSON.stringify({
+        mcpServers: { octen: { command: "npx", args: ["-y", "octen-mcp"] }, other: { url: "https://example.com/mcp" } },
+      }),
+      "utf8",
+    );
+    const prog = makeProgram(home, home);
+    await prog.parseAsync(["node", "octen", "reset", "--devin", "--mcp"]);
+
+    const obj = JSON.parse(readFileSync(join(home, ".config/devin/mcp_config.json"), "utf8"));
+    expect(obj.mcpServers.octen).toBeUndefined();
+    expect(obj.mcpServers.other).toEqual({ url: "https://example.com/mcp" });
+  });
+});

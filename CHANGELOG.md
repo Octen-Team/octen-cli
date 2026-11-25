@@ -5,6 +5,18 @@ All notable changes to the Octen CLI will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.14.0] — 2026-11-25
+
+### Added
+
+- **`octen configure-mcp --devin`** writes the Octen MCP server to
+  `~/.config/devin/mcp_config.json`, which Devin CLI and Devin Local in Devin
+  Desktop both read. With `--scope project` it writes the gitignored
+  `.devin/mcp_config.local.json`, since the entry holds the API key. Devin is
+  detected from a `devin` binary on `PATH` or a `~/.config/devin` directory;
+  `--all` includes it when detected.
+- **`octen reset --devin`** removes that entry.
+
 ## [0.13.1] — 2026-11-23
 
 ### Added
