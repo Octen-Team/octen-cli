@@ -594,7 +594,9 @@ been told to trust, so a project-scoped entry stays inert until you trust the
 directory in Codex. `--scope status` and `reset --scope project` read and remove
 from the same project file.
 
-Devin CLI and Devin Local in Devin Desktop read the same files. For Devin the
+Devin CLI and Devin Local in Devin Desktop read the same files; Devin CLI v3000.3
+(Devin Local 3.6) or later is required, since earlier versions read MCP servers
+from `config.json` instead. For Devin the
 entry points at the hosted server (`https://mcp.octen.ai/mcp` with an `x-api-key`
 header), so it needs no local Node.js, and `--pin` does not apply. Without a key
 it writes `${env:OCTEN_API_KEY}`, which Devin reads from its environment. The
