@@ -2,11 +2,16 @@ import { join } from "node:path";
 
 export type McpFormat = "json-mcpServers" | "json-servers" | "toml" | "claude-code";
 
+/** Octen's hosted MCP server, for clients configured with it instead of a local npx server. */
+export const HOSTED_MCP_URL = "https://mcp.octen.ai/mcp";
+
 export interface McpClient {
   id: "claude-code" | "claude-desktop" | "cursor" | "windsurf" | "vscode" | "codex" | "devin";
   label: string;
   format: McpFormat;
   supportsProject: boolean;
+  /** Configure the hosted server (url + x-api-key header) rather than `npx octen-mcp`. */
+  hosted?: boolean;
   pathFor(scope: "user" | "project", home: string, cwd: string): string;
 }
 
@@ -78,6 +83,7 @@ export const MCP_CLIENTS: McpClient[] = [
     // https://docs.devin.ai/cli/extensibility/mcp/configuration
     // The entry carries the API key, so project scope uses the gitignored local file.
     supportsProject: true,
+    hosted: true,
     pathFor(scope, home, cwd) {
       return scope === "project"
         ? join(cwd, ".devin/mcp_config.local.json")

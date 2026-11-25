@@ -594,10 +594,13 @@ been told to trust, so a project-scoped entry stays inert until you trust the
 directory in Codex. `--scope status` and `reset --scope project` read and remove
 from the same project file.
 
-Devin CLI and Devin Local in Devin Desktop read the same files. The project scope
-writes Devin's gitignored `.devin/mcp_config.local.json` rather than the shared
-`.devin/mcp_config.json`, because the entry holds your API key. For Devin Cloud,
-add the server in the web app instead (Customize → MCPs).
+Devin CLI and Devin Local in Devin Desktop read the same files. For Devin the
+entry points at the hosted server (`https://mcp.octen.ai/mcp` with an `x-api-key`
+header), so it needs no local Node.js, and `--pin` does not apply. Without a key
+it writes `${env:OCTEN_API_KEY}`, which Devin reads from its environment. The
+project scope writes Devin's gitignored `.devin/mcp_config.local.json` rather than
+the shared `.devin/mcp_config.json`, because the entry holds your API key. For
+Devin Cloud, add the server in the web app instead (Customize → MCPs).
 
 #### Codex cold start
 

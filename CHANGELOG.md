@@ -9,9 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- **`octen configure-mcp --devin`** writes the Octen MCP server to
+- **`octen configure-mcp --devin`** adds Octen's hosted MCP server
+  (`https://mcp.octen.ai/mcp`, key in the `x-api-key` header) to
   `~/.config/devin/mcp_config.json`, which Devin CLI and Devin Local in Devin
-  Desktop both read. With `--scope project` it writes the gitignored
+  Desktop both read; no local Node.js is needed and `--pin` does not apply.
+  Without a key it writes `${env:OCTEN_API_KEY}`, which Devin reads from its
+  environment. With `--scope project` it writes the gitignored
   `.devin/mcp_config.local.json`, since the entry holds the API key. Devin is
   detected from a `devin` binary on `PATH` or a `~/.config/devin` directory;
   `--all` includes it when detected.

@@ -1,7 +1,7 @@
 import os from "node:os";
 import pc from "picocolors";
 import type { Command } from "commander";
-import { MCP_CLIENTS } from "../mcp/clients.js";
+import { HOSTED_MCP_URL, MCP_CLIENTS, type McpClient } from "../mcp/clients.js";
 import { installMcp, type InstallOpts } from "../mcp/install.js";
 import { mcpStatus } from "../mcp/detect.js";
 import { resolveApiKey } from "../config/resolve.js";
@@ -135,6 +135,11 @@ export function registerConfigureMcp(
         args: ["-y", pin ? `octen-mcp@${pin}` : "octen-mcp"],
         env: { OCTEN_API_KEY: key },
       };
+      // Hosted clients reach mcp.octen.ai directly. Devin expands ${env:VAR}, not ${VAR}, in headers.
+      const entryFor = (c: McpClient) =>
+        c.hosted
+          ? { url: HOSTED_MCP_URL, headers: { "x-api-key": keyMissing ? "${env:OCTEN_API_KEY}" : key } }
+          : entry;
 
       // Determine which clients to act on, gated by detection.
       let selected: typeof MCP_CLIENTS;
@@ -171,10 +176,16 @@ export function registerConfigureMcp(
         return;
       }
 
+      if (pin && selected.some((c) => c.hosted)) {
+        process.stderr.write(
+          `note: --pin does not apply to ${selected.filter((c) => c.hosted).map((c) => c.label).join(", ")}, which use the hosted server\n`,
+        );
+      }
+
       let anyFailed = false;
       for (const client of selected) {
         try {
-          const result = installMcp(client, scope, entry, home, cwd, installOpts);
+          const result = installMcp(client, scope, entryFor(client), home, cwd, installOpts);
           if (result.method === "claude-cli") {
             process.stdout.write(`${client.label}: configured via claude CLI\n`);
           } else {
