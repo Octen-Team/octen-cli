@@ -21,6 +21,15 @@ describe("MCP_CLIENTS registry", () => {
     expect(client.pathFor("project", HOME, CWD)).toBe("/tmp/c/.devin/mcp_config.local.json");
   });
 
+  // Windows path from the same page: %APPDATA%\\devin\\mcp_config.json.
+  it("devin: on Windows, user scope → %APPDATA%\\devin\\mcp_config.json", () => {
+    const client = MCP_CLIENTS.find((c) => c.id === "devin")!;
+    const env = { APPDATA: "C:\\Users\\u\\AppData\\Roaming" };
+    expect(client.pathFor("user", "C:\\Users\\u", CWD, "win32", env)).toBe(
+      "C:\\Users\\u\\AppData\\Roaming\\devin\\mcp_config.json",
+    );
+  });
+
   it("claude-code: user → ~/.claude.json", () => {
     const client = MCP_CLIENTS.find((c) => c.id === "claude-code")!;
     expect(client).toBeDefined();

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { mkdtempSync, mkdirSync, rmSync } from "node:fs";
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
@@ -43,12 +43,32 @@ describe("isClientInstalled", () => {
 });
 
 describe("isClientInstalled: devin", () => {
-  // Devin CLI and Devin Desktop create ~/.config/devin for their own settings.
-  it("detects Devin from its config directory under the injected home", () => {
+  // Files Devin CLI 3000.14 creates on first run (observed 2026-11-25); Octen only ever writes mcp_config.json.
+  it("detects Devin from its own config.json", () => {
     const home = mkdtempSync(join(tmpdir(), "octen-detect-"));
     try {
       mkdirSync(join(home, ".config/devin"), { recursive: true });
+      writeFileSync(join(home, ".config/devin/config.json"), "{}");
       expect(isClientInstalled("devin", { home })).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+  it("detects Devin from its data directory", () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-detect-"));
+    try {
+      mkdirSync(join(home, ".local/share/devin"), { recursive: true });
+      expect(isClientInstalled("devin", { home })).toBe(true);
+    } finally {
+      rmSync(home, { recursive: true, force: true });
+    }
+  });
+  it.skipIf(hasBinary("devin"))("does not count the mcp_config.json that configure-mcp --force writes", () => {
+    const home = mkdtempSync(join(tmpdir(), "octen-detect-"));
+    try {
+      mkdirSync(join(home, ".config/devin"), { recursive: true });
+      writeFileSync(join(home, ".config/devin/mcp_config.json"), "{}");
+      expect(isClientInstalled("devin", { home })).toBe(false);
     } finally {
       rmSync(home, { recursive: true, force: true });
     }

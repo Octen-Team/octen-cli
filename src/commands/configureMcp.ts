@@ -136,9 +136,11 @@ export function registerConfigureMcp(
         env: { OCTEN_API_KEY: key },
       };
       // Hosted clients reach mcp.octen.ai directly. Devin expands ${env:VAR}, not ${VAR}, in headers.
+      // A project file can be committed, so it never gets the key itself.
+      const envRef = (c: McpClient) => c.hosted && (keyMissing || scope === "project");
       const entryFor = (c: McpClient) =>
         c.hosted
-          ? { url: HOSTED_MCP_URL, headers: { "x-api-key": keyMissing ? "${env:OCTEN_API_KEY}" : key } }
+          ? { url: HOSTED_MCP_URL, headers: { "x-api-key": envRef(c) ? "${env:OCTEN_API_KEY}" : key } }
           : entry;
 
       // Determine which clients to act on, gated by detection.
@@ -205,6 +207,10 @@ export function registerConfigureMcp(
       if (keyMissing) {
         process.stderr.write(
           "warning: no API key found — set OCTEN_API_KEY in each client's environment\n",
+        );
+      } else if (scope === "project" && selected.some((c) => c.hosted)) {
+        process.stderr.write(
+          `note: ${selected.filter((c) => c.hosted).map((c) => c.label).join(", ")} project config references \${env:OCTEN_API_KEY} instead of the key; export OCTEN_API_KEY in the shell you start it from\n`,
         );
       }
     });

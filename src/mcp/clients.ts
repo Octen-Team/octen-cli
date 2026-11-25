@@ -1,4 +1,4 @@
-import { join } from "node:path";
+import { join, win32 } from "node:path";
 
 export type McpFormat = "json-mcpServers" | "json-servers" | "toml" | "claude-code";
 
@@ -12,7 +12,23 @@ export interface McpClient {
   supportsProject: boolean;
   /** Configure the hosted server (url + x-api-key header) rather than `npx octen-mcp`. */
   hosted?: boolean;
-  pathFor(scope: "user" | "project", home: string, cwd: string): string;
+  pathFor(
+    scope: "user" | "project",
+    home: string,
+    cwd: string,
+    platform?: NodeJS.Platform,
+    env?: NodeJS.ProcessEnv,
+  ): string;
+}
+
+/** Devin's user config directory: %APPDATA%\devin on Windows, ~/.config/devin elsewhere. */
+export function devinConfigDir(
+  home: string,
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): string {
+  if (platform === "win32") return win32.join(env.APPDATA ?? win32.join(home, "AppData", "Roaming"), "devin");
+  return join(home, ".config/devin");
 }
 
 export const MCP_CLIENTS: McpClient[] = [
@@ -81,13 +97,13 @@ export const MCP_CLIENTS: McpClient[] = [
     format: "json-mcpServers",
     // Devin CLI and Devin Local (in Devin Desktop) read the same files:
     // https://docs.devin.ai/cli/extensibility/mcp/configuration
-    // The entry carries the API key, so project scope uses the gitignored local file.
+    // Project scope uses the personal local file; configure-mcp puts only an env reference there.
     supportsProject: true,
     hosted: true,
-    pathFor(scope, home, cwd) {
-      return scope === "project"
-        ? join(cwd, ".devin/mcp_config.local.json")
-        : join(home, ".config/devin/mcp_config.json");
+    pathFor(scope, home, cwd, platform, env) {
+      if (scope === "project") return join(cwd, ".devin/mcp_config.local.json");
+      const dir = devinConfigDir(home, platform, env);
+      return (platform ?? process.platform) === "win32" ? win32.join(dir, "mcp_config.json") : join(dir, "mcp_config.json");
     },
   },
 ];

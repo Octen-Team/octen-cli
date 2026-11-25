@@ -542,16 +542,25 @@ describe("configure-mcp --devin", () => {
     expect(obj.mcpServers.octen).toBeDefined();
   });
 
-  it("--scope project writes the gitignored .devin/mcp_config.local.json and not the user file", async () => {
+  // Devin keeps the local file out of git through .git/info/exclude, which it only writes itself:
+  // https://docs.devin.ai/cli/reference/configuration/global-vs-local
+  it("--scope project writes .devin/mcp_config.local.json with the environment reference, never the key", async () => {
     const home = makeTmp();
     const cwd = mkdtempSync(join(tmpdir(), "octen-cwd-"));
+    const err: string[] = [];
+    vi.spyOn(process.stderr, "write").mockImplementation((chunk) => {
+      err.push(String(chunk));
+      return true;
+    });
     try {
       const prog = makeProgram(home, cwd);
       await prog.parseAsync([
         "node", "octen", "configure-mcp", "--devin", "--scope", "project", "--api-key", "k",
       ]);
-      const obj = JSON.parse(readFileSync(join(cwd, ".devin/mcp_config.local.json"), "utf8"));
-      expect(obj.mcpServers.octen.headers).toEqual({ "x-api-key": "k" });
+      const raw = readFileSync(join(cwd, ".devin/mcp_config.local.json"), "utf8");
+      expect(JSON.parse(raw).mcpServers.octen.headers).toEqual({ "x-api-key": "${env:OCTEN_API_KEY}" });
+      expect(raw).not.toContain('"k"');
+      expect(err.join("")).toMatch(/export OCTEN_API_KEY/);
       expect(existsSync(join(cwd, ".devin/mcp_config.json"))).toBe(false);
       expect(existsSync(join(home, ".config/devin/mcp_config.json"))).toBe(false);
     } finally {

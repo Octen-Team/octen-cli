@@ -586,7 +586,7 @@ than a silent fall back to `user`:
 | Codex | `$HOME/.codex/config.toml` | `<project>/.codex/config.toml` |
 | Cursor | `$HOME/.cursor/mcp.json` | `<project>/.cursor/mcp.json` |
 | VS Code | `<project>/.vscode/mcp.json` | `<project>/.vscode/mcp.json` |
-| Devin | `$HOME/.config/devin/mcp_config.json` | `<project>/.devin/mcp_config.local.json` |
+| Devin | `$HOME/.config/devin/mcp_config.json` (Windows: `%APPDATA%\devin\mcp_config.json`) | `<project>/.devin/mcp_config.local.json` |
 | Claude Code, Claude Desktop, Windsurf | user config only | same as user |
 
 Codex reads a project-level `.codex/config.toml` only in a repository it has
@@ -598,9 +598,11 @@ Devin CLI and Devin Local in Devin Desktop read the same files. For Devin the
 entry points at the hosted server (`https://mcp.octen.ai/mcp` with an `x-api-key`
 header), so it needs no local Node.js, and `--pin` does not apply. Without a key
 it writes `${env:OCTEN_API_KEY}`, which Devin reads from its environment. The
-project scope writes Devin's gitignored `.devin/mcp_config.local.json` rather than
-the shared `.devin/mcp_config.json`, because the entry holds your API key. For
-Devin Cloud, add the server in the web app instead (Customize → MCPs).
+project scope writes Devin's personal `.devin/mcp_config.local.json` rather than
+the shared `.devin/mcp_config.json`, and always with `${env:OCTEN_API_KEY}` instead
+of the key, because the file can be committed until Devin has excluded it from
+git; export `OCTEN_API_KEY` in the shell you start Devin from. For Devin Cloud,
+add the server in the web app instead (Customize → MCPs).
 
 #### Codex cold start
 
